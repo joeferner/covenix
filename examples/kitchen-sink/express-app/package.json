@@ -1,0 +1,23 @@
+{
+  "name": "@kitchen-sink/express-app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts",
+    "swagger": "node --experimental-strip-types src/generate-swagger.ts"
+  },
+  "dependencies": {
+    "@kitchen-sink/schemas": "*",
+    "express": "^4.19.2",
+    "http-errors": "^2.0.0",
+    "reflect-metadata": "^0.2.2",
+    "zod": "^4.4.3",
+    "zodec": "file:../../.."
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/http-errors": "^2.0.4",
+    "@types/node": "^22.0.0"
+  }
+}

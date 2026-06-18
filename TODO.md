@@ -37,8 +37,3 @@
   `application/octet-stream` with `type: string, format: binary`). Probably a
   dedicated return type or `@Returns`-style declaration so swagger reflects the
   non-JSON body. Counterpart to multipart uploads on the response side.
-
-- **Response validation in dev mode** — Check handler return values against the
-  matching `@Returns` schema and log a warning on mismatch (no throw in
-  production). Catches schema drift during development. (Mentioned in the
-  Validation section of the README as a planned behavior.)

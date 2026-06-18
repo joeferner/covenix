@@ -5,7 +5,7 @@ import unusedImports from 'eslint-plugin-unused-imports';
 
 export default tseslint.config(
   {
-    ignores: ['dist/', 'node_modules/', 'tmp/'],
+    ignores: ['dist/', 'node_modules/', 'tmp/', 'examples/'],
   },
   eslint.configs.recommended,
   {

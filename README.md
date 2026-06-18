@@ -154,23 +154,28 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 
 Each route gets validation middleware generated from its schemas:
 
-| Source       | Validated against | Failure status |
-| ------------ | ----------------- | -------------- |
-| `req.params` | `@Params` schema  | `400`          |
-| `req.query`  | `@Query` schema   | `400`          |
-| `req.body`   | `@Body` schema    | `422`          |
+| Source         | Validated against | Failure status |
+| -------------- | ----------------- | -------------- |
+| `req.params`   | `@Params` schema  | `400`          |
+| `req.query`    | `@Query` schema   | `400`          |
+| `req.body`     | `@Body` schema    | `422`          |
+| handler return | `@Returns` schema | `500`          |
 
 On success, the original request values are replaced with the parsed (coerced,
-defaulted) output so handlers always receive clean data. In dev mode, responses
-are also checked against the matching `@Returns` schema and a warning is logged
-on mismatch — catching schema drift without breaking production.
+defaulted) output so handlers always receive clean data. Responses are validated
+the same way: the handler's return value is checked against the matching
+`@Returns` schema, and a mismatch **always throws** a `ValidationError` through
+`next(err)` — exactly like a request failure, in every environment. zodec never
+decides what to do about it; your error middleware does (log it and respond
+`500`, swallow it, or surface the drift however you like).
 
 ### Errors flow through Express
 
 zodec never sends an error response itself. A failed validation calls
 `next(err)` with a `ValidationError` that carries the Zod issues and a status
-(`400` for params/query, `422` for body), so it travels the **same** Express
-error pipeline as anything your handlers throw. You stay in control of the
+(`400` for params/query, `422` for body, `500` for a response that doesn't match
+its `@Returns` schema), so it travels the **same** Express error pipeline as
+anything your handlers throw. You stay in control of the
 response shape via your own error middleware:
 
 ```typescript
