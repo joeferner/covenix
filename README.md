@@ -71,8 +71,8 @@ zodec requires **Zod 4+** and **TypeScript 5+** with experimental decorators.
   "compilerOptions": {
     "experimentalDecorators": true,
     "module": "nodenext",
-    "types": ["reflect-metadata"]
-  }
+    "types": ["reflect-metadata"],
+  },
 }
 ```
 
@@ -119,30 +119,30 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 
 ### Class decorators
 
-| Decorator | Purpose |
-|---|---|
-| `@Route(prefix)` | Path prefix for every route in the controller |
+| Decorator        | Purpose                                             |
+| ---------------- | --------------------------------------------------- |
+| `@Route(prefix)` | Path prefix for every route in the controller       |
 | `@Tags(...tags)` | OpenAPI tags applied to the controller's operations |
 
 ### Method decorators
 
-| Decorator | Purpose |
-|---|---|
-| `@Get(path?)` `@Post(path?)` `@Put(path?)` `@Patch(path?)` `@Delete(path?)` | HTTP method + path (use `{id}` for path params) |
-| `@Params(schema)` | Validate `req.params` against a Zod object |
-| `@Query(schema)` | Validate `req.query` |
-| `@Body(schema)` | Validate `req.body` |
-| `@Returns(status, schema)` | Declare a response — stackable for multiple statuses |
-| `@Summary(text)` | Operation summary in swagger |
+| Decorator                                                                   | Purpose                                              |
+| --------------------------------------------------------------------------- | ---------------------------------------------------- |
+| `@Get(path?)` `@Post(path?)` `@Put(path?)` `@Patch(path?)` `@Delete(path?)` | HTTP method + path (use `{id}` for path params)      |
+| `@Params(schema)`                                                           | Validate `req.params` against a Zod object           |
+| `@Query(schema)`                                                            | Validate `req.query`                                 |
+| `@Body(schema)`                                                             | Validate `req.body`                                  |
+| `@Returns(status, schema)`                                                  | Declare a response — stackable for multiple statuses |
+| `@Summary(text)`                                                            | Operation summary in swagger                         |
 
 ### Parameter decorators
 
-| Decorator | Injects |
-|---|---|
-| `@Param(name)` | `req.params[name]` |
-| `@QueryParam(name)` | `req.query[name]` |
-| `@BodyParam()` | the whole validated body |
-| `@Header(name)` | `req.headers[name]` |
+| Decorator           | Injects                                           |
+| ------------------- | ------------------------------------------------- |
+| `@Param(name)`      | `req.params[name]`                                |
+| `@QueryParam(name)` | `req.query[name]`                                 |
+| `@BodyParam()`      | the whole validated body                          |
+| `@Header(name)`     | `req.headers[name]`                               |
 | `@Req()` / `@Res()` | raw Express `Request` / `Response` (escape hatch) |
 
 > **Decorator order is unrestricted.** Each decorator writes metadata keyed on
@@ -154,11 +154,11 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 
 Each route gets validation middleware generated from its schemas:
 
-| Source | Validated against | Failure status |
-|---|---|---|
-| `req.params` | `@Params` schema | `400` |
-| `req.query` | `@Query` schema | `400` |
-| `req.body` | `@Body` schema | `422` |
+| Source       | Validated against | Failure status |
+| ------------ | ----------------- | -------------- |
+| `req.params` | `@Params` schema  | `400`          |
+| `req.query`  | `@Query` schema   | `400`          |
+| `req.body`   | `@Body` schema    | `422`          |
 
 On success, the original request values are replaced with the parsed (coerced,
 defaulted) output so handlers always receive clean data. In dev mode, responses
@@ -200,7 +200,11 @@ app.use(zodecErrorHandler()); // → { status, errors: [{ path, message }] }
 Name your top-level schemas so they become reusable components:
 
 ```typescript
-const UserSchema = z.object({ /* ... */ }).meta({ id: 'User' });
+const UserSchema = z
+  .object({
+    /* ... */
+  })
+  .meta({ id: 'User' });
 //   → referenced as #/components/schemas/User in swagger
 ```
 
