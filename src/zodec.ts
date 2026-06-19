@@ -5,14 +5,16 @@ import {
   getRoutes,
   type ParamMetadata,
   type RouteMetadata,
+  type SecurityRequirement,
 } from './metadata.js';
 import { Readable } from 'node:stream';
 import { Blob, File } from 'node:buffer';
 import { openAsBlob } from 'node:fs';
 import multer, { MulterError, type Multer, type Options } from 'multer';
-import { ValidationError } from './errors.js';
+import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
+import type { SecurityConfig } from './security.js';
 import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
 
 /**
@@ -47,6 +49,12 @@ export interface ZodecOptions {
    * (a per-field `z.file().max()` only runs once the bytes are in hand).
    */
   multipart?: Options;
+  /**
+   * Named security schemes referenced by `@Security`. Each entry pairs an OpenAPI
+   * scheme definition with a runtime handler (use the `bearer`/`apiKey`/… builders).
+   * The scheme definitions are emitted under `components.securitySchemes`.
+   */
+  security?: SecurityConfig;
 }
 
 /** A controller handler method, called with the assembled argument list. */
@@ -121,6 +129,9 @@ interface RawMultipartFile {
 
 /** Where the adapted `File`s are stashed on the request, keyed by field name. */
 const ZODEC_FILES = Symbol('zodec:files');
+
+/** Where the resolved `@Security` principal is stashed on the request. */
+const ZODEC_PRINCIPAL = Symbol('zodec:principal');
 
 /** Adapts a multer file into a web-standard `File` the handler can consume. */
 async function toWebFile(file: RawMultipartFile): Promise<File> {
@@ -212,6 +223,8 @@ function resolveParam(
       return req;
     case 'res':
       return res;
+    case 'principal':
+      return (req as unknown as Record<symbol, unknown>)[ZODEC_PRINCIPAL];
   }
 }
 
@@ -305,7 +318,13 @@ export class Zodec {
     const prototypes = this.controllers.map(
       (instance) => Object.getPrototypeOf(instance) as object,
     );
-    return generateOpenApiDocument(prototypes, this.options.info);
+    // The scheme definitions for components.securitySchemes come from the
+    // instance's security config (each entry's `.scheme`).
+    const security = this.options.security;
+    const securitySchemes = security
+      ? Object.fromEntries(Object.entries(security).map(([name, s]) => [name, s.scheme]))
+      : undefined;
+    return generateOpenApiDocument(prototypes, this.options.info, { securitySchemes });
   }
 
   /**
@@ -321,18 +340,63 @@ export class Zodec {
       const prefix = getPrefix(proto);
       for (const route of getRoutes(proto)) {
         const path = toExpressPath(prefix, route.path);
-        const handler = this.makeHandler(instance, proto, route);
+        const middlewares: RequestHandler[] = [];
+        // Authenticate first — reject unauthorized requests before parsing a body.
+        if (route.security && route.security.length > 0) {
+          middlewares.push(this.securityMiddleware(route.security));
+        }
         // A route whose @Body has a file field is multipart: parse it with multer
         // before the handler runs, so req.body/req.files are populated.
         const fileFields = getMultipartFields(route.body);
         if (fileFields.length > 0) {
-          app[route.method](path, this.multipartMiddleware(fileFields), handler);
-        } else {
-          app[route.method](path, handler);
+          middlewares.push(this.multipartMiddleware(fileFields));
         }
+        app[route.method](path, ...middlewares, this.makeHandler(instance, proto, route));
       }
     }
     return this;
+  }
+
+  /**
+   * Builds middleware that authenticates a route. Runs each requirement (stacked
+   * `@Security` = OR) until one succeeds, stashes the principal on the request,
+   * and rejects otherwise.
+   */
+  private securityMiddleware(requirements: SecurityRequirement[]): RequestHandler {
+    return (req, _res, next) => {
+      this.authenticate(requirements, req).then((principal) => {
+        (req as unknown as Record<symbol, unknown>)[ZODEC_PRINCIPAL] = principal;
+        next();
+      }, next);
+    };
+  }
+
+  /**
+   * Runs the route's security requirements in order, returning the first
+   * successful principal. With multiple requirements (OR), the first failure is
+   * reported if none succeed — a `null`/`undefined` return is a `401`, a thrown
+   * error (e.g. a `403`) is preserved.
+   */
+  private async authenticate(requirements: SecurityRequirement[], req: Request): Promise<unknown> {
+    const config = this.options.security ?? {};
+    let firstFailure: Error | undefined;
+    for (const requirement of requirements) {
+      const scheme = config[requirement.scheme];
+      if (!scheme) {
+        throw new Error(`zodec: no security handler registered for "${requirement.scheme}"`);
+      }
+      try {
+        const principal = await scheme.handler(req, requirement.scopes);
+        if (principal !== null && principal !== undefined) {
+          return principal;
+        }
+        firstFailure ??= new SecurityError(401);
+      } catch (err) {
+        // Preserve a thrown error (e.g. http-errors / SecurityError with a status).
+        firstFailure ??= err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    throw firstFailure ?? new SecurityError(401);
   }
 
   /** The shared multer instance, built from `options.multipart` on first use. */

@@ -36,6 +36,20 @@ export interface RouteMetadata {
    * then header name → Zod schema. Documented in OpenAPI; not validated.
    */
   responseHeaders?: Record<number, Record<string, ZodType>> | undefined;
+  /**
+   * Security requirements (from `@Security`), each a scheme name + required
+   * scopes. Stacked `@Security` decorators are alternatives (OR); the route is
+   * allowed if any one is satisfied. Empty/absent means the route is public.
+   */
+  security?: SecurityRequirement[] | undefined;
+}
+
+/** A single `@Security` requirement: a scheme name and the scopes it requires. */
+export interface SecurityRequirement {
+  /** The security scheme name (a key in the `Zodec` instance's `security` map). */
+  scheme: string;
+  /** Scopes the route requires for this scheme; `[]` when none. */
+  scopes: string[];
 }
 
 /** A binary/file response declaration recorded by `@ReturnsFile`. */
@@ -59,7 +73,7 @@ export interface ExampleMetadata {
 }
 
 /** Where an injected handler parameter is sourced from. */
-export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res';
+export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res' | 'principal';
 
 /** Metadata for one injected handler parameter, as returned by {@link getParams}. */
 export interface ParamMetadata {
@@ -85,6 +99,7 @@ const RESPONSE_HEADERS_KEY = Symbol('zodec:responseHeaders');
 const FILE_RESPONSES_KEY = Symbol('zodec:fileResponses');
 const EXAMPLES_KEY = Symbol('zodec:examples');
 const SUMMARY_KEY = Symbol('zodec:summary');
+const SECURITY_KEY = Symbol('zodec:security');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
 const PARAM_INJECTIONS_KEY = Symbol('zodec:paramInjections');
 const PREFIX_KEY = Symbol('zodec:prefix');
@@ -193,6 +208,41 @@ export function setSummary(target: object, handlerName: string, text: string): v
   Reflect.defineMetadata(SUMMARY_KEY, text, target, handlerName);
 }
 
+/**
+ * Adds a security requirement. Called by `@Security`. When `handlerName` is
+ * omitted the requirement is class-level (applies to every route that doesn't
+ * declare its own). Stacked decorators accumulate as alternatives (OR), kept in
+ * source order.
+ */
+export function addSecurity(
+  target: object,
+  handlerName: string | undefined,
+  requirement: SecurityRequirement,
+): void {
+  const read = (): SecurityRequirement[] =>
+    ((handlerName === undefined
+      ? Reflect.getOwnMetadata(SECURITY_KEY, target)
+      : Reflect.getOwnMetadata(SECURITY_KEY, target, handlerName)) ?? []) as SecurityRequirement[];
+  // Decorators evaluate bottom-up; unshift so the list reads top-to-bottom.
+  const list = read();
+  list.unshift(requirement);
+  if (handlerName === undefined) {
+    Reflect.defineMetadata(SECURITY_KEY, list, target);
+  } else {
+    Reflect.defineMetadata(SECURITY_KEY, list, target, handlerName);
+  }
+}
+
+/**
+ * Reads the class-level `@Security` requirements from a prototype.
+ *
+ * @param target - The controller prototype.
+ * @returns The requirements, or `[]` if none were set.
+ */
+export function getClassSecurity(target: object): SecurityRequirement[] {
+  return (Reflect.getOwnMetadata(SECURITY_KEY, target) ?? []) as SecurityRequirement[];
+}
+
 /** Stores the controller path prefix on a prototype. Called by `@Route`. */
 export function setPrefix(target: object, prefix: string): void {
   Reflect.defineMetadata(PREFIX_KEY, prefix, target);
@@ -260,6 +310,8 @@ export function getRoutes(target: object): RouteMetadata[] {
   // Tags are declared once at the class level; fold them onto every route so a
   // RouteMetadata is self-contained for downstream consumers (e.g. swagger).
   const tags = getTags(target);
+  // Class-level @Security is the default; a method's own @Security overrides it.
+  const classSecurity = getClassSecurity(target);
   return names.map((handlerName) => {
     const entry = Reflect.getOwnMetadata(HTTP_METHOD_KEY, target, handlerName) as HttpMethodEntry;
     return {
@@ -284,6 +336,10 @@ export function getRoutes(target: object): RouteMetadata[] {
       responseHeaders: Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) as
         | Record<number, Record<string, ZodType>>
         | undefined,
+      security:
+        (Reflect.getOwnMetadata(SECURITY_KEY, target, handlerName) as
+          | SecurityRequirement[]
+          | undefined) ?? (classSecurity.length > 0 ? classSecurity : undefined),
     };
   });
 }

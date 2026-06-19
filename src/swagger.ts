@@ -2,6 +2,17 @@ import { z, type ZodType } from 'zod';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { getPrefix, getRoutes, type ExampleMetadata, type RouteMetadata } from './metadata.js';
 import { isMultipart } from './multipart.js';
+import type { SecuritySchemes } from './security.js';
+
+/** Optional inputs for OpenAPI generation beyond the controllers themselves. */
+export interface OpenApiOptions {
+  /**
+   * Security scheme definitions to emit under `components.securitySchemes`. The
+   * `Zodec` instance derives these from its `security` config; pass them
+   * explicitly to {@link generateSwagger} for instance-free generation.
+   */
+  securitySchemes?: SecuritySchemes | undefined;
+}
 
 /**
  * A JSON Schema document or fragment. Uses Zod's own JSON Schema type — it is
@@ -86,7 +97,11 @@ function asParameterSchema(schema: JsonSchema): NonNullable<OpenAPIV3_1.Paramete
 class DocumentBuilder {
   private readonly schemas: Record<string, OpenAPIV3_1.SchemaObject> = {};
 
-  public build(prototypes: object[], info: OpenApiInfo): OpenApiDocument {
+  public build(
+    prototypes: object[],
+    info: OpenApiInfo,
+    options: OpenApiOptions = {},
+  ): OpenApiDocument {
     const paths: OpenAPIV3_1.PathsObject = {};
     for (const proto of prototypes) {
       const prefix = getPrefix(proto);
@@ -97,11 +112,15 @@ class DocumentBuilder {
         paths[path] = item;
       }
     }
+    const components: OpenAPIV3_1.ComponentsObject = { schemas: this.schemas };
+    if (options.securitySchemes && Object.keys(options.securitySchemes).length > 0) {
+      components.securitySchemes = options.securitySchemes;
+    }
     return {
       openapi: '3.1.0',
       info,
       paths,
-      components: { schemas: this.schemas },
+      components,
     };
   }
 
@@ -151,6 +170,10 @@ class DocumentBuilder {
     }
     if (route.summary) {
       operation.summary = route.summary;
+    }
+    // Stacked @Security = OR → one security requirement object per requirement.
+    if (route.security && route.security.length > 0) {
+      operation.security = route.security.map((req) => ({ [req.scheme]: req.scopes }));
     }
     if (parameters.length > 0) {
       operation.parameters = parameters;
@@ -236,8 +259,12 @@ class DocumentBuilder {
  * Builds an OpenAPI 3.1 document from controller prototypes. Independent of
  * route mounting — only reads class-level metadata.
  */
-export function generateOpenApiDocument(prototypes: object[], info: OpenApiInfo): OpenApiDocument {
-  return new DocumentBuilder().build(prototypes, info);
+export function generateOpenApiDocument(
+  prototypes: object[],
+  info: OpenApiInfo,
+  options: OpenApiOptions = {},
+): OpenApiDocument {
+  return new DocumentBuilder().build(prototypes, info, options);
 }
 
 /**
@@ -248,6 +275,8 @@ export function generateOpenApiDocument(prototypes: object[], info: OpenApiInfo)
  *
  * @param controllers - The controller classes (constructors, not instances).
  * @param info - OpenAPI `info` block. Defaults to `{ title: 'API', version: '1.0.0' }`.
+ * @param options - Extra inputs, e.g. `securitySchemes` (needed when routes use
+ *   `@Security`, since scheme definitions aren't carried on the classes).
  * @returns The assembled OpenAPI 3.1 document.
  *
  * @example
@@ -258,9 +287,11 @@ export function generateOpenApiDocument(prototypes: object[], info: OpenApiInfo)
 export function generateSwagger(
   controllers: { prototype: object }[],
   info: OpenApiInfo = { title: 'API', version: '1.0.0' },
+  options: OpenApiOptions = {},
 ): OpenApiDocument {
   return generateOpenApiDocument(
     controllers.map((controller) => controller.prototype),
     info,
+    options,
   );
 }

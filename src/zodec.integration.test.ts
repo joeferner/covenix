@@ -7,10 +7,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import multer, { type Options } from 'multer';
 import { z } from 'zod';
-import { Body, Get, Params, Post, Query, Returns, ReturnsFile, Route, Tags } from './decorators.js';
-import { BodyParam, File, Files, Header, Param, QueryParam, Req, Res } from './parameters.js';
+import {
+  Body,
+  Get,
+  Params,
+  Post,
+  Query,
+  Returns,
+  ReturnsFile,
+  Route,
+  Security,
+  Tags,
+} from './decorators.js';
+import {
+  BodyParam,
+  File,
+  Files,
+  Header,
+  Param,
+  Principal,
+  QueryParam,
+  Req,
+  Res,
+} from './parameters.js';
 import { Zodec } from './zodec.js';
-import { zodecErrorHandler } from './errors.js';
+import { bearer, apiKey } from './security.js';
+import { SecurityError, zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
 
 const Greeting = z.object({ message: z.string() });
@@ -419,6 +441,127 @@ describe('multipart storage engines', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ name: 'f.txt', size: 10, text: 'hello disk' });
+  });
+});
+
+describe('@Security', () => {
+  interface User {
+    id: string;
+    role: 'admin' | 'user';
+  }
+
+  @Route('secure')
+  class SecureController {
+    @Get('me')
+    @Security('bearer')
+    @Returns(200, z.object({ id: z.string(), role: z.string() }))
+    public me(@Principal() user: User): User {
+      return user;
+    }
+
+    @Get('admin')
+    @Security('bearer', ['admin'])
+    @Returns(200, z.object({ ok: z.boolean() }))
+    public admin(): { ok: boolean } {
+      return { ok: true };
+    }
+
+    // Stacked = OR: a valid bearer token OR a valid API key gets in.
+    @Get('either')
+    @Security('bearer')
+    @Security('apiKey')
+    @Returns(200, z.object({ via: z.string() }))
+    public either(@Principal() who: { via: string }): { via: string } {
+      return who;
+    }
+  }
+
+  // bearer: "Bearer admin" / "Bearer user" map to roles; anything else → null (401).
+  // For ['admin'] scope, a non-admin principal throws 403.
+  function secureApp(): express.Express {
+    const app = express();
+    const api = new Zodec({
+      info: { title: 'T', version: '1.0.0' },
+      security: {
+        bearer: bearer((req, scopes) => {
+          const auth = req.headers.authorization;
+          const role = auth === 'Bearer admin' ? 'admin' : auth === 'Bearer user' ? 'user' : null;
+          if (!role) {
+            return null;
+          }
+          if (scopes.length > 0 && !scopes.includes(role)) {
+            throw new SecurityError(403, 'Forbidden');
+          }
+          return { id: `u_${role}`, role, via: 'bearer' };
+        }),
+        apiKey: apiKey({ in: 'header', name: 'x-api-key' }, (req) =>
+          req.headers['x-api-key'] === 'secret' ? { via: 'apiKey' } : null,
+        ),
+      },
+    });
+    api.register(new SecureController());
+    api.mount(app);
+    app.use(zodecErrorHandler());
+    return app;
+  }
+
+  it('injects the principal on a valid token', async () => {
+    const res = await request(secureApp()).get('/secure/me').set('authorization', 'Bearer user');
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ id: 'u_user', role: 'user' });
+  });
+
+  it('rejects a missing/invalid token with 401', async () => {
+    const res = await request(secureApp()).get('/secure/me');
+    expect(res.status).toBe(401);
+  });
+
+  it('allows an in-scope principal', async () => {
+    const res = await request(secureApp())
+      .get('/secure/admin')
+      .set('authorization', 'Bearer admin');
+    expect(res.status).toBe(200);
+  });
+
+  it('forbids an out-of-scope principal with 403', async () => {
+    const res = await request(secureApp()).get('/secure/admin').set('authorization', 'Bearer user');
+    expect(res.status).toBe(403);
+  });
+
+  it('OR: satisfied by the second scheme when the first fails', async () => {
+    const res = await request(secureApp()).get('/secure/either').set('x-api-key', 'secret');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ via: 'apiKey' });
+  });
+
+  it('OR: rejects when no scheme is satisfied', async () => {
+    const res = await request(secureApp()).get('/secure/either');
+    expect(res.status).toBe(401);
+  });
+
+  it('runs security before body validation (401 precedes 422)', async () => {
+    @Route('guarded')
+    class GuardedController {
+      @Post()
+      @Security('bearer')
+      @Body(z.object({ name: z.string().min(3) }))
+      @Returns(201, z.object({}))
+      public create(@BodyParam() body: unknown): unknown {
+        return body;
+      }
+    }
+    const app = express();
+    app.use(express.json());
+    const api = new Zodec({
+      info: { title: 'T', version: '1.0.0' },
+      security: { bearer: bearer(() => null) }, // always 401
+    });
+    api.register(new GuardedController());
+    api.mount(app);
+
+    // Invalid body too, but auth fails first → 401, not 422.
+    const res = await request(app).post('/guarded').send({ name: 'x' });
+    expect(res.status).toBe(401);
   });
 });
 

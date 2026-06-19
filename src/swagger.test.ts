@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { generateSwagger, toJsonSchema } from './swagger.js';
+import { apiKey as apiKeyScheme, bearer } from './security.js';
 import { Zodec } from './zodec.js';
 import {
   Body,
@@ -12,6 +13,7 @@ import {
   Returns,
   ReturnsFile,
   Route,
+  Security,
   Summary,
   Tags,
 } from './decorators.js';
@@ -255,6 +257,46 @@ describe('api.swagger()', () => {
     });
     expect(post?.responses?.['201']).toMatchObject({
       content: { 'application/json': { example: { id: 'w_1' } } },
+    });
+  });
+
+  it('emits per-operation security (stacked = OR) and components.securitySchemes', () => {
+    @Route('admin')
+    class AdminController {
+      @Get('a')
+      @Security('bearerAuth', ['admin'])
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public a(): unknown {
+        return { ok: true };
+      }
+
+      @Get('b')
+      @Security('bearerAuth')
+      @Security('apiKey')
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public b(): unknown {
+        return { ok: true };
+      }
+    }
+
+    const api = new Zodec({
+      info: { title: 'API', version: '1.0.0' },
+      security: {
+        bearerAuth: bearer(() => ({})),
+        apiKey: apiKeyScheme({ in: 'header', name: 'X-API-Key' }, () => ({})),
+      },
+    });
+    api.register(new AdminController());
+    const doc = api.swagger();
+
+    // Single requirement with scopes.
+    expect(doc.paths?.['/admin/a']?.get?.security).toEqual([{ bearerAuth: ['admin'] }]);
+    // Stacked decorators → two requirement objects (OR), in source order.
+    expect(doc.paths?.['/admin/b']?.get?.security).toEqual([{ bearerAuth: [] }, { apiKey: [] }]);
+    // Scheme definitions land in components.
+    expect(doc.components?.securitySchemes).toMatchObject({
+      bearerAuth: { type: 'http', scheme: 'bearer' },
+      apiKey: { type: 'apiKey', in: 'header', name: 'X-API-Key' },
     });
   });
 

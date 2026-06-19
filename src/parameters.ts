@@ -83,6 +83,17 @@ export function Header(name: string): ParameterDecorator {
 }
 
 /**
+ * Injects the principal returned by the route's `@Security` handler (e.g. the
+ * authenticated user). Only meaningful on a route guarded by `@Security`; on an
+ * unguarded route it resolves to `undefined`.
+ */
+export function Principal(): ParameterDecorator {
+  return (target, propertyKey, index) => {
+    addParam(target, String(propertyKey), { index, source: 'principal' });
+  };
+}
+
+/**
  * Escape hatch: injects the raw Express `Request` object as a handler argument.
  */
 export function Req(): ParameterDecorator {

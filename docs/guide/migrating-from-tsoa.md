@@ -17,31 +17,31 @@ the routing and parameter decorators are nearly identical.
 
 ## At a glance
 
-| tsoa                                              | zodec                                           | Notes                                                          |
-| ------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
-| `class C extends Controller`                      | `class C` (plain)                               | No base class.                                                 |
-| `@Route('users')` / `@Tags('Users')`              | `@Route('users')` / `@Tags('Users')`            | Identical.                                                     |
-| `@Get('{id}')`, `@Post()`, …                      | `@Get('{id}')`, `@Post()`, …                    | Identical, including `{id}` path syntax.                       |
-| `@Path() id: number`                              | `@Params(Schema)` + `@Param('id') id`           | Validation schema is separate from injection.                  |
-| `@Query() q: string`                              | `@Query(Schema)` + `@QueryParam('q') q`         | Same split.                                                    |
-| `@Body() body: T`                                 | `@Body(Schema)` + `@BodyParam() body`           | Same split.                                                    |
-| `@BodyProp() x`                                   | `@Body(Schema)` + `@BodyParam('x') x`           | Inject one field.                                              |
-| `@Header('x-id') id`                              | `@Header('x-id') id`                            | Identical.                                                     |
-| `@Request() req`                                  | `@Req() req` / `@Res() res`                     | Escape hatch.                                                  |
-| `@SuccessResponse('201')` + `this.setStatus()`    | `@Returns(201, Schema)`                         | The first declared 2xx is the success status — no manual call. |
-| `@Response<E>(422, '…')`                          | `@Returns(422, ErrorSchema)`                    | Stackable, one per status.                                     |
-| `this.setHeader(…)`                               | `@Returns(200, S, { headers })` + `@Res` to set | Header is documented in the spec.                              |
-| `@Example(…)`                                     | `@Example(value, status?)`                      | Similar.                                                       |
-| `@UploadedFile() f: Express.Multer.File`          | `z.file()` in `@Body` + `@File('f') f: File`    | Auto-detected multipart; web-standard `File`.                  |
-| `@UploadedFiles() fs`                             | `z.array(z.file())` + `@Files('fs') fs: File[]` |                                                                |
-| `@FormField() title`                              | text field in the `@Body` schema + `@BodyParam` |                                                                |
-| `@Produces(…)` + return `Readable`/`Buffer`       | `@ReturnsFile(…)` + return `FileResponse`       |                                                                |
-| Validation from TS types + `@isInt`/`@minLength`  | Zod schema (`z.number().int()`, `.min()`)       | Runtime, explicit.                                             |
-| Models are interfaces/classes                     | `z.object({…}).meta({ id: 'User' })`            | `.meta({ id })` names the component.                           |
-| `ValidateError` (422), handle it yourself         | `ValidationError` + `zodecErrorHandler()`       | Optional ready-made handler.                                   |
-| `tsoa routes && tsoa spec`, `RegisterRoutes(app)` | `api.mount(app)`, `api.swagger()`               | No generated files.                                            |
-| IoC container (`iocModule`)                       | `api.register(new C(deps))`                     | Explicit construction.                                         |
-| `@Security('jwt')`                                | _not yet_ — use Express middleware              | See [Roadmap](#what-zodec-doesn-t-have-yet).                   |
+| tsoa                                              | zodec                                           | Notes                                                             |
+| ------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| `class C extends Controller`                      | `class C` (plain)                               | No base class.                                                    |
+| `@Route('users')` / `@Tags('Users')`              | `@Route('users')` / `@Tags('Users')`            | Identical.                                                        |
+| `@Get('{id}')`, `@Post()`, …                      | `@Get('{id}')`, `@Post()`, …                    | Identical, including `{id}` path syntax.                          |
+| `@Path() id: number`                              | `@Params(Schema)` + `@Param('id') id`           | Validation schema is separate from injection.                     |
+| `@Query() q: string`                              | `@Query(Schema)` + `@QueryParam('q') q`         | Same split.                                                       |
+| `@Body() body: T`                                 | `@Body(Schema)` + `@BodyParam() body`           | Same split.                                                       |
+| `@BodyProp() x`                                   | `@Body(Schema)` + `@BodyParam('x') x`           | Inject one field.                                                 |
+| `@Header('x-id') id`                              | `@Header('x-id') id`                            | Identical.                                                        |
+| `@Request() req`                                  | `@Req() req` / `@Res() res`                     | Escape hatch.                                                     |
+| `@SuccessResponse('201')` + `this.setStatus()`    | `@Returns(201, Schema)`                         | The first declared 2xx is the success status — no manual call.    |
+| `@Response<E>(422, '…')`                          | `@Returns(422, ErrorSchema)`                    | Stackable, one per status.                                        |
+| `this.setHeader(…)`                               | `@Returns(200, S, { headers })` + `@Res` to set | Header is documented in the spec.                                 |
+| `@Example(…)`                                     | `@Example(value, status?)`                      | Similar.                                                          |
+| `@UploadedFile() f: Express.Multer.File`          | `z.file()` in `@Body` + `@File('f') f: File`    | Auto-detected multipart; web-standard `File`.                     |
+| `@UploadedFiles() fs`                             | `z.array(z.file())` + `@Files('fs') fs: File[]` |                                                                   |
+| `@FormField() title`                              | text field in the `@Body` schema + `@BodyParam` |                                                                   |
+| `@Produces(…)` + return `Readable`/`Buffer`       | `@ReturnsFile(…)` + return `FileResponse`       |                                                                   |
+| Validation from TS types + `@isInt`/`@minLength`  | Zod schema (`z.number().int()`, `.min()`)       | Runtime, explicit.                                                |
+| Models are interfaces/classes                     | `z.object({…}).meta({ id: 'User' })`            | `.meta({ id })` names the component.                              |
+| `ValidateError` (422), handle it yourself         | `ValidationError` + `zodecErrorHandler()`       | Optional ready-made handler.                                      |
+| `tsoa routes && tsoa spec`, `RegisterRoutes(app)` | `api.mount(app)`, `api.swagger()`               | No generated files.                                               |
+| IoC container (`iocModule`)                       | `api.register(new C(deps))`                     | Explicit construction.                                            |
+| `@Security('jwt', scopes)`                        | `@Security('jwt', scopes)` + `bearer()` handler | Schemes registered on the instance; principal via `@Principal()`. |
 
 ## A controller, side by side
 
@@ -355,12 +355,68 @@ api.register(new UsersController(new UserService(db)));
 This is usually less setup than wiring an IoC module, and it keeps construction
 explicit and type-checked.
 
-## What zodec doesn't have yet
+## Authentication
 
-- **`@Security` / auth decorators.** tsoa has `@Security('jwt')` plus an
-  `expressAuthentication` handler. zodec has no auth decorator yet — protect
-  routes with ordinary Express middleware in the meantime. This is on the
-  roadmap.
+tsoa's `@Security('jwt', scopes)` names a scheme defined in `tsoa.json`, and a
+single exported `expressAuthentication(req, name, scopes)` function does the work
+for every scheme, attaching the result to `req.user`:
+
+```typescript
+// tsoa — securityDefinitions in tsoa.json + one global function
+export function expressAuthentication(req: Request, name: string, scopes?: string[]) {
+  if (name === 'jwt') {
+    const user = verifyJwt(req.headers.authorization);
+    if (!user) return Promise.reject(new Error('unauthorized'));
+    return Promise.resolve(user);
+  }
+}
+
+@Get('me')
+@Security('jwt', ['users:read'])
+public async me(@Request() req: ExRequest): Promise<User> {
+  return req.user as User;
+}
+```
+
+zodec registers each scheme on the instance (definition **and** handler together,
+via a builder) and injects the principal with `@Principal()`:
+
+```typescript
+import { Zodec, Security, Principal, bearer } from 'zodec';
+
+const api = new Zodec({
+  info,
+  security: {
+    jwt: bearer((req, scopes) => {
+      const user = verifyJwt(req.headers.authorization);
+      if (!user) return null;                       // → 401
+      if (!scopes.every((s) => user.scopes.includes(s))) {
+        throw new SecurityError(403, 'Forbidden');  // handler owns the scope check
+      }
+      return user;                                  // → @Principal()
+    }),
+  },
+});
+
+@Get('me')
+@Security('jwt', ['users:read'])
+public me(@Principal() user: User): User {
+  return user;
+}
+```
+
+Mapping notes:
+
+- **Per-scheme handlers, not one global switch.** Each named scheme carries its
+  own handler, so there's no `securityName` dispatch.
+- **`req.user` → `@Principal()`.** The handler's return value is injected directly.
+- **Scopes are handler-decided** (same as tsoa) — zodec passes them in.
+- **Reject semantics:** return `null`/`undefined` for `401`; throw (e.g.
+  `new SecurityError(403)`) for `403`.
+- **OR** of schemes: stack `@Security` decorators (the request passes if any one
+  succeeds) — the OpenAPI equivalent of multiple requirement objects.
+
+See [Authentication](/guide/authentication) for the full picture.
 
 If you hit a tsoa feature without an obvious zodec equivalent, please
 [open an issue](https://github.com/joeferner/zodec/issues).

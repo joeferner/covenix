@@ -25,6 +25,28 @@ export class ValidationError extends Error {
   }
 }
 
+/**
+ * Raised when a request fails authentication/authorization (`@Security`). zodec
+ * throws this with `401` when a security handler returns `null`/`undefined`; a
+ * handler can throw it directly (e.g. `new SecurityError(403, 'Forbidden')`) for
+ * authenticated-but-not-authorized. Like {@link ValidationError}, it travels the
+ * normal Express error pipeline.
+ */
+export class SecurityError extends Error {
+  /** HTTP status: `401` (unauthenticated) or `403` (forbidden). */
+  public readonly status: number;
+
+  /**
+   * @param status - HTTP status to associate with the failure (defaults to `401`).
+   * @param message - Human-readable message (defaults to `'Unauthorized'`).
+   */
+  public constructor(status = 401, message = 'Unauthorized') {
+    super(message);
+    this.name = 'SecurityError';
+    this.status = status;
+  }
+}
+
 /** Options for {@link zodecErrorHandler}. */
 export interface ZodecErrorHandlerOptions {
   /**
@@ -60,6 +82,10 @@ export function zodecErrorHandler(options: ZodecErrorHandlerOptions = {}): Error
   return (err, _req, res, next) => {
     if (err instanceof ValidationError) {
       res.status(err.status).json(format(err));
+      return;
+    }
+    if (err instanceof SecurityError) {
+      res.status(err.status).json({ status: err.status, message: err.message });
       return;
     }
     next(err);

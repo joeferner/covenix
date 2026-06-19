@@ -136,6 +136,7 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@Body(schema)`                                                             | Validate `req.body`                                                    |
 | `@Returns(status, schema?)`                                                 | Declare a response — stackable; omit `schema` for no body (e.g. `204`) |
 | `@ReturnsFile(status, options?)`                                            | Declare a binary/file response (return a `FileResponse`)               |
+| `@Security(scheme, scopes?)`                                                | Require a named auth scheme — class or method, stackable = OR          |
 | `@Summary(text)`                                                            | Operation summary in swagger                                           |
 | `@Example(value, status?)`                                                  | Example for the request body, or a response (`status`) — stackable     |
 
@@ -149,6 +150,7 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@File(name)`       | an uploaded file as a web `File` (multipart)      |
 | `@Files(name)`      | uploaded files as `File[]` (multipart)            |
 | `@Header(name)`     | `req.headers[name]`                               |
+| `@Principal()`      | the principal from the `@Security` handler        |
 | `@Req()` / `@Res()` | raw Express `Request` / `Response` (escape hatch) |
 
 To return a file or binary stream instead of JSON, pair `@ReturnsFile` with a
@@ -160,6 +162,12 @@ To **receive** files, put a `z.file()` (or `z.array(z.file())`) field in a
 `@Body` schema: zodec auto-detects the route as `multipart/form-data`, parses it
 with multer, and injects each file via `@File` / `@Files`. See
 [File uploads](https://joeferner.github.io/zodec/guide/file-uploads).
+
+To **protect** a route, register named schemes on the instance (`new Zodec({
+security: { bearerAuth: bearer(handler) } })`) and mark routes with
+`@Security('bearerAuth', scopes?)`; the handler's result is injected via
+`@Principal()`. See
+[Authentication](https://joeferner.github.io/zodec/guide/authentication).
 
 ---
 

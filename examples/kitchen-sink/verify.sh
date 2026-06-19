@@ -66,6 +66,35 @@ expect 422 "POST /users (invalid body)" -X POST "$BASE/users" \
 expect 400 "GET /users/not-a-uuid (bad path param)" "$BASE/users/not-a-uuid"
 expect 200 "GET /swagger.json" "$BASE/swagger.json"
 
+# @Security: /auth/me requires a bearer token.
+expect 401 "GET /auth/me (no token) → 401" "$BASE/auth/me"
+# Create an admin + a plain user, then mint their fake tokens (login returns one).
+curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+  -d '{"username":"boss","email":"boss@example.com","role":"admin"}' >/dev/null
+curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+  -d '{"username":"peon","email":"peon@example.com"}' >/dev/null
+ADMIN_TOKEN="Bearer fake-token-for-boss"
+USER_TOKEN="Bearer fake-token-for-peon"
+expect 200 "GET /auth/me (valid token) → 200" "$BASE/auth/me" -H "authorization: $ADMIN_TOKEN"
+
+# Admin-only delete: @Security('bearer', ['admin']). A user token is 403; admin is 204.
+victim="$(
+  curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+    -d '{"username":"victim","email":"victim@example.com"}' |
+    node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).id))'
+)"
+expect 403 "DELETE /users/:id (non-admin) → 403" -X DELETE "$BASE/users/$victim" -H "authorization: $USER_TOKEN"
+expect 204 "DELETE /users/:id (admin) → 204" -X DELETE "$BASE/users/$victim" -H "authorization: $ADMIN_TOKEN"
+
+# Swagger advertises the bearer scheme + the per-operation requirement.
+if curl -s "$BASE/swagger.json" |
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/auth/me"].get.security);process.exit(ok?0:1)})'; then
+  echo "    ✓ swagger documents the bearer scheme + /auth/me security"
+else
+  echo "    ✗ swagger missing security scheme/requirement"
+  fail=1
+fi
+
 # Response header declared via @Returns(..., { headers }) and set by the handler.
 if curl -s -D - -o /dev/null "$BASE/users" | grep -qi '^x-total-count:'; then
   echo "    ✓ GET /users sets the X-Total-Count response header"

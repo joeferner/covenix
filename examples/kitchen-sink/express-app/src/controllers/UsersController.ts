@@ -16,6 +16,7 @@ import {
   ReturnsFile,
   Summary,
   Example,
+  Security,
   Param,
   QueryParam,
   BodyParam,
@@ -23,6 +24,7 @@ import {
   Res,
   File,
   Files,
+  Principal,
   FileResponse,
 } from 'zodec';
 import {
@@ -221,12 +223,20 @@ export class UsersController {
     return this.users.update(id, body);
   }
 
+  // Admin-only. @Security('bearer', ['admin']) runs the bearer handler with the
+  // `['admin']` scope before this handler; the handler 401s on a bad token and
+  // 403s unless the principal's role is admin (see api-security.ts). @Principal()
+  // injects the authenticated actor — here just to log who performed the delete.
   @Delete('{id}')
-  @Summary('Delete a user')
+  @Summary('Delete a user (admin only)')
+  @Security('bearer', ['admin'])
   @Params(IdParams)
   @Returns(204)
+  @Returns(401, ErrorSchema)
+  @Returns(403, ErrorSchema)
   @Returns(404, ErrorSchema)
-  public async remove(@Param('id') id: string): Promise<void> {
+  public async remove(@Param('id') id: string, @Principal() actor: User): Promise<void> {
+    console.warn(`user ${actor.id} deleting user ${id}`);
     await this.users.remove(id);
   }
 }

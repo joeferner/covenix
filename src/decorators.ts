@@ -4,6 +4,7 @@ import {
   addFileResponse,
   addResponseHeaders,
   addReturnSchema,
+  addSecurity,
   setBodySchema,
   setHttpMethod,
   setParamsSchema,
@@ -166,6 +167,36 @@ export function ReturnsFile(status: number, options: ReturnsFileOptions = {}): M
       contentType: options.contentType ?? 'application/octet-stream',
       description: options.description,
     });
+  };
+}
+
+/**
+ * Declares a security requirement for the operation, matching a named scheme in
+ * the `Zodec` instance's `security` map. Before the handler runs, zodec invokes
+ * that scheme's handler; on success the principal is available via `@Principal()`.
+ *
+ * Usable on a method or on the controller class (applies to every route that
+ * doesn't declare its own). **Stackable** — multiple `@Security` decorators are
+ * alternatives (OR): the request is allowed if any one is satisfied.
+ *
+ * @param scheme - The security scheme name (a key in `new Zodec({ security })`).
+ * @param scopes - Scopes the route requires for this scheme (passed to the handler).
+ *
+ * @example
+ * ```ts
+ * @Security('bearerAuth', ['users:write'])
+ * @Security('apiKey')            // OR: either satisfies the route
+ * deleteUser() {}
+ * ```
+ */
+export function Security(scheme: string, scopes: string[] = []): ClassDecorator & MethodDecorator {
+  return (target: object, propertyKey?: string | symbol): void => {
+    if (propertyKey === undefined) {
+      // Class decorator: store on the prototype, where getRoutes reads it.
+      addSecurity((target as { prototype: object }).prototype, undefined, { scheme, scopes });
+    } else {
+      addSecurity(target, String(propertyKey), { scheme, scopes });
+    }
   };
 }
 

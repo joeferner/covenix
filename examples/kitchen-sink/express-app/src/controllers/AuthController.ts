@@ -1,5 +1,17 @@
 import createError from 'http-errors';
-import { Route, Tags, Post, Get, Body, Returns, Summary, Example, BodyParam, Header } from 'zodec';
+import {
+  Route,
+  Tags,
+  Post,
+  Get,
+  Body,
+  Returns,
+  Summary,
+  Example,
+  Security,
+  BodyParam,
+  Principal,
+} from 'zodec';
 import {
   LoginSchema,
   TokenSchema,
@@ -29,13 +41,15 @@ export class AuthController {
     return token;
   }
 
+  // @Security('bearer') runs the `bearer` handler (see api-security.ts) before the
+  // handler. It rejects with 401 on a bad token, so `user` is always present — no
+  // manual header parsing, and @Principal() injects whatever the handler returned.
   @Get('me')
   @Summary('Return the currently authenticated user')
+  @Security('bearer')
   @Returns(200, UserSchema)
   @Returns(401, ErrorSchema)
-  public async me(@Header('authorization') authorization: string | undefined): Promise<User> {
-    const user = await this.auth.currentUser(authorization);
-    if (!user) throw new createError.Unauthorized();
+  public me(@Principal() user: User): User {
     return user;
   }
 }

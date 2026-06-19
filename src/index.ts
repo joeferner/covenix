@@ -11,13 +11,33 @@ export {
   Body,
   Returns,
   ReturnsFile,
+  Security,
   Summary,
   Example,
 } from './decorators.js';
 export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
-export { BodyParam, File, Files, Header, Param, QueryParam, Req, Res } from './parameters.js';
+export {
+  BodyParam,
+  File,
+  Files,
+  Header,
+  Param,
+  Principal,
+  QueryParam,
+  Req,
+  Res,
+} from './parameters.js';
+export { bearer, basic, apiKey, oauth2 } from './security.js';
+export type {
+  BearerOptions,
+  SecurityConfig,
+  SecurityHandler,
+  SecurityScheme,
+  SecuritySchemeObject,
+  SecuritySchemes,
+} from './security.js';
 export { getParams, getPrefix, getRoutes, getTags } from './metadata.js';
 export type {
   ExampleMetadata,
@@ -26,10 +46,11 @@ export type {
   ParamMetadata,
   ParamSource,
   RouteMetadata,
+  SecurityRequirement,
 } from './metadata.js';
 export { Zodec } from './zodec.js';
 export type { ZodecInfo, ZodecOptions } from './zodec.js';
-export { ValidationError, zodecErrorHandler } from './errors.js';
+export { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
 export type { ZodecErrorHandlerOptions } from './errors.js';
 export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
-export type { JsonSchema, OpenApiDocument, OpenApiInfo } from './swagger.js';
+export type { JsonSchema, OpenApiDocument, OpenApiInfo, OpenApiOptions } from './swagger.js';
