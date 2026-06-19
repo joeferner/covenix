@@ -15,6 +15,14 @@ export interface RouteMetadata {
   summary?: string | undefined;
 }
 
+export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res';
+
+export interface ParamMetadata {
+  index: number;
+  source: ParamSource;
+  name?: string | undefined;
+}
+
 // One symbol per concern. Each decorator writes under its own key, so two
 // decorators on the same method can never clobber each other regardless of the
 // order they run in.
@@ -25,6 +33,7 @@ const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
 const SUMMARY_KEY = Symbol('zodec:summary');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
+const PARAM_INJECTIONS_KEY = Symbol('zodec:paramInjections');
 const PREFIX_KEY = Symbol('zodec:prefix');
 const TAGS_KEY = Symbol('zodec:tags');
 
@@ -96,6 +105,20 @@ export function setTags(target: object, tags: string[]): void {
 
 export function getTags(target: object): string[] {
   return (Reflect.getOwnMetadata(TAGS_KEY, target) ?? []) as string[];
+}
+
+export function addParam(target: object, handlerName: string, param: ParamMetadata): void {
+  const params = (Reflect.getOwnMetadata(PARAM_INJECTIONS_KEY, target, handlerName) ??
+    []) as ParamMetadata[];
+  params.push(param);
+  Reflect.defineMetadata(PARAM_INJECTIONS_KEY, params, target, handlerName);
+}
+
+// Parameter decorators run right-to-left, so this list is not in declaration
+// order; each entry carries its own `index` for the caller to place by.
+export function getParams(target: object, handlerName: string): ParamMetadata[] {
+  return (Reflect.getOwnMetadata(PARAM_INJECTIONS_KEY, target, handlerName) ??
+    []) as ParamMetadata[];
 }
 
 // Assembles RouteMetadata[] at read time from the per-concern entries. The
