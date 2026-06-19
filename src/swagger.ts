@@ -1,0 +1,175 @@
+import { z, type ZodType } from 'zod';
+import type { OpenAPIV3_1 } from 'openapi-types';
+import { getPrefix, getRoutes, type RouteMetadata } from './metadata.js';
+
+// A JSON Schema document or fragment. We use Zod's own JSON Schema type — it is
+// authoritative for what z.toJSONSchema emits (draft 2020-12) — so converting
+// schemas needs no extra conversion dependency.
+export type JsonSchema = z.core.JSONSchema.BaseSchema;
+
+// The assembled spec is typed with the authoritative `openapi-types` definitions.
+export type OpenApiDocument = OpenAPIV3_1.Document;
+
+// Converts a single Zod schema to its JSON Schema representation. Nested schemas
+// named via `.meta({ id })` are emitted as `$ref`s into a `$defs` block; the doc
+// assembly step rewrites those references for OpenAPI components.
+export function toJsonSchema(schema: ZodType): JsonSchema {
+  return z.toJSONSchema(schema);
+}
+
+export interface OpenApiInfo {
+  title: string;
+  version: string;
+}
+
+type JsonObject = Record<string, unknown>;
+
+// Rewrites Zod's `#/$defs/X` references to OpenAPI's `#/components/schemas/X`.
+function rewriteRefs(node: unknown): void {
+  if (Array.isArray(node)) {
+    node.forEach(rewriteRefs);
+    return;
+  }
+  if (node !== null && typeof node === 'object') {
+    const obj = node as JsonObject;
+    const ref = obj['$ref'];
+    if (typeof ref === 'string' && ref.startsWith('#/$defs/')) {
+      obj['$ref'] = `#/components/schemas/${ref.slice('#/$defs/'.length)}`;
+    }
+    for (const key of Object.keys(obj)) {
+      rewriteRefs(obj[key]);
+    }
+  }
+}
+
+// Joins controller prefix + route path for OpenAPI, keeping `{id}` placeholders
+// (OpenAPI uses the same curly-brace syntax zodec routes are written in).
+function toOpenApiPath(prefix: string, path: string): string {
+  const joined = `/${prefix}/${path}`.replace(/\/+/g, '/').replace(/\/$/, '');
+  return joined === '' ? '/' : joined;
+}
+
+// Our JSON Schema fragments are draft-2020-12 (what OpenAPI 3.1 uses), but the
+// nominal types differ — bridge them at these boundaries.
+function asSchemaObject(schema: JsonSchema): OpenAPIV3_1.SchemaObject {
+  return schema as unknown as OpenAPIV3_1.SchemaObject;
+}
+
+// `ParameterObject` is aliased to the V3 shape in openapi-types, whose `schema`
+// field doesn't accept a V3.1 SchemaObject — bridge to exactly that field type.
+function asParameterSchema(schema: JsonSchema): NonNullable<OpenAPIV3_1.ParameterObject['schema']> {
+  return schema as unknown as NonNullable<OpenAPIV3_1.ParameterObject['schema']>;
+}
+
+// Walks controller metadata (read off each prototype) and hand-assembles an
+// OpenAPI 3.1 document. Named schemas accumulate in `components.schemas`.
+class DocumentBuilder {
+  private readonly schemas: Record<string, OpenAPIV3_1.SchemaObject> = {};
+
+  public build(prototypes: object[], info: OpenApiInfo): OpenApiDocument {
+    const paths: OpenAPIV3_1.PathsObject = {};
+    for (const proto of prototypes) {
+      const prefix = getPrefix(proto);
+      for (const route of getRoutes(proto)) {
+        const path = toOpenApiPath(prefix, route.path);
+        const item: OpenAPIV3_1.PathItemObject = paths[path] ?? {};
+        (item as Record<string, OpenAPIV3_1.OperationObject>)[route.method] = this.operation(route);
+        paths[path] = item;
+      }
+    }
+    return {
+      openapi: '3.1.0',
+      info,
+      paths,
+      components: { schemas: this.schemas },
+    };
+  }
+
+  private operation(route: RouteMetadata): OpenAPIV3_1.OperationObject {
+    const parameters: OpenAPIV3_1.ParameterObject[] = [
+      ...(route.params ? this.parameters(route.params, 'path') : []),
+      ...(route.query ? this.parameters(route.query, 'query') : []),
+    ];
+    const responses: Record<string, OpenAPIV3_1.ResponseObject> = {};
+    for (const [status, schema] of Object.entries(route.responses)) {
+      responses[status] = {
+        description: '',
+        content: { 'application/json': { schema: this.schema(schema) } },
+      };
+    }
+
+    const operation: OpenAPIV3_1.OperationObject = { responses };
+    if (route.tags && route.tags.length > 0) operation.tags = route.tags;
+    if (route.summary) operation.summary = route.summary;
+    if (parameters.length > 0) operation.parameters = parameters;
+    if (route.body) {
+      operation.requestBody = {
+        required: true,
+        content: { 'application/json': { schema: this.schema(route.body) } },
+      };
+    }
+    return operation;
+  }
+
+  // Converts a schema, hoisting nested named schemas into components. A schema
+  // that is itself named becomes a component and is returned as a `$ref`.
+  private schema(schema: ZodType): OpenAPIV3_1.SchemaObject {
+    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    this.hoist(json);
+    const id = schema.meta()?.id;
+    if (typeof id === 'string') {
+      this.schemas[id] = asSchemaObject(json);
+      return { $ref: `#/components/schemas/${id}` } as OpenAPIV3_1.SchemaObject;
+    }
+    return asSchemaObject(json);
+  }
+
+  // Decomposes a `@Params`/`@Query` object schema into individual OpenAPI
+  // parameters — one per property. Path parameters are always required.
+  private parameters(schema: ZodType, location: 'path' | 'query'): OpenAPIV3_1.ParameterObject[] {
+    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    this.hoist(json);
+    const properties = (json['properties'] ?? {}) as Record<string, JsonSchema>;
+    const required = new Set((json['required'] as string[] | undefined) ?? []);
+    return Object.entries(properties).map(([name, propSchema]) => ({
+      name,
+      in: location,
+      required: location === 'path' ? true : required.has(name),
+      schema: asParameterSchema(propSchema),
+    }));
+  }
+
+  // Moves nested `$defs` into components, strips `$schema`, and rewrites refs.
+  private hoist(json: JsonObject): void {
+    const defs = json['$defs'] as Record<string, JsonObject> | undefined;
+    if (defs) {
+      for (const [name, def] of Object.entries(defs)) {
+        delete def['$schema'];
+        rewriteRefs(def);
+        this.schemas[name] = asSchemaObject(def);
+      }
+      delete json['$defs'];
+    }
+    delete json['$schema'];
+    rewriteRefs(json);
+  }
+}
+
+// Builds an OpenAPI 3.1 document from controller prototypes. Independent of
+// route mounting — only reads class-level metadata.
+export function generateOpenApiDocument(prototypes: object[], info: OpenApiInfo): OpenApiDocument {
+  return new DocumentBuilder().build(prototypes, info);
+}
+
+// Standalone, instance-free generation: pass the controller classes directly.
+// Swagger is derived entirely from class-level metadata, so no instances (and
+// thus no dependencies) are needed — the lightest path for CI and codegen.
+export function generateSwagger(
+  controllers: { prototype: object }[],
+  info: OpenApiInfo = { title: 'API', version: '1.0.0' },
+): OpenApiDocument {
+  return generateOpenApiDocument(
+    controllers.map((controller) => controller.prototype),
+    info,
+  );
+}

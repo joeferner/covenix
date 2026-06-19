@@ -7,6 +7,7 @@ import {
   type RouteMetadata,
 } from './metadata.js';
 import { ValidationError } from './errors.js';
+import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
 
 // Per-request values the handler's injected parameters resolve from. Each source
 // starts as the raw request value and is replaced by the parsed (coerced,
@@ -123,6 +124,15 @@ export class Zodec {
   public register(instance: object): this {
     this.controllers.push(instance);
     return this;
+  }
+
+  // Builds the OpenAPI document from the registered controllers' metadata.
+  // Independent of mount() — does not require routes to be wired.
+  public swagger(): OpenApiDocument {
+    const prototypes = this.controllers.map(
+      (instance) => Object.getPrototypeOf(instance) as object,
+    );
+    return generateOpenApiDocument(prototypes, this.options.info);
   }
 
   // Walks every registered controller's metadata and binds its routes onto the

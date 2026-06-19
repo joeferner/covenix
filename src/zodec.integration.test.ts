@@ -209,6 +209,21 @@ describe('zodecErrorHandler', () => {
     // Not rendered in zodec's validation shape.
     expect(res.body).not.toHaveProperty('errors');
   });
+
+  it('honors a custom formatError', async () => {
+    const app = makeApp(new ThingController());
+    app.use(
+      zodecErrorHandler({
+        formatError: (error) => ({ ok: false, count: error.issues.length }),
+      }),
+    );
+
+    const res = await request(app).post('/things').send({ name: 'no' });
+    const body = res.body as { ok: boolean; count: number };
+
+    expect(res.status).toBe(422);
+    expect(body).toEqual({ ok: false, count: 1 });
+  });
 });
 
 describe('@Res escape hatch', () => {

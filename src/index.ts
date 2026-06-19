@@ -18,3 +18,6 @@ export type { HttpMethod, ParamMetadata, RouteMetadata } from './metadata.js';
 export { Zodec } from './zodec.js';
 export type { ZodecInfo, ZodecOptions } from './zodec.js';
 export { ValidationError, zodecErrorHandler } from './errors.js';
+export type { ZodecErrorHandlerOptions } from './errors.js';
+export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
+export type { JsonSchema, OpenApiDocument, OpenApiInfo } from './swagger.js';
