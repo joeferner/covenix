@@ -13,6 +13,9 @@ export {
   ReturnsFile,
   Security,
   Summary,
+  Description,
+  OperationId,
+  Deprecated,
   Example,
 } from './decorators.js';
 export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';

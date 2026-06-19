@@ -43,6 +43,7 @@ exports[`swagger accuracy > matches the snapshot 1`] = `
   "paths": {
     "/users": {
       "post": {
+        "operationId": "create",
         "requestBody": {
           "content": {
             "application/json": {
@@ -73,6 +74,7 @@ exports[`swagger accuracy > matches the snapshot 1`] = `
     },
     "/users/{id}": {
       "get": {
+        "operationId": "get",
         "parameters": [
           {
             "in": "path",

@@ -5,8 +5,11 @@ import { apiKey as apiKeyScheme, bearer } from './security.js';
 import { Zodec } from './zodec.js';
 import {
   Body,
+  Deprecated,
+  Description,
   Example,
   Get,
+  OperationId,
   Params,
   Post,
   Query,
@@ -211,6 +214,98 @@ describe('api.swagger()', () => {
     });
     // Not the JSON media type.
     expect(post?.requestBody).not.toHaveProperty(['content', 'application/json']);
+  });
+
+  it('emits summary, description, explicit operationId, and deprecated', () => {
+    @Route('widgets')
+    class WidgetController {
+      @Get('{id}')
+      @Summary('Get a widget')
+      @Description('Returns a single widget by its id.')
+      @OperationId('getWidget')
+      @Deprecated()
+      @Returns(200, z.object({ id: z.string() }))
+      public get(): unknown {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new WidgetController());
+    const op = api.swagger().paths?.['/widgets/{id}']?.get;
+
+    expect(op).toMatchObject({
+      summary: 'Get a widget',
+      description: 'Returns a single widget by its id.',
+      operationId: 'getWidget',
+      deprecated: true,
+    });
+  });
+
+  it('defaults operationId to the handler method name when @OperationId is absent', () => {
+    @Route('gadgets')
+    class GadgetController {
+      @Get()
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public listGadgets(): unknown {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new GadgetController());
+    const op = api.swagger().paths?.['/gadgets']?.get;
+
+    expect(op?.operationId).toBe('listGadgets');
+    expect(op).not.toHaveProperty('deprecated'); // only set when @Deprecated
+  });
+
+  it('emits extended info, servers, externalDocs, and top-level tags', () => {
+    @Route('things')
+    class ThingController {
+      @Get()
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public list(): unknown {
+        return null;
+      }
+    }
+
+    const api = new Zodec({
+      info: { title: 'My API', version: '2.0.0', description: 'Does things.' },
+      servers: [{ url: 'https://api.example.com/v1' }],
+      externalDocs: { url: 'https://docs.example.com' },
+      tags: [{ name: 'Things', description: 'Thing operations.' }],
+    });
+    api.register(new ThingController());
+    const doc = api.swagger();
+
+    expect(doc.info).toMatchObject({
+      title: 'My API',
+      version: '2.0.0',
+      description: 'Does things.',
+    });
+    expect(doc.servers).toEqual([{ url: 'https://api.example.com/v1' }]);
+    expect(doc.externalDocs).toEqual({ url: 'https://docs.example.com' });
+    expect(doc.tags).toEqual([{ name: 'Things', description: 'Thing operations.' }]);
+  });
+
+  it('emits a @Returns description on the matching response', () => {
+    @Route('orders')
+    class OrderController {
+      @Get('{id}')
+      @Returns(200, z.object({ id: z.string() }), { description: 'The order' })
+      @Returns(404, z.object({ error: z.string() }), { description: 'No such order' })
+      public get(): unknown {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new OrderController());
+    const responses = api.swagger().paths?.['/orders/{id}']?.get?.responses;
+
+    expect(responses?.['200']).toMatchObject({ description: 'The order' });
+    expect(responses?.['404']).toMatchObject({ description: 'No such order' });
   });
 
   it('emits a no-body response for @Returns(status) with no schema', () => {

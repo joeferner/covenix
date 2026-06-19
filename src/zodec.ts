@@ -18,7 +18,13 @@ import { FileResponse } from './file-response.js';
 import { RangeFileResponse, type RangeBody, type RangePathBody } from './range-file-response.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import type { SecurityConfig } from './security.js';
-import { generateOpenApiDocument, type OpenApiDocument, type SpecVersion } from './swagger.js';
+import type { OpenAPIV3_1 } from 'openapi-types';
+import {
+  generateOpenApiDocument,
+  type OpenApiDocument,
+  type OpenApiInfo,
+  type SpecVersion,
+} from './swagger.js';
 
 /**
  * Per-request values the handler's injected parameters resolve from. Each source
@@ -32,18 +38,22 @@ interface RequestValues {
   body: unknown;
 }
 
-/** OpenAPI `info` block for the generated document. */
-export interface ZodecInfo {
-  /** API title shown in the OpenAPI document. */
-  title: string;
-  /** API version string shown in the OpenAPI document. */
-  version: string;
-}
+/**
+ * OpenAPI `info` block for the generated document — the full OpenAPI Info Object
+ * (`title` + `version` required; `description`/`contact`/`license`/… optional).
+ */
+export type ZodecInfo = OpenApiInfo;
 
 /** Options for constructing a {@link Zodec} instance. */
 export interface ZodecOptions {
-  /** OpenAPI `info` block (title + version). */
+  /** OpenAPI `info` block (`title` + `version` required; rest optional). */
   info: ZodecInfo;
+  /** `servers` array for the generated document (base URLs). */
+  servers?: OpenAPIV3_1.ServerObject[];
+  /** Top-level `externalDocs` for the generated document. */
+  externalDocs?: OpenAPIV3_1.ExternalDocumentationObject;
+  /** Top-level `tags` definitions (descriptions for the names used by `@Tags`). */
+  tags?: OpenAPIV3_1.TagObject[];
   /**
    * multer options for `multipart/form-data` (file-upload) routes, passed
    * straight through to multer. Defaults to in-memory storage, so handlers
@@ -451,6 +461,9 @@ export class Zodec {
     return generateOpenApiDocument(prototypes, this.options.info, {
       securitySchemes,
       specVersion: options.specVersion,
+      servers: this.options.servers,
+      externalDocs: this.options.externalDocs,
+      tags: this.options.tags,
     });
   }
 

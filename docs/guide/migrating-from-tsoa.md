@@ -44,6 +44,9 @@ the routing and parameter decorators are nearly identical.
 | `tsoa routes && tsoa spec`, `RegisterRoutes(app)` | `api.mount(app)`, `api.swagger()`               | No generated files.                                               |
 | IoC container (`iocModule`)                       | `api.register(new C(deps))`                     | Explicit construction.                                            |
 | `@Security('jwt', scopes)`                        | `@Security('jwt', scopes)` + `bearer()` handler | Schemes registered on the instance; principal via `@Principal()`. |
+| `@OperationId('x')`                               | `@OperationId('x')`                             | Both default the id to the method name.                           |
+| JSDoc summary / description on the method         | `@Summary('…')` / `@Description('…')`           | zodec uses decorators, not doc comments.                          |
+| JSDoc `@deprecated` tag                           | `@Deprecated()`                                 | Marks the operation deprecated in the spec.                       |
 
 ## A controller, side by side
 

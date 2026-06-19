@@ -27,6 +27,12 @@ export interface RouteMetadata {
   tags?: string[] | undefined;
   /** `@Summary` text, if any. */
   summary?: string | undefined;
+  /** `@Description` text (the operation's long description), if any. */
+  description?: string | undefined;
+  /** `@OperationId` value (unique operation identifier), if any. */
+  operationId?: string | undefined;
+  /** Whether the operation is marked `@Deprecated`. */
+  deprecated?: boolean | undefined;
   /** Example values (from `@Example`) for the request body and/or responses. */
   examples?: ExampleMetadata[] | undefined;
   /** Binary/file responses (from `@ReturnsFile`), keyed by status code. */
@@ -36,6 +42,11 @@ export interface RouteMetadata {
    * then header name → Zod schema. Documented in OpenAPI; not validated.
    */
   responseHeaders?: Record<number, Record<string, ZodType>> | undefined;
+  /**
+   * Response descriptions (from `@Returns(..., { description })`), keyed by status
+   * code. Emitted as the OpenAPI Response Object `description`.
+   */
+  responseDescriptions?: Record<number, string> | undefined;
   /**
    * Security requirements (from `@Security`), each a scheme name + required
    * scopes. Stacked `@Security` decorators are alternatives (OR); the route is
@@ -96,9 +107,13 @@ const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
 const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
 const RESPONSE_HEADERS_KEY = Symbol('zodec:responseHeaders');
+const RESPONSE_DESCRIPTIONS_KEY = Symbol('zodec:responseDescriptions');
 const FILE_RESPONSES_KEY = Symbol('zodec:fileResponses');
 const EXAMPLES_KEY = Symbol('zodec:examples');
 const SUMMARY_KEY = Symbol('zodec:summary');
+const DESCRIPTION_KEY = Symbol('zodec:description');
+const OPERATION_ID_KEY = Symbol('zodec:operationId');
+const DEPRECATED_KEY = Symbol('zodec:deprecated');
 const SECURITY_KEY = Symbol('zodec:security');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
 const PARAM_INJECTIONS_KEY = Symbol('zodec:paramInjections');
@@ -182,6 +197,19 @@ export function addResponseHeaders(
   Reflect.defineMetadata(RESPONSE_HEADERS_KEY, all, target, handlerName);
 }
 
+/** Records a response description for a status code. Called by `@Returns`. */
+export function addResponseDescription(
+  target: object,
+  handlerName: string,
+  status: number,
+  description: string,
+): void {
+  const all = (Reflect.getOwnMetadata(RESPONSE_DESCRIPTIONS_KEY, target, handlerName) ??
+    {}) as Record<number, string>;
+  all[status] = description;
+  Reflect.defineMetadata(RESPONSE_DESCRIPTIONS_KEY, all, target, handlerName);
+}
+
 /** Records a binary/file response for a status code. Called by `@ReturnsFile`. */
 export function addFileResponse(
   target: object,
@@ -206,6 +234,21 @@ export function addExample(target: object, handlerName: string, example: Example
 /** Stores the operation summary for a handler. Called by `@Summary`. */
 export function setSummary(target: object, handlerName: string, text: string): void {
   Reflect.defineMetadata(SUMMARY_KEY, text, target, handlerName);
+}
+
+/** Stores the operation description for a handler. Called by `@Description`. */
+export function setDescription(target: object, handlerName: string, text: string): void {
+  Reflect.defineMetadata(DESCRIPTION_KEY, text, target, handlerName);
+}
+
+/** Stores the operation id for a handler. Called by `@OperationId`. */
+export function setOperationId(target: object, handlerName: string, id: string): void {
+  Reflect.defineMetadata(OPERATION_ID_KEY, id, target, handlerName);
+}
+
+/** Marks a handler's operation as deprecated. Called by `@Deprecated`. */
+export function setDeprecated(target: object, handlerName: string): void {
+  Reflect.defineMetadata(DEPRECATED_KEY, true, target, handlerName);
 }
 
 /**
@@ -327,6 +370,15 @@ export function getRoutes(target: object): RouteMetadata[] {
       >,
       tags: tags.length > 0 ? tags : undefined,
       summary: Reflect.getOwnMetadata(SUMMARY_KEY, target, handlerName) as string | undefined,
+      description: Reflect.getOwnMetadata(DESCRIPTION_KEY, target, handlerName) as
+        | string
+        | undefined,
+      operationId: Reflect.getOwnMetadata(OPERATION_ID_KEY, target, handlerName) as
+        | string
+        | undefined,
+      deprecated: Reflect.getOwnMetadata(DEPRECATED_KEY, target, handlerName) as
+        | boolean
+        | undefined,
       examples: Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) as
         | ExampleMetadata[]
         | undefined,
@@ -336,6 +388,11 @@ export function getRoutes(target: object): RouteMetadata[] {
       responseHeaders: Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) as
         | Record<number, Record<string, ZodType>>
         | undefined,
+      responseDescriptions: Reflect.getOwnMetadata(
+        RESPONSE_DESCRIPTIONS_KEY,
+        target,
+        handlerName,
+      ) as Record<number, string> | undefined,
       security:
         (Reflect.getOwnMetadata(SECURITY_KEY, target, handlerName) as
           | SecurityRequirement[]

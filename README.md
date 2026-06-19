@@ -138,6 +138,9 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@ReturnsFile(status, options?)`                                            | Declare a binary/file response (return a `FileResponse`)               |
 | `@Security(scheme, scopes?)`                                                | Require a named auth scheme — class or method, stackable = OR          |
 | `@Summary(text)`                                                            | Operation summary in swagger                                           |
+| `@Description(text)`                                                        | Operation description (longer prose) in swagger                        |
+| `@OperationId(id)`                                                          | Operation id (defaults to the handler method name)                     |
+| `@Deprecated()`                                                             | Marks the operation `deprecated` in swagger                            |
 | `@Example(value, status?)`                                                  | Example for the request body, or a response (`status`) — stackable     |
 
 ### Parameter decorators
@@ -293,10 +296,12 @@ full conversion table.
 
 ## Migrating
 
-Coming from another framework? See the migration guides:
+Coming from another tool? See the migration guides:
 
 - **[Migrating from tsoa](https://joeferner.github.io/zodec/guide/migrating-from-tsoa)** —
   decorator/concept mapping, JSDoc-tags → Zod, and how zodec drops the build step.
+- **[Migrating from a hand-written OpenAPI doc](https://joeferner.github.io/zodec/guide/migrating-from-openapi)** —
+  every OpenAPI feature mapped to its zodec/Zod equivalent, plus the post-process escape hatch.
 
 ---
 

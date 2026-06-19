@@ -3,10 +3,14 @@ import {
   addExample,
   addFileResponse,
   addResponseHeaders,
+  addResponseDescription,
   addReturnSchema,
   addSecurity,
   setBodySchema,
+  setDeprecated,
+  setDescription,
   setHttpMethod,
+  setOperationId,
   setParamsSchema,
   setPrefix,
   setQuerySchema,
@@ -22,6 +26,8 @@ export interface ReturnsOptions {
    * OpenAPI `responses[status].headers` (not validated at runtime).
    */
   headers?: Record<string, ZodType>;
+  /** Response description for the OpenAPI `responses[status].description`. */
+  description?: string;
 }
 
 /** Options for {@link ReturnsFile}. */
@@ -132,11 +138,14 @@ export function Body(schema: ZodType): MethodDecorator {
  *
  * @param status - HTTP status code, e.g. `200`.
  * @param schema - Zod schema for the response body; omit for no body.
- * @param options - Extra response metadata, e.g. `headers`.
+ * @param options - Extra response metadata, e.g. `headers` or `description`.
  *
  * @example
  * ```ts
- * @Returns(200, UserListSchema, { headers: { 'X-Total-Count': z.number().int() } })
+ * @Returns(200, UserListSchema, {
+ *   description: 'A page of users',
+ *   headers: { 'X-Total-Count': z.number().int() },
+ * })
  * ```
  */
 export function Returns(
@@ -148,6 +157,9 @@ export function Returns(
     addReturnSchema(target, String(propertyKey), status, schema);
     if (options?.headers) {
       addResponseHeaders(target, String(propertyKey), status, options.headers);
+    }
+    if (options?.description !== undefined) {
+      addResponseDescription(target, String(propertyKey), status, options.description);
     }
   };
 }
@@ -208,6 +220,40 @@ export function Security(scheme: string, scopes: string[] = []): ClassDecorator 
 export function Summary(text: string): MethodDecorator {
   return (target, propertyKey) => {
     setSummary(target, String(propertyKey), text);
+  };
+}
+
+/**
+ * Sets the operation's `description` in the generated OpenAPI document — the
+ * longer prose shown beneath the summary (CommonMark is allowed).
+ *
+ * @param text - Description of the operation.
+ */
+export function Description(text: string): MethodDecorator {
+  return (target, propertyKey) => {
+    setDescription(target, String(propertyKey), text);
+  };
+}
+
+/**
+ * Sets the operation's `operationId` — a unique identifier used by client/code
+ * generators to name the generated method.
+ *
+ * @param id - Unique operation id (must be unique across the whole document).
+ */
+export function OperationId(id: string): MethodDecorator {
+  return (target, propertyKey) => {
+    setOperationId(target, String(propertyKey), id);
+  };
+}
+
+/**
+ * Marks the operation as `deprecated` in the generated OpenAPI document. The
+ * route still works; tools render it struck through.
+ */
+export function Deprecated(): MethodDecorator {
+  return (target, propertyKey) => {
+    setDeprecated(target, String(propertyKey));
   };
 }
 

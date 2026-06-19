@@ -28,7 +28,10 @@ export default defineConfig({
         },
         {
           text: 'Migrating',
-          items: [{ text: 'From tsoa', link: '/guide/migrating-from-tsoa' }],
+          items: [
+            { text: 'From tsoa', link: '/guide/migrating-from-tsoa' },
+            { text: 'From OpenAPI', link: '/guide/migrating-from-openapi' },
+          ],
         },
       ],
       '/api/': [{ text: 'Overview', link: '/api/' }, ...typedocSidebar],

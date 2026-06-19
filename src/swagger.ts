@@ -24,6 +24,15 @@ export interface OpenApiOptions {
   securitySchemes?: SecuritySchemes | undefined;
   /** OpenAPI spec version to emit. Defaults to `'3.1'`. */
   specVersion?: SpecVersion | undefined;
+  /** `servers` array for the document (base URLs). */
+  servers?: OpenAPIV3_1.ServerObject[] | undefined;
+  /** Top-level `externalDocs` for the document. */
+  externalDocs?: OpenAPIV3_1.ExternalDocumentationObject | undefined;
+  /**
+   * Top-level `tags` array — tag definitions with descriptions. The tag *names*
+   * on operations come from `@Tags`; this adds their descriptions/metadata.
+   */
+  tags?: OpenAPIV3_1.TagObject[] | undefined;
 }
 
 /**
@@ -48,13 +57,12 @@ export function toJsonSchema(schema: ZodType): JsonSchema {
   return z.toJSONSchema(schema);
 }
 
-/** OpenAPI `info` block (title + version) passed to the document builders. */
-export interface OpenApiInfo {
-  /** API title. */
-  title: string;
-  /** API version string. */
-  version: string;
-}
+/**
+ * OpenAPI `info` block. `title` and `version` are required; the rest of the
+ * OpenAPI Info Object (`description`, `summary`, `termsOfService`, `contact`,
+ * `license`) is optional and emitted verbatim.
+ */
+export type OpenApiInfo = OpenAPIV3_1.InfoObject;
 
 /** A mutable JSON object, used while rewriting converted schemas. */
 type JsonObject = Record<string, unknown>;
@@ -128,12 +136,23 @@ class DocumentBuilder {
     if (options.securitySchemes && Object.keys(options.securitySchemes).length > 0) {
       components.securitySchemes = options.securitySchemes;
     }
-    return {
+    const document: OpenApiDocument = {
       openapi: '3.1.0',
       info,
       paths,
       components,
     };
+    // Top-level document metadata — emitted verbatim when provided.
+    if (options.servers) {
+      document.servers = options.servers;
+    }
+    if (options.externalDocs) {
+      document.externalDocs = options.externalDocs;
+    }
+    if (options.tags) {
+      document.tags = options.tags;
+    }
+    return document;
   }
 
   private operation(route: RouteMetadata): OpenAPIV3_1.OperationObject {
@@ -142,9 +161,12 @@ class DocumentBuilder {
       ...(route.params ? this.parameters(route.params, 'path') : []),
       ...(route.query ? this.parameters(route.query, 'query') : []),
     ];
+    const descriptions = route.responseDescriptions ?? {};
     const responses: Record<string, OpenAPIV3_1.ResponseObject> = {};
     for (const [status, schema] of Object.entries(route.responses)) {
-      const response: OpenAPIV3_1.ResponseObject = { description: '' };
+      const response: OpenAPIV3_1.ResponseObject = {
+        description: descriptions[Number(status)] ?? '',
+      };
       // A status declared with no schema (e.g. 204) has no response body.
       if (schema) {
         const example = examples.find((e) => e.status === Number(status));
@@ -155,7 +177,7 @@ class DocumentBuilder {
     // Binary/file responses (@ReturnsFile) advertise a binary body.
     for (const [status, decl] of Object.entries(route.fileResponses ?? {})) {
       responses[status] = {
-        description: decl.description ?? '',
+        description: decl.description ?? descriptions[Number(status)] ?? '',
         content: {
           [decl.contentType]: {
             schema: { type: 'string', format: 'binary' },
@@ -182,6 +204,15 @@ class DocumentBuilder {
     }
     if (route.summary) {
       operation.summary = route.summary;
+    }
+    if (route.description) {
+      operation.description = route.description;
+    }
+    // Defaults to the handler method name; @OperationId overrides. (Operation ids
+    // must be unique across the document — override when method names collide.)
+    operation.operationId = route.operationId ?? route.handlerName;
+    if (route.deprecated) {
+      operation.deprecated = true;
     }
     // Stacked @Security = OR → one security requirement object per requirement.
     if (route.security && route.security.length > 0) {

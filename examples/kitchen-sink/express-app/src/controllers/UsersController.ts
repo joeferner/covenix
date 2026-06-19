@@ -15,6 +15,9 @@ import {
   Returns,
   ReturnsFile,
   Summary,
+  Description,
+  OperationId,
+  Deprecated,
   Example,
   Security,
   Param,
@@ -77,8 +80,10 @@ export class UsersController {
   @Get('{id}')
   @Summary('Fetch a single user by id')
   @Params(IdParams)
-  @Returns(200, UserSchema)
-  @Returns(404, ErrorSchema)
+  // The optional `description` fills the OpenAPI Response Object description
+  // (which the spec requires) instead of leaving it blank.
+  @Returns(200, UserSchema, { description: 'The requested user' })
+  @Returns(404, ErrorSchema, { description: 'No user with that id' })
   public async get(@Param('id') id: string): Promise<User> {
     const user = await this.users.findById(id);
     if (!user) throw new createError.NotFound(`No user ${id}`);
@@ -110,6 +115,14 @@ export class UsersController {
   // not a coerced number).
   @Get('{id}/avatar')
   @Summary('Avatar URL for a user (no method-level schema on this route)')
+  // @Description adds the longer prose; @OperationId names it for client codegen
+  // (otherwise it would default to the method name, `avatar`); @Deprecated marks
+  // it superseded — the route still works, but tools render it struck through.
+  @Description(
+    'Returns a URL string. Superseded by `GET {id}/avatar/raw`, which streams the image with HTTP Range support.',
+  )
+  @OperationId('getUserAvatarUrl')
+  @Deprecated()
   @Returns(200, z.object({ url: z.string() }))
   public async avatar(
     @Param('id') id: string,

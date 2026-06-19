@@ -86,6 +86,15 @@ victim="$(
 expect 403 "DELETE /users/:id (non-admin) → 403" -X DELETE "$BASE/users/$victim" -H "authorization: $USER_TOKEN"
 expect 204 "DELETE /users/:id (admin) → 204" -X DELETE "$BASE/users/$victim" -H "authorization: $ADMIN_TOKEN"
 
+# @Deprecated + @OperationId surface on the legacy avatar URL operation.
+if curl -s "$BASE/swagger.json" |
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const op=JSON.parse(s).paths["/users/{id}/avatar"].get;process.exit(op.deprecated===true&&op.operationId==="getUserAvatarUrl"?0:1)})'; then
+  echo "    ✓ swagger marks GET /users/{id}/avatar deprecated with a custom operationId"
+else
+  echo "    ✗ swagger missing deprecated/operationId on /users/{id}/avatar"
+  fail=1
+fi
+
 # Swagger advertises the bearer scheme + the per-operation requirement.
 if curl -s "$BASE/swagger.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/auth/me"].get.security);process.exit(ok?0:1)})'; then
