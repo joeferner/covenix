@@ -2,6 +2,7 @@ import type { ZodObject, ZodType } from 'zod';
 import {
   addExample,
   addFileResponse,
+  addResponseHeaders,
   addReturnSchema,
   setBodySchema,
   setHttpMethod,
@@ -12,6 +13,15 @@ import {
   setTags,
   type HttpMethod,
 } from './metadata.js';
+
+/** Options for {@link Returns}. */
+export interface ReturnsOptions {
+  /**
+   * Response headers, keyed by header name → Zod schema. Documented in the
+   * OpenAPI `responses[status].headers` (not validated at runtime).
+   */
+  headers?: Record<string, ZodType>;
+}
 
 /** Options for {@link ReturnsFile}. */
 export interface ReturnsFileOptions {
@@ -121,10 +131,23 @@ export function Body(schema: ZodType): MethodDecorator {
  *
  * @param status - HTTP status code, e.g. `200`.
  * @param schema - Zod schema for the response body; omit for no body.
+ * @param options - Extra response metadata, e.g. `headers`.
+ *
+ * @example
+ * ```ts
+ * @Returns(200, UserListSchema, { headers: { 'X-Total-Count': z.number().int() } })
+ * ```
  */
-export function Returns(status: number, schema?: ZodType): MethodDecorator {
+export function Returns(
+  status: number,
+  schema?: ZodType,
+  options?: ReturnsOptions,
+): MethodDecorator {
   return (target, propertyKey) => {
     addReturnSchema(target, String(propertyKey), status, schema);
+    if (options?.headers) {
+      addResponseHeaders(target, String(propertyKey), status, options.headers);
+    }
   };
 }
 

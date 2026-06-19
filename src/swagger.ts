@@ -131,6 +131,18 @@ class DocumentBuilder {
         },
       };
     }
+    // Response headers (@Returns(..., { headers })) attach to their response.
+    for (const [status, headers] of Object.entries(route.responseHeaders ?? {})) {
+      const response = responses[status];
+      if (response) {
+        response.headers = Object.fromEntries(
+          Object.entries(headers).map(([name, schema]) => [
+            name,
+            { schema: asParameterSchema(this.toJson(schema)) },
+          ]),
+        );
+      }
+    }
 
     const operation: OpenAPIV3_1.OperationObject = { responses };
     if (route.tags && route.tags.length > 0) {
@@ -150,6 +162,13 @@ class DocumentBuilder {
       };
     }
     return operation;
+  }
+
+  /** Converts a Zod schema to a JSON Schema fragment, hoisting named `$defs`. */
+  private toJson(schema: ZodType): JsonSchema {
+    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    this.hoist(json);
+    return json;
   }
 
   /** Builds a media type object: the converted schema plus an optional example. */

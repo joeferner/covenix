@@ -31,6 +31,11 @@ export interface RouteMetadata {
   examples?: ExampleMetadata[] | undefined;
   /** Binary/file responses (from `@ReturnsFile`), keyed by status code. */
   fileResponses?: Record<number, FileResponseDecl> | undefined;
+  /**
+   * Response headers (from `@Returns(..., { headers })`), keyed by status code,
+   * then header name → Zod schema. Documented in OpenAPI; not validated.
+   */
+  responseHeaders?: Record<number, Record<string, ZodType>> | undefined;
 }
 
 /** A binary/file response declaration recorded by `@ReturnsFile`. */
@@ -76,6 +81,7 @@ const PARAMS_SCHEMA_KEY = Symbol('zodec:paramsSchema');
 const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
 const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
+const RESPONSE_HEADERS_KEY = Symbol('zodec:responseHeaders');
 const FILE_RESPONSES_KEY = Symbol('zodec:fileResponses');
 const EXAMPLES_KEY = Symbol('zodec:examples');
 const SUMMARY_KEY = Symbol('zodec:summary');
@@ -144,6 +150,21 @@ export function setQuerySchema(target: object, handlerName: string, schema: ZodT
 /** Stores the `req.body` schema for a handler. Called by `@Body`. */
 export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
   Reflect.defineMetadata(BODY_KEY, schema, target, handlerName);
+}
+
+/** Records response headers for a status code. Called by `@Returns`. */
+export function addResponseHeaders(
+  target: object,
+  handlerName: string,
+  status: number,
+  headers: Record<string, ZodType>,
+): void {
+  const all = (Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) ?? {}) as Record<
+    number,
+    Record<string, ZodType>
+  >;
+  all[status] = { ...all[status], ...headers };
+  Reflect.defineMetadata(RESPONSE_HEADERS_KEY, all, target, handlerName);
 }
 
 /** Records a binary/file response for a status code. Called by `@ReturnsFile`. */
@@ -259,6 +280,9 @@ export function getRoutes(target: object): RouteMetadata[] {
         | undefined,
       fileResponses: Reflect.getOwnMetadata(FILE_RESPONSES_KEY, target, handlerName) as
         | Record<number, FileResponseDecl>
+        | undefined,
+      responseHeaders: Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) as
+        | Record<number, Record<string, ZodType>>
         | undefined,
     };
   });

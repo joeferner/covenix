@@ -66,6 +66,14 @@ expect 422 "POST /users (invalid body)" -X POST "$BASE/users" \
 expect 400 "GET /users/not-a-uuid (bad path param)" "$BASE/users/not-a-uuid"
 expect 200 "GET /swagger.json" "$BASE/swagger.json"
 
+# Response header declared via @Returns(..., { headers }) and set by the handler.
+if curl -s -D - -o /dev/null "$BASE/users" | grep -qi '^x-total-count:'; then
+  echo "    ✓ GET /users sets the X-Total-Count response header"
+else
+  echo "    ✗ GET /users missing X-Total-Count header"
+  fail=1
+fi
+
 # File download: create a user, then download it as CSV (@ReturnsFile / FileResponse).
 uid="$(
   curl -s -X POST "$BASE/users" -H 'content-type: application/json' \

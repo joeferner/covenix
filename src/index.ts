@@ -14,7 +14,7 @@ export {
   Summary,
   Example,
 } from './decorators.js';
-export type { ReturnsFileOptions } from './decorators.js';
+export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
 export { BodyParam, Header, Param, QueryParam, Req, Res } from './parameters.js';

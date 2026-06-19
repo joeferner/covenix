@@ -148,6 +148,30 @@ describe('api.swagger()', () => {
     });
   });
 
+  it('attaches @Returns headers to the matching response', () => {
+    @Route('widgets')
+    class WidgetController {
+      @Get()
+      @Returns(200, z.object({ ok: z.boolean() }), {
+        headers: { 'X-Total-Count': z.number().int(), 'X-Request-Id': z.string() },
+      })
+      public list(): unknown {
+        return { ok: true };
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new WidgetController());
+    const res200 = api.swagger().paths?.['/widgets']?.get?.responses?.['200'];
+
+    expect(res200).toMatchObject({
+      headers: {
+        'X-Total-Count': { schema: { type: 'integer' } },
+        'X-Request-Id': { schema: { type: 'string' } },
+      },
+    });
+  });
+
   it('emits a no-body response for @Returns(status) with no schema', () => {
     @Route('things')
     class ThingController {
