@@ -300,6 +300,55 @@ describe('api.swagger()', () => {
     });
   });
 
+  describe('specVersion', () => {
+    const Thing = z
+      .object({
+        name: z.string().nullable(), // anyOf [string, null] → nullable
+        count: z.number().gt(0).lt(10), // exclusive bounds (numeric → boolean)
+        kind: z.literal('widget'), // const → enum
+        avatar: z.file().mime(['image/png']).optional(), // contentEncoding/contentMediaType
+      })
+      .meta({ id: 'Thing' });
+
+    @Route('things')
+    class ThingsController {
+      @Post()
+      @Body(Thing)
+      @Returns(200, Thing)
+      public create(): unknown {
+        return null;
+      }
+    }
+
+    function doc(specVersion?: '3.0' | '3.1'): ReturnType<Zodec['swagger']> {
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new ThingsController());
+      return api.swagger(specVersion ? { specVersion } : {});
+    }
+
+    it('emits 3.1.0 by default', () => {
+      expect(doc().openapi).toBe('3.1.0');
+    });
+
+    it('down-converts to 3.0.3 with 3.0-shaped schemas', () => {
+      const d = doc('3.0');
+      expect(d.openapi).toBe('3.0.3');
+      expect(d.components?.schemas?.['Thing']).toMatchObject({
+        properties: {
+          name: { type: 'string', nullable: true }, // anyOf[..., null] collapsed
+          count: { minimum: 0, maximum: 10, exclusiveMinimum: true, exclusiveMaximum: true },
+          kind: { enum: ['widget'] }, // const → enum
+          avatar: { type: 'string', format: 'binary' }, // 3.1 annotations dropped
+        },
+      });
+      const props = (d.components?.schemas?.['Thing'] as { properties: Record<string, object> })
+        .properties;
+      expect(props['name']).not.toHaveProperty('anyOf');
+      expect(props['kind']).not.toHaveProperty('const');
+      expect(props['avatar']).not.toHaveProperty('contentEncoding');
+    });
+  });
+
   it('generateSwagger(classes) matches api.swagger() for the same controllers', () => {
     const info = { title: 'My API', version: '1.0.0' };
 

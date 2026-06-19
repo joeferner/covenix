@@ -53,4 +53,10 @@ export type { ZodecInfo, ZodecOptions } from './zodec.js';
 export { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
 export type { ZodecErrorHandlerOptions } from './errors.js';
 export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
-export type { JsonSchema, OpenApiDocument, OpenApiInfo, OpenApiOptions } from './swagger.js';
+export type {
+  JsonSchema,
+  OpenApiDocument,
+  OpenApiInfo,
+  OpenApiOptions,
+  SpecVersion,
+} from './swagger.js';

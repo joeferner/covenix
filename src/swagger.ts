@@ -2,7 +2,17 @@ import { z, type ZodType } from 'zod';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { getPrefix, getRoutes, type ExampleMetadata, type RouteMetadata } from './metadata.js';
 import { isMultipart } from './multipart.js';
+import { downConvertToV30 } from './downconvert.js';
 import type { SecuritySchemes } from './security.js';
+
+/**
+ * OpenAPI specification version to emit. zodec produces **`'3.1'`** by default
+ * (its native form — Zod 4's `z.toJSONSchema()` is JSON Schema draft 2020-12,
+ * which 3.1 uses verbatim). Choose `'3.0'` when a consumer has only partial 3.1
+ * support (e.g. `openapi-generator`'s `typescript-fetch`); zodec down-converts
+ * the schemas (nullable, exclusive bounds, `const`, binary, …) accordingly.
+ */
+export type SpecVersion = '3.0' | '3.1';
 
 /** Optional inputs for OpenAPI generation beyond the controllers themselves. */
 export interface OpenApiOptions {
@@ -12,6 +22,8 @@ export interface OpenApiOptions {
    * explicitly to {@link generateSwagger} for instance-free generation.
    */
   securitySchemes?: SecuritySchemes | undefined;
+  /** OpenAPI spec version to emit. Defaults to `'3.1'`. */
+  specVersion?: SpecVersion | undefined;
 }
 
 /**
@@ -264,7 +276,9 @@ export function generateOpenApiDocument(
   info: OpenApiInfo,
   options: OpenApiOptions = {},
 ): OpenApiDocument {
-  return new DocumentBuilder().build(prototypes, info, options);
+  const document = new DocumentBuilder().build(prototypes, info, options);
+  // The builder always emits 3.1 (zodec's native form); down-convert if asked.
+  return options.specVersion === '3.0' ? downConvertToV30(document) : document;
 }
 
 /**
@@ -275,9 +289,10 @@ export function generateOpenApiDocument(
  *
  * @param controllers - The controller classes (constructors, not instances).
  * @param info - OpenAPI `info` block. Defaults to `{ title: 'API', version: '1.0.0' }`.
- * @param options - Extra inputs, e.g. `securitySchemes` (needed when routes use
- *   `@Security`, since scheme definitions aren't carried on the classes).
- * @returns The assembled OpenAPI 3.1 document.
+ * @param options - Extra inputs: `securitySchemes` (needed when routes use
+ *   `@Security`, since scheme definitions aren't carried on the classes) and
+ *   `specVersion` (`'3.1'` by default; `'3.0'` to down-convert).
+ * @returns The assembled OpenAPI document (3.1 by default).
  *
  * @example
  * ```ts

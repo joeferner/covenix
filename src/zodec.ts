@@ -15,7 +15,7 @@ import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import type { SecurityConfig } from './security.js';
-import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
+import { generateOpenApiDocument, type OpenApiDocument, type SpecVersion } from './swagger.js';
 
 /**
  * Per-request values the handler's injected parameters resolve from. Each source
@@ -312,9 +312,10 @@ export class Zodec {
    * Builds the OpenAPI document from the registered controllers' metadata.
    * Independent of {@link Zodec.mount} — does not require routes to be wired.
    *
-   * @returns The assembled OpenAPI 3.1 document.
+   * @param options - Generation options, e.g. `specVersion` (defaults to `'3.1'`).
+   * @returns The assembled OpenAPI document.
    */
-  public swagger(): OpenApiDocument {
+  public swagger(options: { specVersion?: SpecVersion } = {}): OpenApiDocument {
     const prototypes = this.controllers.map(
       (instance) => Object.getPrototypeOf(instance) as object,
     );
@@ -324,7 +325,10 @@ export class Zodec {
     const securitySchemes = security
       ? Object.fromEntries(Object.entries(security).map(([name, s]) => [name, s.scheme]))
       : undefined;
-    return generateOpenApiDocument(prototypes, this.options.info, { securitySchemes });
+    return generateOpenApiDocument(prototypes, this.options.info, {
+      securitySchemes,
+      specVersion: options.specVersion,
+    });
   }
 
   /**

@@ -273,6 +273,21 @@ instance, no service wiring, no Express — just the classes and their decorator
 Use `api.swagger()` instead when you already have a configured instance on hand
 (e.g. serving the spec from the running app).
 
+### Spec version: 3.1 by default
+
+zodec emits **OpenAPI 3.1.0** — its native form, since Zod 4's `z.toJSONSchema()`
+is JSON Schema draft 2020-12 (what 3.1 uses). For tooling with only partial 3.1
+support (e.g. `openapi-generator`'s `typescript-fetch`), pass `specVersion: '3.0'`
+to down-convert nullables, exclusive bounds, `const`, and binary annotations:
+
+```typescript
+api.swagger({ specVersion: '3.0' });
+generateSwagger([UsersController], info, { specVersion: '3.0' });
+```
+
+See [OpenAPI / Swagger](https://joeferner.github.io/zodec/guide/swagger) for the
+full conversion table.
+
 ---
 
 ## Migrating
