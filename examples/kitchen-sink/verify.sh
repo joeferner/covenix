@@ -17,7 +17,9 @@ TMP="$(mktemp -d)"
 fail=0
 
 cleanup() {
-  [ -n "${SERVER_PID:-}" ] && kill "$SERVER_PID" 2>/dev/null || true
+  # The server runs in its own process group (setsid); kill the whole group so
+  # the tsx → node grandchild holding the port goes down too, not just `npm`.
+  [ -n "${SERVER_PGID:-}" ] && kill -- "-$SERVER_PGID" 2>/dev/null || true
   rm -rf "$TMP"
 }
 trap cleanup EXIT
@@ -32,8 +34,8 @@ npm install >/dev/null
 # 1. Boot the server and exercise endpoints
 # ----------------------------------------------------------------------------
 echo "==> Starting server on :$PORT"
-(cd "$APP_DIR" && PORT="$PORT" exec npm start) >"$TMP/server.log" 2>&1 &
-SERVER_PID=$!
+setsid sh -c "cd '$APP_DIR' && PORT='$PORT' exec npm start" >"$TMP/server.log" 2>&1 &
+SERVER_PGID=$!
 
 for _ in $(seq 1 50); do
   curl -sf "$BASE/health" >/dev/null 2>&1 && break
@@ -63,6 +65,26 @@ expect 422 "POST /users (invalid body)" -X POST "$BASE/users" \
   -H 'content-type: application/json' -d '{"username":"x"}'
 expect 400 "GET /users/not-a-uuid (bad path param)" "$BASE/users/not-a-uuid"
 expect 200 "GET /swagger.json" "$BASE/swagger.json"
+
+# File download: create a user, then download it as CSV (@ReturnsFile / FileResponse).
+uid="$(
+  curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+    -d '{"username":"bob","email":"bob@example.com"}' |
+    node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).id))'
+)"
+DL_HEADERS="$TMP/export.headers"
+DL_BODY="$(curl -s -D "$DL_HEADERS" "$BASE/users/$uid/export")"
+DL_CODE="$(awk 'NR==1{print $2}' "$DL_HEADERS")"
+if [ "$DL_CODE" = "200" ] &&
+  grep -qi '^content-type: *text/csv' "$DL_HEADERS" &&
+  grep -qi '^content-disposition: *attachment' "$DL_HEADERS" &&
+  printf '%s' "$DL_BODY" | head -1 | grep -q '^id,username,email'; then
+  echo "    ✓ GET /users/:id/export streams CSV (200, content-type + attachment)"
+else
+  echo "    ✗ GET /users/:id/export failed (code=$DL_CODE)"
+  sed -n '1,8p' "$DL_HEADERS"
+  fail=1
+fi
 
 # ----------------------------------------------------------------------------
 # 2. Instance vs static swagger generators must produce identical output

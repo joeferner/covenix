@@ -12,12 +12,14 @@ import {
   Query,
   Body,
   Returns,
+  ReturnsFile,
   Summary,
   Example,
   Param,
   QueryParam,
   BodyParam,
   Header,
+  FileResponse,
 } from 'zodec';
 import {
   CreateUserSchema,
@@ -97,6 +99,25 @@ export class UsersController {
   ): Promise<{ url: string }> {
     const dimension = size ?? '128';
     return { url: `https://avatars.example.com/${id}?size=${dimension}` };
+  }
+
+  // File download: return a `FileResponse` instead of JSON. zodec streams the
+  // body and sets Content-Type / Content-Disposition, and `@ReturnsFile`
+  // declares the binary media type in the generated OpenAPI (so swagger reflects
+  // the non-JSON body). The 404 still flows through the normal error pipeline.
+  @Get('{id}/export')
+  @Summary('Download a user as a CSV file')
+  @Params(IdParams)
+  @ReturnsFile(200, { contentType: 'text/csv' })
+  @Returns(404, ErrorSchema)
+  public async export(@Param('id') id: string): Promise<FileResponse> {
+    const user = await this.users.findById(id);
+    if (!user) throw new createError.NotFound(`No user ${id}`);
+    const csv = `id,username,email\n${user.id},${user.username},${user.email}\n`;
+    return new FileResponse(Buffer.from(csv), {
+      contentType: 'text/csv',
+      filename: `user-${user.id}.csv`,
+    });
   }
 
   @Post()

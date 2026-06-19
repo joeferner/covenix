@@ -36,7 +36,9 @@ class ItemsController {
   @Returns(200, Item)
   @Returns(404, z.object({}))
   public get(@Param('id') id: string): unknown {
-    if (id === 'missing') throw new createError.NotFound('no such item');
+    if (id === 'missing') {
+      throw new createError.NotFound('no such item');
+    }
     return { id, name: 'found' };
   }
 

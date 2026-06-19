@@ -120,11 +120,28 @@ class DocumentBuilder {
       }
       responses[status] = response;
     }
+    // Binary/file responses (@ReturnsFile) advertise a binary body.
+    for (const [status, decl] of Object.entries(route.fileResponses ?? {})) {
+      responses[status] = {
+        description: decl.description ?? '',
+        content: {
+          [decl.contentType]: {
+            schema: { type: 'string', format: 'binary' },
+          },
+        },
+      };
+    }
 
     const operation: OpenAPIV3_1.OperationObject = { responses };
-    if (route.tags && route.tags.length > 0) operation.tags = route.tags;
-    if (route.summary) operation.summary = route.summary;
-    if (parameters.length > 0) operation.parameters = parameters;
+    if (route.tags && route.tags.length > 0) {
+      operation.tags = route.tags;
+    }
+    if (route.summary) {
+      operation.summary = route.summary;
+    }
+    if (parameters.length > 0) {
+      operation.parameters = parameters;
+    }
     if (route.body) {
       const example = examples.find((e) => e.status === undefined);
       operation.requestBody = {
@@ -138,7 +155,9 @@ class DocumentBuilder {
   /** Builds a media type object: the converted schema plus an optional example. */
   private media(schema: ZodType, example?: ExampleMetadata): OpenAPIV3_1.MediaTypeObject {
     const media: OpenAPIV3_1.MediaTypeObject = { schema: this.schema(schema) };
-    if (example) media.example = example.value;
+    if (example) {
+      media.example = example.value;
+    }
     return media;
   }
 

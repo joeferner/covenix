@@ -6,7 +6,9 @@ import {
   type ParamMetadata,
   type RouteMetadata,
 } from './metadata.js';
+import { Readable } from 'node:stream';
 import { ValidationError } from './errors.js';
+import { FileResponse } from './file-response.js';
 import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
 
 /**
@@ -67,17 +69,23 @@ function validate(route: RouteMetadata, req: Request): RequestValues {
   };
   if (route.params) {
     const result = route.params.safeParse(req.params);
-    if (!result.success) throw new ValidationError(400, result.error.issues);
+    if (!result.success) {
+      throw new ValidationError(400, result.error.issues);
+    }
     values.params = result.data as Record<string, unknown>;
   }
   if (route.query) {
     const result = route.query.safeParse(req.query);
-    if (!result.success) throw new ValidationError(400, result.error.issues);
+    if (!result.success) {
+      throw new ValidationError(400, result.error.issues);
+    }
     values.query = result.data as Record<string, unknown>;
   }
   if (route.body) {
     const result = route.body.safeParse(req.body);
-    if (!result.success) throw new ValidationError(422, result.error.issues);
+    if (!result.success) {
+      throw new ValidationError(422, result.error.issues);
+    }
     values.body = result.data;
   }
   return values;
@@ -106,6 +114,29 @@ function resolveParam(
       return req;
     case 'res':
       return res;
+  }
+}
+
+/**
+ * Streams a {@link FileResponse} to the client: sets Content-Disposition and
+ * Content-Type, then sends the buffer or pipes the stream. `fallbackStatus` is
+ * the route's success status, used when the FileResponse doesn't set its own.
+ */
+function sendFile(res: Response, file: FileResponse, fallbackStatus: number): void {
+  res.status(file.status ?? fallbackStatus);
+  // res.attachment() encodes the filename per RFC 5987/6266 (UTF-8 safe, with an
+  // ASCII fallback) and escapes it — it also guesses Content-Type from the
+  // extension, so set the explicit contentType afterward to let it win.
+  if (file.filename) {
+    res.attachment(file.filename);
+  }
+  if (file.contentType) {
+    res.type(file.contentType);
+  }
+  if (file.body instanceof Readable) {
+    file.body.pipe(res);
+  } else {
+    res.end(file.body);
   }
 }
 
@@ -216,7 +247,14 @@ export class Zodec {
         const args = buildArgs(params, values, req, res);
         Promise.resolve(fn.apply(instance, args)).then((value: unknown) => {
           // A handler using @Res() writes the response itself — don't double-send.
-          if (res.headersSent) return;
+          if (res.headersSent) {
+            return;
+          }
+          // A FileResponse streams a binary body; skip JSON + response validation.
+          if (value instanceof FileResponse) {
+            sendFile(res, value, status);
+            return;
+          }
           // Always-on response validation: the return value must match its
           // declared @Returns schema. A mismatch is a server bug, so it throws
           // a 500 ValidationError through the same error pipeline as everything

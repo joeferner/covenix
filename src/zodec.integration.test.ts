@@ -3,10 +3,11 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import request from 'supertest';
 import { z } from 'zod';
-import { Body, Get, Params, Post, Query, Returns, Route, Tags } from './decorators.js';
+import { Body, Get, Params, Post, Query, Returns, ReturnsFile, Route, Tags } from './decorators.js';
 import { BodyParam, Header, Param, QueryParam, Req, Res } from './parameters.js';
 import { Zodec } from './zodec.js';
 import { zodecErrorHandler } from './errors.js';
+import { FileResponse } from './file-response.js';
 
 const Greeting = z.object({ message: z.string() });
 
@@ -223,6 +224,53 @@ describe('zodecErrorHandler', () => {
 
     expect(res.status).toBe(422);
     expect(body).toEqual({ ok: false, count: 1 });
+  });
+});
+
+describe('file responses', () => {
+  @Route('files')
+  class FileController {
+    @Get('report')
+    @ReturnsFile(200, { contentType: 'text/csv' })
+    public report(): FileResponse {
+      return new FileResponse(Buffer.from('a,b\n1,2\n'), {
+        contentType: 'text/csv',
+        filename: 'report.csv',
+      });
+    }
+  }
+
+  it('streams a FileResponse with the right headers and body', async () => {
+    const res = await request(makeApp(new FileController())).get('/files/report');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/csv');
+    expect(res.headers['content-disposition']).toContain('report.csv');
+    expect(res.text).toBe('a,b\n1,2\n');
+  });
+
+  it('encodes a UTF-8 filename per RFC 5987 (filename* with ASCII fallback)', async () => {
+    @Route('files')
+    class UnicodeController {
+      @Get('report')
+      @ReturnsFile(200, { contentType: 'text/plain' })
+      public report(): FileResponse {
+        return new FileResponse(Buffer.from('hello'), {
+          contentType: 'text/plain',
+          filename: 'résumé €.txt',
+        });
+      }
+    }
+
+    const res = await request(makeApp(new UnicodeController())).get('/files/report');
+    const disposition = res.headers['content-disposition'];
+
+    expect(res.status).toBe(200);
+    // RFC 5987 UTF-8 form with the non-ASCII bytes percent-encoded...
+    expect(disposition).toContain("filename*=UTF-8''r%C3%A9sum%C3%A9%20%E2%82%AC.txt");
+    // ...plus an ASCII fallback `filename` for older clients.
+    expect(disposition).toMatch(/filename="[^"]*"/);
+    expect(res.text).toBe('hello');
   });
 });
 

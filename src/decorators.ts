@@ -1,6 +1,7 @@
 import type { ZodObject, ZodType } from 'zod';
 import {
   addExample,
+  addFileResponse,
   addReturnSchema,
   setBodySchema,
   setHttpMethod,
@@ -11,6 +12,18 @@ import {
   setTags,
   type HttpMethod,
 } from './metadata.js';
+
+/** Options for {@link ReturnsFile}. */
+export interface ReturnsFileOptions {
+  /**
+   * Media type advertised in the OpenAPI document. Defaults to
+   * `application/octet-stream`; the runtime `Content-Type` (from the returned
+   * `FileResponse`) can differ.
+   */
+  contentType?: string;
+  /** Response description for the OpenAPI document. */
+  description?: string;
+}
 
 function httpMethodDecorator(method: HttpMethod, path = ''): MethodDecorator {
   return (target, propertyKey) => {
@@ -112,6 +125,24 @@ export function Body(schema: ZodType): MethodDecorator {
 export function Returns(status: number, schema?: ZodType): MethodDecorator {
   return (target, propertyKey) => {
     addReturnSchema(target, String(propertyKey), status, schema);
+  };
+}
+
+/**
+ * Declares a binary/file response for a status code. Stackable. The handler
+ * should return a `FileResponse` for this status (zodec streams it); this
+ * decorator only advertises the binary body in the generated OpenAPI document
+ * (`{ type: 'string', format: 'binary' }`).
+ *
+ * @param status - HTTP status code, e.g. `200`.
+ * @param options - Media type / description for the OpenAPI document.
+ */
+export function ReturnsFile(status: number, options: ReturnsFileOptions = {}): MethodDecorator {
+  return (target, propertyKey) => {
+    addFileResponse(target, String(propertyKey), status, {
+      contentType: options.contentType ?? 'application/octet-stream',
+      description: options.description,
+    });
   };
 }
 

@@ -10,6 +10,7 @@ import {
   Post,
   Query,
   Returns,
+  ReturnsFile,
   Route,
   Summary,
   Tags,
@@ -110,6 +111,41 @@ describe('api.swagger()', () => {
     expect(Object.keys(doc.components?.schemas ?? {})).toEqual(
       expect.arrayContaining(['User', 'CreateUser']),
     );
+  });
+
+  it('emits a binary media type for @ReturnsFile', () => {
+    @Route('files')
+    class FileController {
+      @Get('default')
+      @ReturnsFile(200)
+      public a(): null {
+        return null;
+      }
+
+      @Get('csv')
+      @ReturnsFile(200, { contentType: 'text/csv', description: 'A CSV export' })
+      public b(): null {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new FileController());
+    const doc = api.swagger();
+
+    // Default media type when none is given.
+    expect(doc.paths?.['/files/default']?.get?.responses?.['200']).toMatchObject({
+      content: {
+        'application/octet-stream': {
+          schema: { type: 'string', format: 'binary' },
+        },
+      },
+    });
+    // Explicit media type + description.
+    expect(doc.paths?.['/files/csv']?.get?.responses?.['200']).toMatchObject({
+      description: 'A CSV export',
+      content: { 'text/csv': { schema: { type: 'string', format: 'binary' } } },
+    });
   });
 
   it('emits a no-body response for @Returns(status) with no schema', () => {

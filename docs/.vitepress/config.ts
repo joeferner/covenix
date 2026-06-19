@@ -20,6 +20,7 @@ export default defineConfig({
             { text: 'Getting Started', link: '/guide/getting-started' },
             { text: 'Validation & Errors', link: '/guide/validation' },
             { text: 'OpenAPI / Swagger', link: '/guide/swagger' },
+            { text: 'File Downloads', link: '/guide/file-downloads' },
             { text: 'API Reference', link: '/api/' },
           ],
         },

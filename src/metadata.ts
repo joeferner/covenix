@@ -29,6 +29,20 @@ export interface RouteMetadata {
   summary?: string | undefined;
   /** Example values (from `@Example`) for the request body and/or responses. */
   examples?: ExampleMetadata[] | undefined;
+  /** Binary/file responses (from `@ReturnsFile`), keyed by status code. */
+  fileResponses?: Record<number, FileResponseDecl> | undefined;
+}
+
+/** A binary/file response declaration recorded by `@ReturnsFile`. */
+export interface FileResponseDecl {
+  /**
+   * Media type for the binary body in the OpenAPI document. Defaults to
+   * `application/octet-stream` when not specified — the runtime `Content-Type`
+   * (from the returned `FileResponse`) can differ.
+   */
+  contentType: string;
+  /** Optional response description for the OpenAPI document. */
+  description?: string | undefined;
 }
 
 /** An example value attached to a route by `@Example`. */
@@ -62,6 +76,7 @@ const PARAMS_SCHEMA_KEY = Symbol('zodec:paramsSchema');
 const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
 const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
+const FILE_RESPONSES_KEY = Symbol('zodec:fileResponses');
 const EXAMPLES_KEY = Symbol('zodec:examples');
 const SUMMARY_KEY = Symbol('zodec:summary');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
@@ -129,6 +144,19 @@ export function setQuerySchema(target: object, handlerName: string, schema: ZodT
 /** Stores the `req.body` schema for a handler. Called by `@Body`. */
 export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
   Reflect.defineMetadata(BODY_KEY, schema, target, handlerName);
+}
+
+/** Records a binary/file response for a status code. Called by `@ReturnsFile`. */
+export function addFileResponse(
+  target: object,
+  handlerName: string,
+  status: number,
+  decl: FileResponseDecl,
+): void {
+  const fileResponses = (Reflect.getOwnMetadata(FILE_RESPONSES_KEY, target, handlerName) ??
+    {}) as Record<number, FileResponseDecl>;
+  fileResponses[status] = decl;
+  Reflect.defineMetadata(FILE_RESPONSES_KEY, fileResponses, target, handlerName);
 }
 
 /** Appends an example value for a handler. Called by `@Example`. */
@@ -228,6 +256,9 @@ export function getRoutes(target: object): RouteMetadata[] {
       summary: Reflect.getOwnMetadata(SUMMARY_KEY, target, handlerName) as string | undefined,
       examples: Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) as
         | ExampleMetadata[]
+        | undefined,
+      fileResponses: Reflect.getOwnMetadata(FILE_RESPONSES_KEY, target, handlerName) as
+        | Record<number, FileResponseDecl>
         | undefined,
     };
   });

@@ -55,4 +55,12 @@ export default tseslint.config(
     },
   },
   prettier,
+  {
+    // After prettier: eslint-config-prettier disables `curly`, but the `all`
+    // form is safe with prettier, so re-enable it to require braces on every
+    // control statement (if/else/for/while/do).
+    rules: {
+      curly: ['error', 'all'],
+    },
+  },
 );
