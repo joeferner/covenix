@@ -54,7 +54,26 @@ FileResponse.fromPath(path, options?); // streams a file from disk
 - **`options.filename`** — download filename. Encoded per **RFC 5987/6266**
   (a UTF-8 `filename*` plus an ASCII `filename` fallback), so non-ASCII names
   like `résumé.pdf` work and are safely escaped.
+- **`options.disposition`** — `'attachment'` (the default when a `filename` is
+  set) forces a download; `'inline'` lets the browser render it (images, PDFs,
+  audio) while still suggesting `filename`.
+- **`options.headers`** — extra response headers (e.g. `Cache-Control`, or
+  `Content-Length` for a stream). Values may be strings or numbers, and they are
+  applied **last**, so they override the headers derived from
+  `contentType`/`filename`/`disposition`.
 - **`options.status`** — overrides the HTTP status.
+
+```typescript
+return new FileResponse(pngBytes, {
+  contentType: 'image/png',
+  filename: 'avatar.png',
+  disposition: 'inline', // render in the browser instead of downloading
+  headers: { 'Cache-Control': 'private, no-store' },
+});
+```
+
+For a `Uint8Array`/`Buffer` body, `Content-Length` is set automatically; you only
+need it in `headers` for a stream.
 
 ```typescript
 // Stream a file straight from disk:
@@ -84,3 +103,39 @@ generated OpenAPI document:
 
 It's stackable with `@Returns`, so one route can declare both a binary success
 response and JSON error responses.
+
+## Partial downloads — `RangeFileResponse`
+
+For large or seekable content (video, audio, big files), return a
+[`RangeFileResponse`](/api/classes/RangeFileResponse) instead. It **guarantees
+HTTP `Range` support**: its body type is narrowed to sources zodec can serve a
+byte slice from, so returning one is the opt-in. zodec advertises
+`Accept-Ranges: bytes` and emits `206 Partial Content` for a single satisfiable
+range, `416 Range Not Satisfiable` for an unsatisfiable one, and a full `200` for
+a multi-range or malformed request. It takes the same options as `FileResponse`.
+
+Three body kinds:
+
+```typescript
+// 1. Bytes — size is intrinsic; zodec slices.
+return new RangeFileResponse(buffer, { contentType: 'image/png', disposition: 'inline' });
+
+// 2. A range-aware stream source — for large/remote content (object storage, a
+//    big file). zodec calls stream(range) for just the requested slice.
+return new RangeFileResponse(
+  { size: object.size, stream: (range) => store.getStream(key, range) },
+  { contentType: 'video/mp4', filename: 'clip.mp4' },
+);
+
+// 3. A file on disk — served via Express, so Range AND conditional GET
+//    (ETag / If-Modified-Since / If-Range) are handled for you.
+return RangeFileResponse.fromPath('/var/media/clip.mp4', { contentType: 'video/mp4' });
+```
+
+The stream source receives `{ start, end }` (inclusive) for a range request, or
+no argument for a full response. zodec resolves the slice **before** writing any
+header, so a source that throws (e.g. not found) still produces a clean error
+response. Conditional GET is handled only on the `fromPath` path; the byte
+sources support `Range` only.
+
+Pair it with `@ReturnsFile` exactly like `FileResponse`.

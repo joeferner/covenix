@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import express from 'express';
 import type { Request, Response } from 'express';
 import request from 'supertest';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
 import multer, { type Options } from 'multer';
 import { z } from 'zod';
 import {
@@ -34,6 +35,7 @@ import { Zodec } from './zodec.js';
 import { bearer, apiKey } from './security.js';
 import { SecurityError, zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
+import { RangeFileResponse } from './range-file-response.js';
 
 const Greeting = z.object({ message: z.string() });
 
@@ -297,6 +299,155 @@ describe('file responses', () => {
     // ...plus an ASCII fallback `filename` for older clients.
     expect(disposition).toMatch(/filename="[^"]*"/);
     expect(res.text).toBe('hello');
+  });
+
+  it('sends inline disposition with extra headers (Cache-Control)', async () => {
+    @Route('files')
+    class InlineController {
+      @Get('avatar')
+      @ReturnsFile(200, { contentType: 'image/png' })
+      public avatar(): FileResponse {
+        return new FileResponse(Buffer.from('PNGDATA'), {
+          contentType: 'image/png',
+          filename: 'me.png',
+          disposition: 'inline',
+          headers: { 'Cache-Control': 'private, no-store', 'X-Custom': 1 },
+        });
+      }
+    }
+
+    const res = await request(makeApp(new InlineController())).get('/files/avatar');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(/^inline/);
+    expect(res.headers['content-disposition']).toContain('me.png');
+    expect(res.headers['cache-control']).toBe('private, no-store');
+    expect(res.headers['x-custom']).toBe('1'); // numbers are stringified
+  });
+
+  it('lets an explicit header override the derived one', async () => {
+    @Route('files')
+    class OverrideController {
+      @Get('thing')
+      @ReturnsFile(200)
+      public thing(): FileResponse {
+        return new FileResponse(Buffer.from('x'), {
+          contentType: 'text/plain',
+          headers: { 'Content-Type': 'application/octet-stream' }, // wins
+        });
+      }
+    }
+
+    const res = await request(makeApp(new OverrideController())).get('/files/thing');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/octet-stream');
+  });
+});
+
+describe('range file responses', () => {
+  const data = Buffer.from('helloworld'); // 10 bytes
+
+  @Route('range')
+  class RangeController {
+    // Buffer body: range-capable by construction.
+    @Get('buf')
+    @ReturnsFile(200, { contentType: 'text/plain' })
+    public buf(): RangeFileResponse {
+      return new RangeFileResponse(new Uint8Array(data), { contentType: 'text/plain' });
+    }
+
+    // Stream source: zodec asks for the requested slice.
+    @Get('stream')
+    @ReturnsFile(200, { contentType: 'text/plain' })
+    public stream(): RangeFileResponse {
+      return new RangeFileResponse(
+        {
+          size: data.length,
+          stream: (range) =>
+            Readable.from(range ? data.subarray(range.start, range.end + 1) : data),
+        },
+        { contentType: 'text/plain' },
+      );
+    }
+  }
+
+  it('serves the full body with Accept-Ranges when no Range is sent', async () => {
+    const res = await request(makeApp(new RangeController())).get('/range/buf');
+    expect(res.status).toBe(200);
+    expect(res.headers['accept-ranges']).toBe('bytes');
+    expect(res.headers['content-length']).toBe('10');
+    expect(res.text).toBe('helloworld');
+  });
+
+  it('serves 206 with Content-Range for a single satisfiable range (buffer)', async () => {
+    const res = await request(makeApp(new RangeController()))
+      .get('/range/buf')
+      .set('Range', 'bytes=0-4');
+    expect(res.status).toBe(206);
+    expect(res.headers['content-range']).toBe('bytes 0-4/10');
+    expect(res.headers['content-length']).toBe('5');
+    expect(res.text).toBe('hello');
+  });
+
+  it('asks a stream source for the requested slice (206)', async () => {
+    const res = await request(makeApp(new RangeController()))
+      .get('/range/stream')
+      .set('Range', 'bytes=5-9');
+    expect(res.status).toBe(206);
+    expect(res.headers['content-range']).toBe('bytes 5-9/10');
+    expect(res.text).toBe('world');
+  });
+
+  it('returns 416 for an unsatisfiable range', async () => {
+    const res = await request(makeApp(new RangeController()))
+      .get('/range/buf')
+      .set('Range', 'bytes=50-60');
+    expect(res.status).toBe(416);
+    expect(res.headers['content-range']).toBe('bytes */10');
+  });
+
+  it('falls back to a full 200 for a multi-range request', async () => {
+    const res = await request(makeApp(new RangeController()))
+      .get('/range/buf')
+      .set('Range', 'bytes=0-1,3-4');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe('helloworld');
+  });
+
+  describe('fromPath (Express sendFile)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zodec-range-'));
+    const file = join(dir, 'data.txt');
+    writeFileSync(file, 'helloworld');
+
+    @Route('disk')
+    class DiskController {
+      @Get('file')
+      @ReturnsFile(200, { contentType: 'text/plain' })
+      public file(): RangeFileResponse {
+        return RangeFileResponse.fromPath(file, { contentType: 'text/plain' });
+      }
+    }
+
+    it('serves a disk file with Range support', async () => {
+      const res = await request(makeApp(new DiskController()))
+        .get('/disk/file')
+        .set('Range', 'bytes=0-4');
+      expect(res.status).toBe(206);
+      expect(res.headers['content-range']).toBe('bytes 0-4/10');
+      expect(res.text).toBe('hello');
+    });
+
+    it('honors conditional GET (ETag → 304)', async () => {
+      const app = makeApp(new DiskController());
+      const first = await request(app).get('/disk/file');
+      expect(first.status).toBe(200);
+      const etag = first.headers['etag'] as string;
+      expect(etag).toBeTruthy();
+
+      const second = await request(app).get('/disk/file').set('If-None-Match', etag);
+      expect(second.status).toBe(304);
+    });
   });
 });
 

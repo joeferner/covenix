@@ -26,6 +26,7 @@ import {
   Files,
   Principal,
   FileResponse,
+  RangeFileResponse,
 } from 'zodec';
 import {
   CreateUserSchema,
@@ -175,6 +176,27 @@ export class UsersController {
     const user = await this.users.findById(id);
     if (!user) throw new createError.NotFound(`No user ${id}`);
     return { uploaded: photos.length };
+  }
+
+  // Download the avatar uploaded above, with HTTP Range support. Returning a
+  // RangeFileResponse (rather than FileResponse) is the opt-in: its body type is
+  // narrowed to range-capable sources, so zodec advertises `Accept-Ranges: bytes`
+  // and serves 206/416 automatically. A Uint8Array body is range-capable by
+  // construction (the size is intrinsic). `disposition: 'inline'` lets a browser
+  // render it in an <img> instead of downloading.
+  @Get('{id}/avatar/raw')
+  @Summary('Download a user avatar (supports HTTP Range)')
+  @Params(IdParams)
+  @ReturnsFile(200, { description: 'The stored avatar image' })
+  @Returns(404, ErrorSchema)
+  public async getAvatar(@Param('id') id: string): Promise<RangeFileResponse> {
+    const avatar = await this.users.getAvatar(id);
+    if (!avatar) throw new createError.NotFound(`No avatar for user ${id}`);
+    return new RangeFileResponse(avatar.bytes, {
+      contentType: avatar.contentType,
+      filename: `avatar-${id}`,
+      disposition: 'inline',
+    });
   }
 
   @Post()

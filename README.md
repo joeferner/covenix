@@ -155,7 +155,8 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 
 To return a file or binary stream instead of JSON, pair `@ReturnsFile` with a
 **`FileResponse`** return value — zodec streams the body and sets
-`Content-Type`/`Content-Disposition`. See
+`Content-Type`/`Content-Disposition` (plus optional `disposition`/`headers`). For
+HTTP `Range` / partial content, return a **`RangeFileResponse`** instead. See
 [File downloads](https://joeferner.github.io/zodec/guide/file-downloads).
 
 To **receive** files, put a `z.file()` (or `z.array(z.file())`) field in a

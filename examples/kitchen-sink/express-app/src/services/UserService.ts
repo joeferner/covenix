@@ -73,4 +73,10 @@ export class UserService {
     if (!this.users.has(id)) throw new createError.NotFound(`No user ${id}`);
     this.avatars.set(id, avatar);
   }
+
+  public async getAvatar(
+    id: string,
+  ): Promise<{ bytes: Uint8Array; contentType: string } | undefined> {
+    return this.avatars.get(id);
+  }
 }

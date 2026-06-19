@@ -140,4 +140,4 @@ file fields rendered as binary:
 ```
 
 This is the upload counterpart to [File downloads](/guide/file-downloads), which
-covers sending binary responses with `@ReturnsFile` and `FileResponse`.
+covers sending binary responses with `@ReturnsFile`, `FileResponse`, and `RangeFileResponse`.

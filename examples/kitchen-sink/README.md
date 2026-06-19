@@ -37,16 +37,17 @@ schema is just a value and works across module boundaries with no special wiring
 
 ## Feature coverage
 
-| Feature                                                        | Where                                                        |
-| -------------------------------------------------------------- | ------------------------------------------------------------ |
-| `@Route`, `@Tags`                                              | every controller                                             |
-| `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`                       | `UsersController.ts`                                         |
-| `@Params`, `@Query`, `@Body`, stackable `@Returns`, `@Summary` | `UsersController.ts`                                         |
-| `@Param`, `@QueryParam`, `@BodyParam`, `@Header`               | `UsersController.ts`, `AuthController.ts`                    |
-| Multipart upload — `z.file()` in `@Body`, `@File`/`@Files`     | `UsersController.ts`                                         |
-| `@Security` + `@Principal`, scopes, `bearer()` handler         | `AuthController.ts`, `UsersController.ts`, `api-security.ts` |
-| `@Req` / `@Res` escape hatch                                   | `HealthController.ts`                                        |
-| `new Zodec({ info })`, `register`, `mount`, `swagger`          | `api.ts`, `main.ts`, `generate-swagger.ts`                   |
-| `zodecErrorHandler()`                                          | `main.ts`                                                    |
-| `http-errors` thrown from handlers                             | controllers + services                                       |
-| Named schemas via `.meta({ id })` → `#/components/schemas/*`   | `schemas/`                                                   |
+| Feature                                                           | Where                                                        |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| `@Route`, `@Tags`                                                 | every controller                                             |
+| `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`                          | `UsersController.ts`                                         |
+| `@Params`, `@Query`, `@Body`, stackable `@Returns`, `@Summary`    | `UsersController.ts`                                         |
+| `@Param`, `@QueryParam`, `@BodyParam`, `@Header`                  | `UsersController.ts`, `AuthController.ts`                    |
+| Multipart upload — `z.file()` in `@Body`, `@File`/`@Files`        | `UsersController.ts`                                         |
+| `@ReturnsFile` + `FileResponse`; `RangeFileResponse` (HTTP Range) | `UsersController.ts`                                         |
+| `@Security` + `@Principal`, scopes, `bearer()` handler            | `AuthController.ts`, `UsersController.ts`, `api-security.ts` |
+| `@Req` / `@Res` escape hatch                                      | `HealthController.ts`                                        |
+| `new Zodec({ info })`, `register`, `mount`, `swagger`             | `api.ts`, `main.ts`, `generate-swagger.ts`                   |
+| `zodecErrorHandler()`                                             | `main.ts`                                                    |
+| `http-errors` thrown from handlers                                | controllers + services                                       |
+| Named schemas via `.meta({ id })` → `#/components/schemas/*`      | `schemas/`                                                   |

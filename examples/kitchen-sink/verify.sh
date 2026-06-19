@@ -140,6 +140,21 @@ fi
 expect 422 "POST /users/:id/avatar (wrong mime type) → 422" \
   -X POST "$BASE/users/$uid/avatar" -F "avatar=@$PNG;type=image/gif"
 
+# Download the uploaded avatar with an HTTP Range (RangeFileResponse, inline).
+RAW_HEADERS="$TMP/avatar.headers"
+curl -s -D "$RAW_HEADERS" -o /dev/null -H 'Range: bytes=0-2' "$BASE/users/$uid/avatar/raw"
+RAW_CODE="$(awk 'NR==1{print $2}' "$RAW_HEADERS")"
+if [ "$RAW_CODE" = "206" ] &&
+  grep -qi '^accept-ranges: *bytes' "$RAW_HEADERS" &&
+  grep -qi '^content-range: *bytes 0-2/' "$RAW_HEADERS" &&
+  grep -qi '^content-disposition: *inline' "$RAW_HEADERS"; then
+  echo "    ✓ GET /users/:id/avatar/raw serves a 206 partial range (inline)"
+else
+  echo "    ✗ GET /users/:id/avatar/raw range failed (code=$RAW_CODE)"
+  sed -n '1,10p' "$RAW_HEADERS"
+  fail=1
+fi
+
 # Swagger advertises the upload as a binary multipart body.
 if curl -s "$BASE/swagger.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const b=d.paths["/users/{id}/avatar"].post.requestBody.content["multipart/form-data"].schema.properties.avatar;process.exit(b.format==="binary"?0:1)})'; then

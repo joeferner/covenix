@@ -30,12 +30,14 @@ the routing and parameter decorators are nearly identical.
 | `@Request() req`                                  | `@Req() req` / `@Res() res`                     | Escape hatch.                                                     |
 | `@SuccessResponse('201')` + `this.setStatus()`    | `@Returns(201, Schema)`                         | The first declared 2xx is the success status — no manual call.    |
 | `@Response<E>(422, '…')`                          | `@Returns(422, ErrorSchema)`                    | Stackable, one per status.                                        |
-| `this.setHeader(…)`                               | `@Returns(200, S, { headers })` + `@Res` to set | Header is documented in the spec.                                 |
+| `this.setHeader(…)` (JSON)                        | `@Returns(200, S, { headers })` + `@Res` to set | Header is documented in the spec.                                 |
+| `this.setHeader(…)` (downloads)                   | `FileResponse({ headers, disposition })`        | Cache-Control/inline without `@Res`.                              |
 | `@Example(…)`                                     | `@Example(value, status?)`                      | Similar.                                                          |
 | `@UploadedFile() f: Express.Multer.File`          | `z.file()` in `@Body` + `@File('f') f: File`    | Auto-detected multipart; web-standard `File`.                     |
 | `@UploadedFiles() fs`                             | `z.array(z.file())` + `@Files('fs') fs: File[]` |                                                                   |
 | `@FormField() title`                              | text field in the `@Body` schema + `@BodyParam` |                                                                   |
 | `@Produces(…)` + return `Readable`/`Buffer`       | `@ReturnsFile(…)` + return `FileResponse`       |                                                                   |
+| Manual `req.range` / `206` / `416`                | return a `RangeFileResponse`                    | Range negotiation is automatic.                                   |
 | Validation from TS types + `@isInt`/`@minLength`  | Zod schema (`z.number().int()`, `.min()`)       | Runtime, explicit.                                                |
 | Models are interfaces/classes                     | `z.object({…}).meta({ id: 'User' })`            | `.meta({ id })` names the component.                              |
 | `ValidateError` (422), handle it yourself         | `ValidationError` + `zodecErrorHandler()`       | Optional ready-made handler.                                      |
@@ -302,6 +304,51 @@ the `Content-Disposition` (including RFC 5987 UTF-8 filenames) is handled for yo
 public async export(): Promise<FileResponse> {
   return new FileResponse(Buffer.from(csv), { contentType: 'text/csv', filename: 'users.csv' });
 }
+```
+
+The other imperative bits map onto `FileResponse` options instead of
+`this.setHeader`:
+
+- **`inline` vs `attachment`** (tsoa's `contentDisposition(name, { type })`) →
+  `disposition: 'inline' | 'attachment'`.
+- **`Cache-Control`, `Content-Length`, other headers** → the `headers` bag (no
+  `@Res()` needed). `Content-Length` is automatic for a `Uint8Array`/`Buffer`.
+
+```typescript
+return new FileResponse(bytes, {
+  contentType: artifact.mimeType,
+  filename: artifact.filename,
+  disposition: artifact.mimeType.startsWith('image/') ? 'inline' : 'attachment',
+  headers: { 'Cache-Control': 'private, no-store' },
+});
+```
+
+### Range / partial downloads
+
+tsoa has no built-in Range support — you read `req.range(size)` and set `206`/
+`416`, `Content-Range`, and `Accept-Ranges` by hand. zodec packages that into
+`RangeFileResponse`: return one and the `206`/`416`/full-`200` negotiation is
+automatic.
+
+```typescript
+// tsoa — manual range handling on the raw response (abridged)
+const ranges = req.range(file.size);
+if (ranges === -1) {
+  this.setStatus(416);
+  res.setHeader('Content-Range', `bytes */${file.size}`);
+} else if (Array.isArray(ranges) && ranges.length === 1) {
+  const { start, end } = ranges[0];
+  this.setStatus(206);
+  res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
+  return file.getStream({ start, end });
+}
+
+// zodec — return a RangeFileResponse; zodec negotiates the range
+return new RangeFileResponse(
+  { size: file.size, stream: (range) => file.getStream(range) },
+  { contentType: file.contentType, filename: file.filename, disposition: 'inline' },
+);
+// or, for a disk file (adds conditional GET): RangeFileResponse.fromPath(path)
 ```
 
 See [File downloads](/guide/file-downloads).

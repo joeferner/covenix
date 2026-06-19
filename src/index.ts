@@ -18,6 +18,14 @@ export {
 export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
+export { RangeFileResponse } from './range-file-response.js';
+export type {
+  ByteRange,
+  RangeBody,
+  RangePathBody,
+  RangeStreamBody,
+  RangeStreamSource,
+} from './range-file-response.js';
 export {
   BodyParam,
   File,

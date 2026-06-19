@@ -10,9 +10,12 @@ import {
 import { Readable } from 'node:stream';
 import { Blob, File } from 'node:buffer';
 import { openAsBlob } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import multer, { MulterError, type Multer, type Options } from 'multer';
+import contentDisposition from 'content-disposition';
 import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
+import { RangeFileResponse, type RangeBody, type RangePathBody } from './range-file-response.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import type { SecurityConfig } from './security.js';
 import { generateOpenApiDocument, type OpenApiDocument, type SpecVersion } from './swagger.js';
@@ -228,26 +231,146 @@ function resolveParam(
   }
 }
 
+/** The Content-Disposition/Content-Type/headers shared by both file responses. */
+interface FileHeaderFields {
+  contentType: string | undefined;
+  filename: string | undefined;
+  disposition: 'inline' | 'attachment' | undefined;
+  headers: Record<string, string | number> | undefined;
+}
+
 /**
- * Streams a {@link FileResponse} to the client: sets Content-Disposition and
- * Content-Type, then sends the buffer or pipes the stream. `fallbackStatus` is
- * the route's success status, used when the FileResponse doesn't set its own.
+ * Applies Content-Disposition, Content-Type, and any extra headers to the
+ * response. Extra `headers` are applied last, so they override the derived ones.
  */
-function sendFile(res: Response, file: FileResponse, fallbackStatus: number): void {
-  res.status(file.status ?? fallbackStatus);
-  // res.attachment() encodes the filename per RFC 5987/6266 (UTF-8 safe, with an
-  // ASCII fallback) and escapes it — it also guesses Content-Type from the
-  // extension, so set the explicit contentType afterward to let it win.
-  if (file.filename) {
+function applyFileHeaders(res: Response, file: FileHeaderFields): void {
+  // Default to `attachment` when a filename is given (a download), else nothing.
+  const disposition = file.disposition ?? (file.filename ? 'attachment' : undefined);
+  if (disposition === 'attachment' && file.filename) {
+    // res.attachment() encodes the filename per RFC 5987/6266 (UTF-8 safe, with
+    // an ASCII fallback) and escapes it.
     res.attachment(file.filename);
+  } else if (disposition) {
+    // inline (or attachment with no filename) — content-disposition encodes the
+    // optional filename the same RFC 5987 way Express does internally.
+    res.setHeader(
+      'Content-Disposition',
+      file.filename ? contentDisposition(file.filename, { type: disposition }) : disposition,
+    );
   }
+  // Explicit contentType wins over res.attachment()'s extension guess.
   if (file.contentType) {
     res.type(file.contentType);
   }
+  if (file.headers) {
+    for (const [name, value] of Object.entries(file.headers)) {
+      res.setHeader(name, typeof value === 'number' ? String(value) : value);
+    }
+  }
+}
+
+/**
+ * Streams a {@link FileResponse} to the client: sets Content-Disposition and
+ * Content-Type, applies any extra headers, then sends the buffer or pipes the
+ * stream. `fallbackStatus` is the route's success status, used when the
+ * FileResponse doesn't set its own.
+ */
+function sendFile(res: Response, file: FileResponse, fallbackStatus: number): void {
+  res.status(file.status ?? fallbackStatus);
+  applyFileHeaders(res, file);
   if (file.body instanceof Readable) {
     file.body.pipe(res);
   } else {
     res.end(file.body);
+  }
+}
+
+/** Whether a range body is the disk-path kind (served via Express sendFile). */
+function isPathBody(body: RangeBody): body is RangePathBody {
+  return !(body instanceof Uint8Array) && 'path' in body;
+}
+
+/**
+ * Serves a {@link RangeFileResponse}, honoring HTTP `Range`. A single satisfiable
+ * range yields `206` with `Content-Range`; an unsatisfiable one yields `416`;
+ * multi-range / malformed / no range yields a full `200`. Path-backed bodies are
+ * delegated to Express `res.sendFile` (Range + conditional GET). The body is
+ * resolved before any header is written, so a source error becomes a clean error
+ * response instead of arriving mid-status.
+ */
+async function sendRangeFile(
+  req: Request,
+  res: Response,
+  file: RangeFileResponse,
+  fallbackStatus: number,
+): Promise<void> {
+  if (isPathBody(file.body)) {
+    const headers: Record<string, string> = {};
+    const disposition = file.disposition ?? (file.filename ? 'attachment' : undefined);
+    if (disposition) {
+      headers['Content-Disposition'] = file.filename
+        ? contentDisposition(file.filename, { type: disposition })
+        : disposition;
+    }
+    if (file.contentType) {
+      headers['Content-Type'] = file.contentType;
+    }
+    if (file.headers) {
+      for (const [name, value] of Object.entries(file.headers)) {
+        headers[name] = String(value);
+      }
+    }
+    const absolute = resolvePath(file.body.path);
+    await new Promise<void>((resolve, reject) => {
+      res.sendFile(absolute, { headers }, (err?: Error) => (err ? reject(err) : resolve()));
+    });
+    return;
+  }
+
+  const body = file.body;
+  const size = body instanceof Uint8Array ? body.byteLength : body.size;
+  res.setHeader('Accept-Ranges', 'bytes');
+  const ranges = req.range(size);
+
+  if (ranges === -1) {
+    // Unsatisfiable — 416 with Content-Range: bytes */<size>.
+    res.status(416).setHeader('Content-Range', `bytes */${size}`);
+    res.end();
+    return;
+  }
+
+  const single =
+    Array.isArray(ranges) && ranges.type === 'bytes' && ranges.length === 1 ? ranges[0] : undefined;
+
+  if (single) {
+    const { start, end } = single;
+    // Resolve the slice first; a stream source may throw before headers are sent.
+    const chunk =
+      body instanceof Uint8Array
+        ? body.subarray(start, end + 1)
+        : await body.stream({ start, end });
+    res.status(206);
+    applyFileHeaders(res, file);
+    res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
+    res.setHeader('Content-Length', String(end - start + 1));
+    sendBinary(res, chunk);
+    return;
+  }
+
+  // No range, multi-range, or malformed: full body.
+  const chunk = body instanceof Uint8Array ? body : await body.stream();
+  res.status(file.status ?? fallbackStatus);
+  applyFileHeaders(res, file);
+  res.setHeader('Content-Length', String(size));
+  sendBinary(res, chunk);
+}
+
+/** Sends bytes (via `res.end`) or pipes a stream. */
+function sendBinary(res: Response, chunk: Uint8Array | Readable): void {
+  if (chunk instanceof Readable) {
+    chunk.pipe(res);
+  } else {
+    res.end(Buffer.from(chunk));
   }
 }
 
@@ -464,6 +587,11 @@ export class Zodec {
           // A FileResponse streams a binary body; skip JSON + response validation.
           if (value instanceof FileResponse) {
             sendFile(res, value, status);
+            return;
+          }
+          // A RangeFileResponse additionally honors HTTP Range (async-capable).
+          if (value instanceof RangeFileResponse) {
+            sendRangeFile(req, res, value, status).catch(next);
             return;
           }
           // Always-on response validation: the return value must match its
