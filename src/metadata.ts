@@ -18,12 +18,25 @@ export interface RouteMetadata {
   query?: ZodType | undefined;
   /** `@Body` schema, if any. */
   body?: ZodType | undefined;
-  /** Declared responses, keyed by status code (from `@Returns`). */
-  responses: Record<number, ZodType>;
+  /**
+   * Declared responses, keyed by status code (from `@Returns`). A value of
+   * `undefined` means the status was declared with no body (e.g. `204`).
+   */
+  responses: Record<number, ZodType | undefined>;
   /** Class-level `@Tags`, folded onto each route. */
   tags?: string[] | undefined;
   /** `@Summary` text, if any. */
   summary?: string | undefined;
+  /** Example values (from `@Example`) for the request body and/or responses. */
+  examples?: ExampleMetadata[] | undefined;
+}
+
+/** An example value attached to a route by `@Example`. */
+export interface ExampleMetadata {
+  /** Response status the example illustrates; omitted means the request body. */
+  status?: number | undefined;
+  /** The example value, surfaced on the OpenAPI media type. */
+  value: unknown;
 }
 
 /** Where an injected handler parameter is sourced from. */
@@ -49,6 +62,7 @@ const PARAMS_SCHEMA_KEY = Symbol('zodec:paramsSchema');
 const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
 const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
+const EXAMPLES_KEY = Symbol('zodec:examples');
 const SUMMARY_KEY = Symbol('zodec:summary');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
 const PARAM_INJECTIONS_KEY = Symbol('zodec:paramInjections');
@@ -84,16 +98,19 @@ export function setHttpMethod(
   }
 }
 
-/** Adds a response schema for a status code. Called by `@Returns`. */
+/**
+ * Adds a response for a status code. Called by `@Returns`. A `schema` of
+ * `undefined` declares the status with no body (e.g. `204`).
+ */
 export function addReturnSchema(
   target: object,
   handlerName: string,
   status: number,
-  schema: ZodType,
+  schema?: ZodType,
 ): void {
   const returns = (Reflect.getOwnMetadata(RETURNS_KEY, target, handlerName) ?? {}) as Record<
     number,
-    ZodType
+    ZodType | undefined
   >;
   returns[status] = schema;
   Reflect.defineMetadata(RETURNS_KEY, returns, target, handlerName);
@@ -112,6 +129,14 @@ export function setQuerySchema(target: object, handlerName: string, schema: ZodT
 /** Stores the `req.body` schema for a handler. Called by `@Body`. */
 export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
   Reflect.defineMetadata(BODY_KEY, schema, target, handlerName);
+}
+
+/** Appends an example value for a handler. Called by `@Example`. */
+export function addExample(target: object, handlerName: string, example: ExampleMetadata): void {
+  const examples = (Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) ??
+    []) as ExampleMetadata[];
+  examples.push(example);
+  Reflect.defineMetadata(EXAMPLES_KEY, examples, target, handlerName);
 }
 
 /** Stores the operation summary for a handler. Called by `@Summary`. */
@@ -197,10 +222,13 @@ export function getRoutes(target: object): RouteMetadata[] {
       body: Reflect.getOwnMetadata(BODY_KEY, target, handlerName) as ZodType | undefined,
       responses: (Reflect.getOwnMetadata(RETURNS_KEY, target, handlerName) ?? {}) as Record<
         number,
-        ZodType
+        ZodType | undefined
       >,
       tags: tags.length > 0 ? tags : undefined,
       summary: Reflect.getOwnMetadata(SUMMARY_KEY, target, handlerName) as string | undefined,
+      examples: Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) as
+        | ExampleMetadata[]
+        | undefined,
     };
   });
 }

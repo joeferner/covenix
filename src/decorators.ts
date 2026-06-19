@@ -1,5 +1,6 @@
 import type { ZodObject, ZodType } from 'zod';
 import {
+  addExample,
   addReturnSchema,
   setBodySchema,
   setHttpMethod,
@@ -103,11 +104,12 @@ export function Body(schema: ZodType): MethodDecorator {
  * Declares a response for a status code. Stackable — apply once per status. The
  * handler's return value is validated against the matching schema (a mismatch
  * responds `500`), and the schema is emitted in the generated OpenAPI document.
+ * Omit `schema` for a no-body response (e.g. `@Returns(204)`).
  *
  * @param status - HTTP status code, e.g. `200`.
- * @param schema - Zod schema describing the response body for that status.
+ * @param schema - Zod schema for the response body; omit for no body.
  */
-export function Returns(status: number, schema: ZodType): MethodDecorator {
+export function Returns(status: number, schema?: ZodType): MethodDecorator {
   return (target, propertyKey) => {
     addReturnSchema(target, String(propertyKey), status, schema);
   };
@@ -121,5 +123,29 @@ export function Returns(status: number, schema: ZodType): MethodDecorator {
 export function Summary(text: string): MethodDecorator {
   return (target, propertyKey) => {
     setSummary(target, String(propertyKey), text);
+  };
+}
+
+/**
+ * Attaches an example value to the operation's OpenAPI media type. Stackable.
+ * With no `status` the example illustrates the request body (pairs with
+ * `@Body`); with a `status` it illustrates that response (pairs with
+ * `@Returns`).
+ *
+ * @param value - The example value (not validated against the schema).
+ * @param status - Response status to attach to; omit for the request body.
+ *
+ * @example
+ * ```ts
+ * @Body(CreateUserSchema)
+ * @Example({ username: 'ada' })
+ * @Returns(201, UserSchema)
+ * @Example({ id: '...', username: 'ada' }, 201)
+ * createUser() {}
+ * ```
+ */
+export function Example(value: unknown, status?: number): MethodDecorator {
+  return (target, propertyKey) => {
+    addExample(target, String(propertyKey), status === undefined ? { value } : { status, value });
   };
 }

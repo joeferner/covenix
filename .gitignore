@@ -6,3 +6,6 @@ dist/
 docs/api/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+
+# Generated swagger output from examples
+examples/**/swagger.json

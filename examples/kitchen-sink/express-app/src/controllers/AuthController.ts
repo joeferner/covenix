@@ -1,5 +1,5 @@
 import createError from 'http-errors';
-import { Route, Tags, Post, Get, Body, Returns, Summary, BodyParam, Header } from 'zodec';
+import { Route, Tags, Post, Get, Body, Returns, Summary, Example, BodyParam, Header } from 'zodec';
 import {
   LoginSchema,
   TokenSchema,
@@ -19,7 +19,9 @@ export class AuthController {
   @Post('login')
   @Summary('Exchange credentials for a bearer token')
   @Body(LoginSchema)
+  @Example({ username: 'ada', password: 'correct-horse-battery' })
   @Returns(200, TokenSchema)
+  @Example({ token: 'fake-token-for-ada', expiresIn: 3600 }, 200)
   @Returns(401, ErrorSchema)
   public async login(@BodyParam() creds: Login): Promise<Token> {
     const token = await this.auth.login(creds);

@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Aspirational zodec example — represents the desired state once tmp/requirements.md is implemented and README.md is fulfilled. Will not compile until zodec exists.",
+  "scripts": {
+    "verify": "bash verify.sh"
+  },
   "workspaces": [
     "schemas",
     "express-app"

@@ -2,7 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { generateSwagger, toJsonSchema } from './swagger.js';
 import { Zodec } from './zodec.js';
-import { Body, Get, Params, Post, Query, Returns, Route, Summary, Tags } from './decorators.js';
+import {
+  Body,
+  Example,
+  Get,
+  Params,
+  Post,
+  Query,
+  Returns,
+  Route,
+  Summary,
+  Tags,
+} from './decorators.js';
 
 describe('toJsonSchema', () => {
   it('converts a Zod object to JSON Schema', () => {
@@ -99,6 +110,53 @@ describe('api.swagger()', () => {
     expect(Object.keys(doc.components?.schemas ?? {})).toEqual(
       expect.arrayContaining(['User', 'CreateUser']),
     );
+  });
+
+  it('emits a no-body response for @Returns(status) with no schema', () => {
+    @Route('things')
+    class ThingController {
+      @Get('{id}')
+      @Returns(204)
+      public remove(): null {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new ThingController());
+    const res204 = api.swagger().paths?.['/things/{id}']?.get?.responses?.['204'];
+
+    expect(res204).toBeDefined();
+    expect(res204).not.toHaveProperty('content');
+  });
+
+  it('surfaces @Example values on request and response media types', () => {
+    const Created = z.object({ id: z.string() }).meta({ id: 'Created' });
+    const CreateBody = z.object({ name: z.string() }).meta({ id: 'CreateBody' });
+
+    @Route('widgets')
+    class WidgetController {
+      @Post()
+      @Body(CreateBody)
+      @Example({ name: 'gizmo' })
+      @Returns(201, Created)
+      @Example({ id: 'w_1' }, 201)
+      public create(): unknown {
+        return null;
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new WidgetController());
+    const doc = api.swagger();
+
+    const post = doc.paths?.['/widgets']?.post;
+    expect(post?.requestBody).toMatchObject({
+      content: { 'application/json': { example: { name: 'gizmo' } } },
+    });
+    expect(post?.responses?.['201']).toMatchObject({
+      content: { 'application/json': { example: { id: 'w_1' } } },
+    });
   });
 
   it('generateSwagger(classes) matches api.swagger() for the same controllers', () => {

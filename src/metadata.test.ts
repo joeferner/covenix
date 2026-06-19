@@ -1,6 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { Body, Get, Params, Post, Query, Returns, Summary, Route, Tags } from './decorators.js';
+import {
+  Body,
+  Example,
+  Get,
+  Params,
+  Post,
+  Query,
+  Returns,
+  Summary,
+  Route,
+  Tags,
+} from './decorators.js';
 import {
   addReturnSchema,
   getPrefix,
@@ -41,6 +52,27 @@ describe('metadata assembly', () => {
       summary: 'Get a thing',
     });
     expect(Object.keys(routes[0]!.responses)).toEqual(['200']);
+  });
+
+  it('records @Example values for the request body and responses', () => {
+    @Route('widgets')
+    class WidgetController {
+      @Post()
+      @Body(Thing)
+      @Example({ name: 'in' })
+      @Returns(201, Thing)
+      @Example({ id: 'out' }, 201)
+      public create(): unknown {
+        return null;
+      }
+    }
+
+    // Decorators apply bottom-to-top, so order is not guaranteed; assert by
+    // membership (the swagger builder looks examples up by status, not order).
+    const route = getRoutes(WidgetController.prototype)[0]!;
+    expect(route.examples).toHaveLength(2);
+    expect(route.examples).toContainEqual({ value: { name: 'in' } });
+    expect(route.examples).toContainEqual({ status: 201, value: { id: 'out' } });
   });
 
   it('captures @Params / @Query / @Body schemas via decorators', () => {

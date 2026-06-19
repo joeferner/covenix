@@ -13,6 +13,7 @@ import {
   Body,
   Returns,
   Summary,
+  Example,
   Param,
   QueryParam,
   BodyParam,
@@ -101,7 +102,20 @@ export class UsersController {
   @Post()
   @Summary('Create a user')
   @Body(CreateUserSchema)
+  // Request-body example (no status) and a 201 response example. Both surface on
+  // their media types in the generated OpenAPI / Swagger UI.
+  @Example({ username: 'ada', email: 'ada@example.com' })
   @Returns(201, UserSchema)
+  @Example(
+    {
+      id: '7b9c1e2a-4f6d-4b8a-9c1e-2a4f6d4b8a9c',
+      username: 'ada',
+      email: 'ada@example.com',
+      role: 'user',
+      createdAt: '2026-06-19T00:00:00.000Z',
+    },
+    201,
+  )
   @Returns(422, ErrorSchema)
   public async create(
     @BodyParam() body: CreateUser,
@@ -134,7 +148,7 @@ export class UsersController {
   @Delete('{id}')
   @Summary('Delete a user')
   @Params(IdParams)
-  @Returns(204, z.void())
+  @Returns(204)
   @Returns(404, ErrorSchema)
   public async remove(@Param('id') id: string): Promise<void> {
     await this.users.remove(id);

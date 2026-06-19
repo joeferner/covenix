@@ -128,14 +128,15 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 
 ### Method decorators
 
-| Decorator                                                                   | Purpose                                              |
-| --------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `@Get(path?)` `@Post(path?)` `@Put(path?)` `@Patch(path?)` `@Delete(path?)` | HTTP method + path (use `{id}` for path params)      |
-| `@Params(schema)`                                                           | Validate `req.params` against a Zod object           |
-| `@Query(schema)`                                                            | Validate `req.query`                                 |
-| `@Body(schema)`                                                             | Validate `req.body`                                  |
-| `@Returns(status, schema)`                                                  | Declare a response — stackable for multiple statuses |
-| `@Summary(text)`                                                            | Operation summary in swagger                         |
+| Decorator                                                                   | Purpose                                                            |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `@Get(path?)` `@Post(path?)` `@Put(path?)` `@Patch(path?)` `@Delete(path?)` | HTTP method + path (use `{id}` for path params)                    |
+| `@Params(schema)`                                                           | Validate `req.params` against a Zod object                         |
+| `@Query(schema)`                                                            | Validate `req.query`                                               |
+| `@Body(schema)`                                                             | Validate `req.body`                                                |
+| `@Returns(status, schema)`                                                  | Declare a response — stackable for multiple statuses               |
+| `@Summary(text)`                                                            | Operation summary in swagger                                       |
+| `@Example(value, status?)`                                                  | Example for the request body, or a response (`status`) — stackable |
 
 ### Parameter decorators
 

@@ -2,6 +2,7 @@
 // import it here — this module is the single place controllers get registered.
 import 'reflect-metadata';
 import { Zodec } from 'zodec';
+import { apiInfo } from './api-info.js';
 import { HealthController } from './controllers/HealthController.js';
 import { UsersController } from './controllers/UsersController.js';
 import { AuthController } from './controllers/AuthController.js';
@@ -15,9 +16,7 @@ const authService = new AuthService(userService);
 // One configured Zodec instance, shared by the server (main.ts) and the headless
 // swagger generator (generate-swagger.ts). register() just records the instances;
 // the consumer decides whether to mount() routes or only call swagger().
-export const api = new Zodec({
-  info: { title: 'Kitchen Sink API', version: '1.0.0' },
-});
+export const api = new Zodec({ info: apiInfo });
 
 api.register(new HealthController());
 api.register(new UsersController(userService));

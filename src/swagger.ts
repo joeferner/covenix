@@ -1,6 +1,6 @@
 import { z, type ZodType } from 'zod';
 import type { OpenAPIV3_1 } from 'openapi-types';
-import { getPrefix, getRoutes, type RouteMetadata } from './metadata.js';
+import { getPrefix, getRoutes, type ExampleMetadata, type RouteMetadata } from './metadata.js';
 
 /**
  * A JSON Schema document or fragment. Uses Zod's own JSON Schema type — it is
@@ -105,16 +105,20 @@ class DocumentBuilder {
   }
 
   private operation(route: RouteMetadata): OpenAPIV3_1.OperationObject {
+    const examples = route.examples ?? [];
     const parameters: OpenAPIV3_1.ParameterObject[] = [
       ...(route.params ? this.parameters(route.params, 'path') : []),
       ...(route.query ? this.parameters(route.query, 'query') : []),
     ];
     const responses: Record<string, OpenAPIV3_1.ResponseObject> = {};
     for (const [status, schema] of Object.entries(route.responses)) {
-      responses[status] = {
-        description: '',
-        content: { 'application/json': { schema: this.schema(schema) } },
-      };
+      const response: OpenAPIV3_1.ResponseObject = { description: '' };
+      // A status declared with no schema (e.g. 204) has no response body.
+      if (schema) {
+        const example = examples.find((e) => e.status === Number(status));
+        response.content = { 'application/json': this.media(schema, example) };
+      }
+      responses[status] = response;
     }
 
     const operation: OpenAPIV3_1.OperationObject = { responses };
@@ -122,12 +126,20 @@ class DocumentBuilder {
     if (route.summary) operation.summary = route.summary;
     if (parameters.length > 0) operation.parameters = parameters;
     if (route.body) {
+      const example = examples.find((e) => e.status === undefined);
       operation.requestBody = {
         required: true,
-        content: { 'application/json': { schema: this.schema(route.body) } },
+        content: { 'application/json': this.media(route.body, example) },
       };
     }
     return operation;
+  }
+
+  /** Builds a media type object: the converted schema plus an optional example. */
+  private media(schema: ZodType, example?: ExampleMetadata): OpenAPIV3_1.MediaTypeObject {
+    const media: OpenAPIV3_1.MediaTypeObject = { schema: this.schema(schema) };
+    if (example) media.example = example.value;
+    return media;
   }
 
   /**
