@@ -14,6 +14,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "docs:api": "typedoc",
+    "docs:dev": "typedoc && vitepress dev docs",
+    "docs:build": "typedoc && vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "pre-commit": "npm run format && npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
@@ -34,8 +38,12 @@
     "http-errors": "^2.0.1",
     "prettier": "^3.8.4",
     "supertest": "^7.2.2",
+    "typedoc": "^0.28.19",
+    "typedoc-plugin-markdown": "^4.12.0",
+    "typedoc-vitepress-theme": "^1.1.3",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.1",
+    "vitepress": "^1.6.4",
     "vitest": "^4.1.9"
   }
 }

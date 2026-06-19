@@ -3,3 +3,6 @@ node_modules/
 tmp/
 package-lock.json
 **/__snapshots__/
+docs/api/
+docs/.vitepress/dist/
+docs/.vitepress/cache/

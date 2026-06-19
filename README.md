@@ -145,9 +145,6 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@Header(name)`     | `req.headers[name]`                               |
 | `@Req()` / `@Res()` | raw Express `Request` / `Response` (escape hatch) |
 
-> **Decorator order is unrestricted.** Each decorator writes metadata keyed on
-> its own method name, so there's no "last route" dependency between them.
-
 ---
 
 ## Validation
