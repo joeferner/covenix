@@ -23,12 +23,15 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^12.1.0",
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
+    "@types/http-errors": "^2.0.5",
     "@types/supertest": "^7.2.0",
     "eslint": "^10.5.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "http-errors": "^2.0.1",
     "prettier": "^3.8.4",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
