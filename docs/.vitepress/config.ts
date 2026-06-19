@@ -25,6 +25,10 @@ export default defineConfig({
             { text: 'API Reference', link: '/api/' },
           ],
         },
+        {
+          text: 'Migrating',
+          items: [{ text: 'From tsoa', link: '/guide/migrating-from-tsoa' }],
+        },
       ],
       '/api/': [{ text: 'Overview', link: '/api/' }, ...typedocSidebar],
     },

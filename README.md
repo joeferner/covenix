@@ -267,6 +267,15 @@ Use `api.swagger()` instead when you already have a configured instance on hand
 
 ---
 
+## Migrating
+
+Coming from another framework? See the migration guides:
+
+- **[Migrating from tsoa](https://joeferner.github.io/zodec/guide/migrating-from-tsoa)** —
+  decorator/concept mapping, JSDoc-tags → Zod, and how zodec drops the build step.
+
+---
+
 ## License
 
 MIT © Joe Ferner
