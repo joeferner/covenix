@@ -13,7 +13,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "pre-commit": "npm run format && npm run lint && npm test"
+    "typecheck": "tsc --noEmit",
+    "pre-commit": "npm run format && npm run lint && npm run typecheck && npm test"
   },
   "dependencies": {
     "express": "^5.2.1",

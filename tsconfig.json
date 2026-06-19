@@ -40,5 +40,8 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true
-  }
+  },
+  // The library source. Examples have their own configs and are
+  // intentionally not type-checked here.
+  "include": ["src"]
 }

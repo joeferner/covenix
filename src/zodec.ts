@@ -6,6 +6,17 @@ import {
   type ParamMetadata,
   type RouteMetadata,
 } from './metadata.js';
+import { ValidationError } from './errors.js';
+
+// Per-request values the handler's injected parameters resolve from. Each source
+// starts as the raw request value and is replaced by the parsed (coerced,
+// defaulted) output once its schema validates. Kept separate from `req` because
+// Express 5 exposes `req.query` as a getter only — it cannot be reassigned.
+interface RequestValues {
+  params: Record<string, unknown>;
+  query: Record<string, unknown>;
+  body: unknown;
+}
 
 export interface ZodecInfo {
   title: string;
@@ -32,16 +43,48 @@ function successStatus(responses: Record<number, unknown>): number {
   return codes.find((code) => code >= 200 && code < 300) ?? 200;
 }
 
-// Resolves a single injected parameter from the request. A decorator with no
-// `name` injects the whole bag (e.g. `@Param()` → all params).
-function resolveParam(param: ParamMetadata, req: Request, res: Response): unknown {
+// Validates the request sources that have schemas, returning the parsed values
+// (raw values for sources without a schema). Throws ValidationError on the first
+// failure — 400 for params/query, 422 for body.
+function validate(route: RouteMetadata, req: Request): RequestValues {
+  const values: RequestValues = {
+    params: req.params,
+    query: req.query,
+    body: req.body as unknown,
+  };
+  if (route.params) {
+    const result = route.params.safeParse(req.params);
+    if (!result.success) throw new ValidationError(400, result.error.issues);
+    values.params = result.data as Record<string, unknown>;
+  }
+  if (route.query) {
+    const result = route.query.safeParse(req.query);
+    if (!result.success) throw new ValidationError(400, result.error.issues);
+    values.query = result.data as Record<string, unknown>;
+  }
+  if (route.body) {
+    const result = route.body.safeParse(req.body);
+    if (!result.success) throw new ValidationError(422, result.error.issues);
+    values.body = result.data;
+  }
+  return values;
+}
+
+// Resolves a single injected parameter. A decorator with no `name` injects the
+// whole bag (e.g. `@Param()` → all params).
+function resolveParam(
+  param: ParamMetadata,
+  values: RequestValues,
+  req: Request,
+  res: Response,
+): unknown {
   switch (param.source) {
     case 'param':
-      return param.name ? req.params[param.name] : req.params;
+      return param.name ? values.params[param.name] : values.params;
     case 'query':
-      return param.name ? req.query[param.name] : req.query;
+      return param.name ? values.query[param.name] : values.query;
     case 'body':
-      return req.body as unknown;
+      return values.body;
     case 'header':
       return param.name ? req.headers[param.name.toLowerCase()] : req.headers;
     case 'req':
@@ -53,10 +96,15 @@ function resolveParam(param: ParamMetadata, req: Request, res: Response): unknow
 
 // Builds the handler argument array, placing each injected value at its own
 // parameter index. Indexes without a decorator stay `undefined`.
-function buildArgs(params: ParamMetadata[], req: Request, res: Response): unknown[] {
+function buildArgs(
+  params: ParamMetadata[],
+  values: RequestValues,
+  req: Request,
+  res: Response,
+): unknown[] {
   const args: unknown[] = [];
   for (const param of params) {
-    args[param.index] = resolveParam(param, req, res);
+    args[param.index] = resolveParam(param, values, req, res);
   }
   return args;
 }
@@ -102,12 +150,24 @@ export class Zodec {
     const params = getParams(proto, route.handlerName);
     return (req, res, next) => {
       try {
-        const args = buildArgs(params, req, res);
+        const values = validate(route, req);
+        const args = buildArgs(params, values, req, res);
         Promise.resolve(fn.apply(instance, args)).then((value: unknown) => {
           // A handler using @Res() writes the response itself — don't double-send.
-          if (!res.headersSent) {
-            res.status(status).json(value);
+          if (res.headersSent) return;
+          // Always-on response validation: the return value must match its
+          // declared @Returns schema. A mismatch is a server bug, so it throws
+          // a 500 ValidationError through the same error pipeline as everything
+          // else — zodec never decides what to do with it.
+          const schema = route.responses[status];
+          if (schema) {
+            const result = schema.safeParse(value);
+            if (!result.success) {
+              next(new ValidationError(500, result.error.issues));
+              return;
+            }
           }
+          res.status(status).json(value);
         }, next);
       } catch (err) {
         next(err);
