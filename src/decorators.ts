@@ -1,8 +1,11 @@
-import type { ZodType } from 'zod';
+import type { ZodObject, ZodType } from 'zod';
 import {
   addReturnSchema,
+  setBodySchema,
   setHttpMethod,
+  setParamsSchema,
   setPrefix,
+  setQuerySchema,
   setSummary,
   setTags,
   type HttpMethod,
@@ -31,6 +34,24 @@ export const Post = (path = ''): MethodDecorator => httpMethodDecorator('post', 
 export const Put = (path = ''): MethodDecorator => httpMethodDecorator('put', path);
 export const Patch = (path = ''): MethodDecorator => httpMethodDecorator('patch', path);
 export const Delete = (path = ''): MethodDecorator => httpMethodDecorator('delete', path);
+
+export function Params(schema: ZodObject): MethodDecorator {
+  return (target, propertyKey) => {
+    setParamsSchema(target, String(propertyKey), schema);
+  };
+}
+
+export function Query(schema: ZodObject): MethodDecorator {
+  return (target, propertyKey) => {
+    setQuerySchema(target, String(propertyKey), schema);
+  };
+}
+
+export function Body(schema: ZodType): MethodDecorator {
+  return (target, propertyKey) => {
+    setBodySchema(target, String(propertyKey), schema);
+  };
+}
 
 export function Returns(status: number, schema: ZodType): MethodDecorator {
   return (target, propertyKey) => {

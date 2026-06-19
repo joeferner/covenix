@@ -7,7 +7,11 @@ export interface RouteMetadata {
   method: HttpMethod;
   path: string;
   handlerName: string;
+  params?: ZodType | undefined;
+  query?: ZodType | undefined;
+  body?: ZodType | undefined;
   responses: Record<number, ZodType>;
+  tags?: string[] | undefined;
   summary?: string | undefined;
 }
 
@@ -15,6 +19,9 @@ export interface RouteMetadata {
 // decorators on the same method can never clobber each other regardless of the
 // order they run in.
 const HTTP_METHOD_KEY = Symbol('zodec:httpMethod');
+const PARAMS_SCHEMA_KEY = Symbol('zodec:paramsSchema');
+const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
+const BODY_KEY = Symbol('zodec:body');
 const RETURNS_KEY = Symbol('zodec:returns');
 const SUMMARY_KEY = Symbol('zodec:summary');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
@@ -59,6 +66,18 @@ export function addReturnSchema(
   Reflect.defineMetadata(RETURNS_KEY, returns, target, handlerName);
 }
 
+export function setParamsSchema(target: object, handlerName: string, schema: ZodType): void {
+  Reflect.defineMetadata(PARAMS_SCHEMA_KEY, schema, target, handlerName);
+}
+
+export function setQuerySchema(target: object, handlerName: string, schema: ZodType): void {
+  Reflect.defineMetadata(QUERY_SCHEMA_KEY, schema, target, handlerName);
+}
+
+export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
+  Reflect.defineMetadata(BODY_KEY, schema, target, handlerName);
+}
+
 export function setSummary(target: object, handlerName: string, text: string): void {
   Reflect.defineMetadata(SUMMARY_KEY, text, target, handlerName);
 }
@@ -83,16 +102,23 @@ export function getTags(target: object): string[] {
 // handler-name list is the source of truth for which methods are routes.
 export function getRoutes(target: object): RouteMetadata[] {
   const names = (Reflect.getOwnMetadata(HANDLER_NAMES_KEY, target) ?? []) as string[];
+  // Tags are declared once at the class level; fold them onto every route so a
+  // RouteMetadata is self-contained for downstream consumers (e.g. swagger).
+  const tags = getTags(target);
   return names.map((handlerName) => {
     const entry = Reflect.getOwnMetadata(HTTP_METHOD_KEY, target, handlerName) as HttpMethodEntry;
     return {
       method: entry.method,
       path: entry.path,
       handlerName,
+      params: Reflect.getOwnMetadata(PARAMS_SCHEMA_KEY, target, handlerName) as ZodType | undefined,
+      query: Reflect.getOwnMetadata(QUERY_SCHEMA_KEY, target, handlerName) as ZodType | undefined,
+      body: Reflect.getOwnMetadata(BODY_KEY, target, handlerName) as ZodType | undefined,
       responses: (Reflect.getOwnMetadata(RETURNS_KEY, target, handlerName) ?? {}) as Record<
         number,
         ZodType
       >,
+      tags: tags.length > 0 ? tags : undefined,
       summary: Reflect.getOwnMetadata(SUMMARY_KEY, target, handlerName) as string | undefined,
     };
   });
