@@ -172,6 +172,45 @@ describe('api.swagger()', () => {
     });
   });
 
+  it('emits a multipart/form-data body when @Body has a file field', () => {
+    @Route('uploads')
+    class UploadController {
+      @Post()
+      @Body(
+        z.object({
+          avatar: z.file().max(2_000_000).mime(['image/png']),
+          photos: z.array(z.file()).max(4),
+          caption: z.string().optional(),
+        }),
+      )
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public upload(): unknown {
+        return { ok: true };
+      }
+    }
+
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new UploadController());
+    const post = api.swagger().paths?.['/uploads']?.post;
+
+    expect(post?.requestBody).toMatchObject({
+      content: {
+        'multipart/form-data': {
+          schema: {
+            type: 'object',
+            properties: {
+              avatar: { type: 'string', format: 'binary' },
+              photos: { type: 'array', items: { type: 'string', format: 'binary' } },
+              caption: { type: 'string' },
+            },
+          },
+        },
+      },
+    });
+    // Not the JSON media type.
+    expect(post?.requestBody).not.toHaveProperty(['content', 'application/json']);
+  });
+
   it('emits a no-body response for @Returns(status) with no schema', () => {
     @Route('things')
     class ThingController {

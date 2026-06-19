@@ -145,7 +145,9 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | ------------------- | ------------------------------------------------- |
 | `@Param(name)`      | `req.params[name]`                                |
 | `@QueryParam(name)` | `req.query[name]`                                 |
-| `@BodyParam()`      | the whole validated body                          |
+| `@BodyParam(name?)` | the whole validated body, or one field of it      |
+| `@File(name)`       | an uploaded file as a web `File` (multipart)      |
+| `@Files(name)`      | uploaded files as `File[]` (multipart)            |
 | `@Header(name)`     | `req.headers[name]`                               |
 | `@Req()` / `@Res()` | raw Express `Request` / `Response` (escape hatch) |
 
@@ -153,6 +155,11 @@ To return a file or binary stream instead of JSON, pair `@ReturnsFile` with a
 **`FileResponse`** return value — zodec streams the body and sets
 `Content-Type`/`Content-Disposition`. See
 [File downloads](https://joeferner.github.io/zodec/guide/file-downloads).
+
+To **receive** files, put a `z.file()` (or `z.array(z.file())`) field in a
+`@Body` schema: zodec auto-detects the route as `multipart/form-data`, parses it
+with multer, and injects each file via `@File` / `@Files`. See
+[File uploads](https://joeferner.github.io/zodec/guide/file-uploads).
 
 ---
 

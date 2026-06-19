@@ -1,6 +1,7 @@
 import { z, type ZodType } from 'zod';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import { getPrefix, getRoutes, type ExampleMetadata, type RouteMetadata } from './metadata.js';
+import { isMultipart } from './multipart.js';
 
 /**
  * A JSON Schema document or fragment. Uses Zod's own JSON Schema type — it is
@@ -156,9 +157,12 @@ class DocumentBuilder {
     }
     if (route.body) {
       const example = examples.find((e) => e.status === undefined);
+      // A body with a file field is multipart/form-data; the schema conversion
+      // already emits file props as `{ type: 'string', format: 'binary' }`.
+      const mediaType = isMultipart(route.body) ? 'multipart/form-data' : 'application/json';
       operation.requestBody = {
         required: true,
-        content: { 'application/json': this.media(route.body, example) },
+        content: { [mediaType]: this.media(route.body, example) },
       };
     }
     return operation;

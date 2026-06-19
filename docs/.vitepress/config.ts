@@ -21,6 +21,7 @@ export default defineConfig({
             { text: 'Validation & Errors', link: '/guide/validation' },
             { text: 'OpenAPI / Swagger', link: '/guide/swagger' },
             { text: 'File Downloads', link: '/guide/file-downloads' },
+            { text: 'File Uploads', link: '/guide/file-uploads' },
             { text: 'API Reference', link: '/api/' },
           ],
         },

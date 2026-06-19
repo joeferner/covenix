@@ -7,8 +7,12 @@ import {
   type RouteMetadata,
 } from './metadata.js';
 import { Readable } from 'node:stream';
+import { Blob, File } from 'node:buffer';
+import { openAsBlob } from 'node:fs';
+import multer, { MulterError, type Multer, type Options } from 'multer';
 import { ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
+import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
 
 /**
@@ -35,6 +39,14 @@ export interface ZodecInfo {
 export interface ZodecOptions {
   /** OpenAPI `info` block (title + version). */
   info: ZodecInfo;
+  /**
+   * multer options for `multipart/form-data` (file-upload) routes, passed
+   * straight through to multer. Defaults to in-memory storage, so handlers
+   * receive a `File` backed by the uploaded bytes. Set `storage` for disk/custom
+   * storage and `limits.fileSize` to reject oversized uploads before buffering
+   * (a per-field `z.file().max()` only runs once the bytes are in hand).
+   */
+  multipart?: Options;
 }
 
 /** A controller handler method, called with the assembled argument list. */
@@ -82,13 +94,97 @@ function validate(route: RouteMetadata, req: Request): RequestValues {
     values.query = result.data as Record<string, unknown>;
   }
   if (route.body) {
-    const result = route.body.safeParse(req.body);
+    const fileFields = getMultipartFields(route.body);
+    const input =
+      fileFields.length > 0 ? assembleMultipartBody(req, fileFields) : (req.body as unknown);
+    const result = route.body.safeParse(input);
     if (!result.success) {
       throw new ValidationError(422, result.error.issues);
     }
     values.body = result.data;
   }
   return values;
+}
+
+/**
+ * The fields zodec reads off a multer file. Modeled structurally so the source
+ * doesn't depend on multer's (Express-augmenting) types. Memory storage provides
+ * `buffer`; disk (and custom) storage provides `path`.
+ */
+interface RawMultipartFile {
+  originalname: string;
+  mimetype: string;
+  size: number;
+  buffer?: Uint8Array;
+  path?: string;
+}
+
+/** Where the adapted `File`s are stashed on the request, keyed by field name. */
+const ZODEC_FILES = Symbol('zodec:files');
+
+/** Adapts a multer file into a web-standard `File` the handler can consume. */
+async function toWebFile(file: RawMultipartFile): Promise<File> {
+  if (file.buffer) {
+    // Memory storage (the default): wrap the bytes directly. The copy gives a
+    // plain ArrayBuffer-backed view, which is what the `File` ctor accepts.
+    return new File([new Uint8Array(file.buffer)], file.originalname, { type: file.mimetype });
+  }
+  // Disk/custom storage: back the File by the file on disk. `openAsBlob` reads
+  // nothing up front — size/type are known from stat, and bytes are streamed
+  // only when the handler reads them — so large uploads aren't buffered in RAM.
+  // `openAsBlob` is typed with the global `Blob`, which is nominally distinct
+  // from `node:buffer`'s `Blob` that this `File` ctor expects — bridge the two.
+  const blob = (await openAsBlob(file.path ?? '', { type: file.mimetype })) as unknown as Blob;
+  return new File([blob], file.originalname, { type: file.mimetype });
+}
+
+/**
+ * Adapts every uploaded file to a `File` and stashes the result on the request,
+ * keyed by field name. Run from the multipart middleware (which is already async)
+ * so disk-backed files can be wrapped lazily without blocking.
+ */
+async function adaptMultipartFiles(req: Request, fileFields: MultipartFileField[]): Promise<void> {
+  const raw =
+    (req as unknown as { files?: Record<string, RawMultipartFile[] | undefined> }).files ?? {};
+  const adapted: Record<string, File[]> = {};
+  for (const field of fileFields) {
+    adapted[field.name] = await Promise.all((raw[field.name] ?? []).map(toWebFile));
+  }
+  (req as unknown as Record<symbol, unknown>)[ZODEC_FILES] = adapted;
+}
+
+/**
+ * Builds the object validated against a multipart `@Body` schema: multer puts
+ * text fields on `req.body`; the adapted files were stashed by
+ * {@link adaptMultipartFiles}. Merge them, unwrapping single-file fields.
+ */
+function assembleMultipartBody(
+  req: Request,
+  fileFields: MultipartFileField[],
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    ...((req.body as Record<string, unknown> | undefined) ?? {}),
+  };
+  const files = ((req as unknown as Record<symbol, unknown>)[ZODEC_FILES] ?? {}) as Record<
+    string,
+    File[] | undefined
+  >;
+  for (const field of fileFields) {
+    const uploaded = files[field.name] ?? [];
+    body[field.name] = field.multiple ? uploaded : uploaded[0];
+  }
+  return body;
+}
+
+/**
+ * Maps a multer error (oversized file, too many files, unexpected field) to a
+ * `422` {@link ValidationError} so it travels the same pipeline as schema
+ * failures.
+ */
+function multipartError(err: MulterError): ValidationError {
+  return new ValidationError(422, [
+    { code: 'custom', path: err.field ? [err.field] : [], message: err.message },
+  ] as unknown as ValidationError['issues']);
 }
 
 /**
@@ -107,7 +203,9 @@ function resolveParam(
     case 'query':
       return param.name ? values.query[param.name] : values.query;
     case 'body':
-      return values.body;
+      return param.name
+        ? (values.body as Record<string, unknown> | undefined)?.[param.name]
+        : values.body;
     case 'header':
       return param.name ? req.headers[param.name.toLowerCase()] : req.headers;
     case 'req':
@@ -172,6 +270,8 @@ function buildArgs(
  */
 export class Zodec {
   private readonly controllers: object[] = [];
+  /** Lazily-built multer instance, shared across all multipart routes. */
+  private uploader: Multer | undefined;
 
   /**
    * @param options - Instance options, including the OpenAPI `info` block.
@@ -220,13 +320,56 @@ export class Zodec {
       const proto = Object.getPrototypeOf(instance) as object;
       const prefix = getPrefix(proto);
       for (const route of getRoutes(proto)) {
-        app[route.method](
-          toExpressPath(prefix, route.path),
-          this.makeHandler(instance, proto, route),
-        );
+        const path = toExpressPath(prefix, route.path);
+        const handler = this.makeHandler(instance, proto, route);
+        // A route whose @Body has a file field is multipart: parse it with multer
+        // before the handler runs, so req.body/req.files are populated.
+        const fileFields = getMultipartFields(route.body);
+        if (fileFields.length > 0) {
+          app[route.method](path, this.multipartMiddleware(fileFields), handler);
+        } else {
+          app[route.method](path, handler);
+        }
       }
     }
     return this;
+  }
+
+  /** The shared multer instance, built from `options.multipart` on first use. */
+  private getUploader(): Multer {
+    if (!this.uploader) {
+      const multipart = this.options.multipart ?? {};
+      // Default to in-memory storage so handlers get a File backed by the bytes,
+      // but only when the caller hasn't configured `storage` or `dest` (either of
+      // which selects multer's own storage) — otherwise pass options through.
+      this.uploader =
+        multipart.storage || multipart.dest
+          ? multer(multipart)
+          : multer({ ...multipart, storage: multer.memoryStorage() });
+    }
+    return this.uploader;
+  }
+
+  /**
+   * Builds the middleware that parses a multipart request: multer populates
+   * `req.body`/`req.files`, then each file is adapted to a web-standard `File`.
+   * multer's own errors (oversized, too many, unexpected field) become `422`s.
+   */
+  private multipartMiddleware(fileFields: MultipartFileField[]): RequestHandler {
+    const upload = this.getUploader().fields(
+      fileFields.map((field) =>
+        field.multiple ? { name: field.name } : { name: field.name, maxCount: 1 },
+      ),
+    );
+    return (req, res, next) => {
+      upload(req, res, (err: unknown) => {
+        if (err) {
+          next(err instanceof MulterError ? multipartError(err) : err);
+          return;
+        }
+        adaptMultipartFiles(req, fileFields).then(() => next(), next);
+      });
+    };
   }
 
   /**

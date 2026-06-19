@@ -17,7 +17,7 @@ export {
 export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
-export { BodyParam, Header, Param, QueryParam, Req, Res } from './parameters.js';
+export { BodyParam, File, Files, Header, Param, QueryParam, Req, Res } from './parameters.js';
 export { getParams, getPrefix, getRoutes, getTags } from './metadata.js';
 export type {
   ExampleMetadata,

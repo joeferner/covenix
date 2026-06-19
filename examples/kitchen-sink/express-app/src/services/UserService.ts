@@ -8,6 +8,7 @@ import type { CreateUser, UpdateUser, User, UserList } from '@kitchen-sink/schem
  */
 export class UserService {
   private readonly users = new Map<string, User>();
+  private readonly avatars = new Map<string, { bytes: Uint8Array; contentType: string }>();
 
   public async list(page: number, limit: number): Promise<UserList> {
     const all = [...this.users.values()];
@@ -63,5 +64,13 @@ export class UserService {
 
   public async remove(id: string): Promise<void> {
     if (!this.users.delete(id)) throw new createError.NotFound(`No user ${id}`);
+  }
+
+  public async setAvatar(
+    id: string,
+    avatar: { bytes: Uint8Array; contentType: string },
+  ): Promise<void> {
+    if (!this.users.has(id)) throw new createError.NotFound(`No user ${id}`);
+    this.avatars.set(id, avatar);
   }
 }

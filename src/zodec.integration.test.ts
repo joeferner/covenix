@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 import express from 'express';
 import type { Request, Response } from 'express';
 import request from 'supertest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import multer, { type Options } from 'multer';
 import { z } from 'zod';
 import { Body, Get, Params, Post, Query, Returns, ReturnsFile, Route, Tags } from './decorators.js';
-import { BodyParam, Header, Param, QueryParam, Req, Res } from './parameters.js';
+import { BodyParam, File, Files, Header, Param, QueryParam, Req, Res } from './parameters.js';
 import { Zodec } from './zodec.js';
 import { zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
@@ -271,6 +275,150 @@ describe('file responses', () => {
     // ...plus an ASCII fallback `filename` for older clients.
     expect(disposition).toMatch(/filename="[^"]*"/);
     expect(res.text).toBe('hello');
+  });
+});
+
+describe('multipart file uploads', () => {
+  const AvatarUpload = z.object({
+    avatar: z.file().max(1_000).mime(['image/png', 'text/plain']),
+    caption: z.string().max(10).optional(),
+  });
+  const GalleryUpload = z.object({
+    photos: z.array(z.file()).max(2),
+  });
+
+  @Route('uploads')
+  class UploadController {
+    @Post('avatar')
+    @Body(AvatarUpload)
+    @Returns(
+      200,
+      z.object({ name: z.string(), type: z.string(), size: z.number(), text: z.string() }),
+    )
+    public async avatar(
+      @File('avatar') avatar: globalThis.File,
+      @BodyParam('caption') caption: string | undefined,
+    ): Promise<Record<string, unknown>> {
+      return {
+        name: avatar.name,
+        type: avatar.type,
+        size: avatar.size,
+        text: await avatar.text(),
+        caption,
+      };
+    }
+
+    @Post('photos')
+    @Body(GalleryUpload)
+    @Returns(200, z.object({ count: z.number(), names: z.array(z.string()) }))
+    public photos(@Files('photos') photos: globalThis.File[]): Record<string, unknown> {
+      return { count: photos.length, names: photos.map((p) => p.name) };
+    }
+  }
+
+  it('parses an uploaded file into a web File and a text field', async () => {
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/avatar')
+      .field('caption', 'hi')
+      .attach('avatar', Buffer.from('pixels'), { filename: 'a.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      name: 'a.png',
+      type: 'image/png',
+      size: 6,
+      text: 'pixels',
+      caption: 'hi',
+    });
+  });
+
+  it('returns 422 when a file exceeds the schema size limit', async () => {
+    const big = Buffer.alloc(2_000, 0x41);
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/avatar')
+      .attach('avatar', big, { filename: 'big.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 422 when a file has a disallowed mime type', async () => {
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/avatar')
+      .attach('avatar', Buffer.from('x'), { filename: 'a.gif', contentType: 'image/gif' });
+
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 422 when a required file is missing', async () => {
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/avatar')
+      .field('caption', 'hi');
+
+    expect(res.status).toBe(422);
+  });
+
+  it('injects multiple files as an array', async () => {
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/photos')
+      .attach('photos', Buffer.from('1'), { filename: 'one.png', contentType: 'image/png' })
+      .attach('photos', Buffer.from('2'), { filename: 'two.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ count: 2, names: ['one.png', 'two.png'] });
+  });
+
+  it('returns 422 when more files arrive than the schema array allows', async () => {
+    const res = await request(makeApp(new UploadController()))
+      .post('/uploads/photos')
+      .attach('photos', Buffer.from('1'), { filename: 'one.png', contentType: 'image/png' })
+      .attach('photos', Buffer.from('2'), { filename: 'two.png', contentType: 'image/png' })
+      .attach('photos', Buffer.from('3'), { filename: 'three.png', contentType: 'image/png' });
+
+    expect(res.status).toBe(422);
+  });
+});
+
+describe('multipart storage engines', () => {
+  const Upload = z.object({ file: z.file().max(1_000) });
+
+  @Route('store')
+  class StoreController {
+    @Post()
+    @Body(Upload)
+    @Returns(200, z.object({ name: z.string(), size: z.number(), text: z.string() }))
+    public async store(@File('file') file: globalThis.File): Promise<Record<string, unknown>> {
+      return { name: file.name, size: file.size, text: await file.text() };
+    }
+  }
+
+  function appWith(multipart: Options | undefined): express.Express {
+    const app = express();
+    const api = new Zodec({
+      info: { title: 'T', version: '1.0.0' },
+      ...(multipart ? { multipart } : {}),
+    });
+    api.register(new StoreController());
+    api.mount(app);
+    return app;
+  }
+
+  // Whatever the storage engine, the handler should receive an equivalent File —
+  // memory wraps the buffer; disk (`dest` or a `diskStorage`) is backed lazily by
+  // the file on disk via openAsBlob.
+  it.each<[string, Options | undefined]>([
+    ['memory (default)', undefined],
+    ['disk via dest', { dest: mkdtempSync(join(tmpdir(), 'zodec-dest-')) }],
+    ['disk via diskStorage', { storage: multer.diskStorage({}) }],
+  ])('adapts an upload to a File with %s storage', async (_label, multipart) => {
+    const res = await request(appWith(multipart))
+      .post('/store')
+      .attach('file', Buffer.from('hello disk'), {
+        filename: 'f.txt',
+        contentType: 'text/plain',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ name: 'f.txt', size: 10, text: 'hello disk' });
   });
 });
 

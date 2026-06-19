@@ -43,6 +43,7 @@ schema is just a value and works across module boundaries with no special wiring
 | `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`                       | `UsersController.ts`                       |
 | `@Params`, `@Query`, `@Body`, stackable `@Returns`, `@Summary` | `UsersController.ts`                       |
 | `@Param`, `@QueryParam`, `@BodyParam`, `@Header`               | `UsersController.ts`, `AuthController.ts`  |
+| Multipart upload — `z.file()` in `@Body`, `@File`/`@Files`     | `UsersController.ts`                       |
 | `@Req` / `@Res` escape hatch                                   | `HealthController.ts`                      |
 | `new Zodec({ info })`, `register`, `mount`, `swagger`          | `api.ts`, `main.ts`, `generate-swagger.ts` |
 | `zodecErrorHandler()`                                          | `main.ts`                                  |

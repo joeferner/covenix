@@ -25,12 +25,48 @@ export function QueryParam(name: string): ParameterDecorator {
 }
 
 /**
- * Injects the whole request body as a handler argument — the value parsed by
- * `@Body` when present, otherwise the raw `req.body`.
+ * Injects the request body (the value parsed by `@Body` when present, otherwise
+ * the raw `req.body`). With a `name`, injects that single field of the parsed
+ * body; with no `name`, the whole body.
+ *
+ * @param name - Optional body field to inject; omit for the whole body.
  */
-export function BodyParam(): ParameterDecorator {
+export function BodyParam(name?: string): ParameterDecorator {
   return (target, propertyKey, index) => {
-    addParam(target, String(propertyKey), { index, source: 'body' });
+    addParam(target, String(propertyKey), { index, source: 'body', name });
+  };
+}
+
+/**
+ * Injects a single uploaded file from a `multipart/form-data` request as a
+ * web-standard `File`. Pairs with a `z.file()` field in the `@Body` schema (its
+ * presence is what makes the route multipart); the file is validated against
+ * that schema's constraints before the handler runs.
+ *
+ * @param name - The form field name (an object key in the `@Body` schema).
+ *
+ * @example
+ * ```ts
+ * @Body(z.object({ avatar: z.file().max(2_000_000) }))
+ * upload(@File('avatar') avatar: File) {}
+ * ```
+ */
+export function File(name: string): ParameterDecorator {
+  return (target, propertyKey, index) => {
+    addParam(target, String(propertyKey), { index, source: 'body', name });
+  };
+}
+
+/**
+ * Injects multiple uploaded files from a `multipart/form-data` request as an
+ * array of web-standard `File`s. Pairs with a `z.array(z.file())` field in the
+ * `@Body` schema.
+ *
+ * @param name - The form field name (an object key in the `@Body` schema).
+ */
+export function Files(name: string): ParameterDecorator {
+  return (target, propertyKey, index) => {
+    addParam(target, String(propertyKey), { index, source: 'body', name });
   };
 }
 

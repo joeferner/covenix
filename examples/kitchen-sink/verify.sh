@@ -94,6 +94,32 @@ else
   fail=1
 fi
 
+# Multipart upload (@Body with a z.file() field → multipart/form-data).
+PNG="$TMP/avatar.png"
+printf '\211PNG\r\n\032\n' >"$PNG" # minimal PNG signature; enough bytes to upload
+UP_BODY="$(curl -s -X POST "$BASE/users/$uid/avatar" \
+  -F "avatar=@$PNG;type=image/png" -F 'caption=hi there')"
+if printf '%s' "$UP_BODY" | grep -q '"contentType":"image/png"' &&
+  printf '%s' "$UP_BODY" | grep -q '"caption":"hi there"'; then
+  echo "    ✓ POST /users/:id/avatar accepts a multipart upload"
+else
+  echo "    ✗ POST /users/:id/avatar upload failed: $UP_BODY"
+  fail=1
+fi
+
+# A non-image upload must be rejected by the schema's .mime() constraint (422).
+expect 422 "POST /users/:id/avatar (wrong mime type) → 422" \
+  -X POST "$BASE/users/$uid/avatar" -F "avatar=@$PNG;type=image/gif"
+
+# Swagger advertises the upload as a binary multipart body.
+if curl -s "$BASE/swagger.json" |
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const b=d.paths["/users/{id}/avatar"].post.requestBody.content["multipart/form-data"].schema.properties.avatar;process.exit(b.format==="binary"?0:1)})'; then
+  echo "    ✓ swagger documents /users/{id}/avatar as a binary multipart body"
+else
+  echo "    ✗ swagger missing binary multipart body for /users/{id}/avatar"
+  fail=1
+fi
+
 # ----------------------------------------------------------------------------
 # 2. Instance vs static swagger generators must produce identical output
 # ----------------------------------------------------------------------------

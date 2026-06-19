@@ -21,6 +21,8 @@ import {
   BodyParam,
   Header,
   Res,
+  File,
+  Files,
   FileResponse,
 } from 'zodec';
 import {
@@ -29,10 +31,14 @@ import {
   UserSchema,
   UserListSchema,
   PaginationQuerySchema,
+  AvatarUploadSchema,
+  GalleryUploadSchema,
+  UploadResultSchema,
   ErrorSchema,
   type CreateUser,
   type UpdateUser,
   type UserList,
+  type UploadResult,
   type User,
 } from '@kitchen-sink/schemas';
 import type { UserService } from '../services/UserService.js';
@@ -127,6 +133,46 @@ export class UsersController {
       contentType: 'text/csv',
       filename: `user-${user.id}.csv`,
     });
+  }
+
+  // File upload (multipart/form-data). zodec auto-detects multipart because the
+  // @Body schema has a `z.file()` field — there's no @Multipart marker. multer
+  // (memory storage) parses the request, each file is adapted to a web-standard
+  // `File`, and the whole body is validated against the schema like any other:
+  // `avatar` must be a ≤2 MB PNG/JPEG, `caption` an optional short string. A
+  // violation throws the usual 422.
+  @Post('{id}/avatar')
+  @Summary('Upload an avatar image for a user')
+  @Params(IdParams)
+  @Body(AvatarUploadSchema)
+  @Returns(200, UploadResultSchema)
+  @Returns(404, ErrorSchema)
+  public async uploadAvatar(
+    @Param('id') id: string,
+    @File('avatar') avatar: File,
+    @BodyParam('caption') caption: string | undefined,
+  ): Promise<UploadResult> {
+    const bytes = new Uint8Array(await avatar.arrayBuffer());
+    await this.users.setAvatar(id, { bytes, contentType: avatar.type });
+    return { filename: avatar.name, contentType: avatar.type, size: avatar.size, caption };
+  }
+
+  // Multiple files in a single field: `z.array(z.file())` in the schema, injected
+  // as `File[]` via @Files. Each element is validated against the inner file
+  // schema, and the array length cap (`.max(8)`) is enforced too.
+  @Post('{id}/photos')
+  @Summary('Upload multiple photos for a user')
+  @Params(IdParams)
+  @Body(GalleryUploadSchema)
+  @Returns(200, z.object({ uploaded: z.number().int() }))
+  @Returns(404, ErrorSchema)
+  public async uploadPhotos(
+    @Param('id') id: string,
+    @Files('photos') photos: File[],
+  ): Promise<{ uploaded: number }> {
+    const user = await this.users.findById(id);
+    if (!user) throw new createError.NotFound(`No user ${id}`);
+    return { uploaded: photos.length };
   }
 
   @Post()
