@@ -228,6 +228,30 @@ client generation a `generate-swagger` script can register controllers and call
 `api.swagger()` headlessly, writing `swagger.json` to disk without starting the
 server.
 
+### Static generation — no instances required
+
+Swagger is derived entirely from class-level metadata, so if you only need the
+spec you don't have to construct controllers (or their dependencies) at all.
+`generateSwagger(controllers)` takes the controller **classes** directly and
+returns the OpenAPI document:
+
+```typescript
+// generate-swagger-static.ts
+import { writeFile } from 'node:fs/promises';
+import { generateSwagger } from 'zodec';
+import { HealthController } from './controllers/HealthController.js';
+import { UsersController } from './controllers/UsersController.js';
+import { AuthController } from './controllers/AuthController.js';
+
+const swagger = generateSwagger([HealthController, UsersController, AuthController]);
+await writeFile('swagger.json', JSON.stringify(swagger, null, 2));
+```
+
+This is the lightest path for CI spec checks and client codegen: no `Zodec`
+instance, no service wiring, no Express — just the classes and their decorators.
+Use `api.swagger()` instead when you already have a configured instance on hand
+(e.g. serving the spec from the running app).
+
 ---
 
 ## License
