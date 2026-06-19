@@ -9,44 +9,56 @@ import {
 import { ValidationError } from './errors.js';
 import { generateOpenApiDocument, type OpenApiDocument } from './swagger.js';
 
-// Per-request values the handler's injected parameters resolve from. Each source
-// starts as the raw request value and is replaced by the parsed (coerced,
-// defaulted) output once its schema validates. Kept separate from `req` because
-// Express 5 exposes `req.query` as a getter only — it cannot be reassigned.
+/**
+ * Per-request values the handler's injected parameters resolve from. Each source
+ * starts as the raw request value and is replaced by the parsed (coerced,
+ * defaulted) output once its schema validates. Kept separate from `req` because
+ * Express 5 exposes `req.query` as a getter only — it cannot be reassigned.
+ */
 interface RequestValues {
   params: Record<string, unknown>;
   query: Record<string, unknown>;
   body: unknown;
 }
 
+/** OpenAPI `info` block for the generated document. */
 export interface ZodecInfo {
+  /** API title shown in the OpenAPI document. */
   title: string;
+  /** API version string shown in the OpenAPI document. */
   version: string;
 }
 
+/** Options for constructing a {@link Zodec} instance. */
 export interface ZodecOptions {
+  /** OpenAPI `info` block (title + version). */
   info: ZodecInfo;
 }
 
+/** A controller handler method, called with the assembled argument list. */
 type HandlerFn = (...args: unknown[]) => unknown;
 
-// Joins the controller prefix and route path into a single Express path,
-// collapsing duplicate slashes and translating `{id}` placeholders to `:id`.
+/**
+ * Joins the controller prefix and route path into a single Express path,
+ * collapsing duplicate slashes and translating `{id}` placeholders to `:id`.
+ */
 function toExpressPath(prefix: string, path: string): string {
   const joined = `/${prefix}/${path}`.replace(/\/+/g, '/').replace(/\/$/, '');
   const normalized = joined === '' ? '/' : joined;
   return normalized.replace(/\{([^}]+)\}/g, ':$1');
 }
 
-// The status sent on success: the first declared 2xx response, or 200.
+/** The status sent on success: the first declared 2xx response, or 200. */
 function successStatus(responses: Record<number, unknown>): number {
   const codes = Object.keys(responses).map(Number);
   return codes.find((code) => code >= 200 && code < 300) ?? 200;
 }
 
-// Validates the request sources that have schemas, returning the parsed values
-// (raw values for sources without a schema). Throws ValidationError on the first
-// failure — 400 for params/query, 422 for body.
+/**
+ * Validates the request sources that have schemas, returning the parsed values
+ * (raw values for sources without a schema). Throws {@link ValidationError} on
+ * the first failure — 400 for params/query, 422 for body.
+ */
 function validate(route: RouteMetadata, req: Request): RequestValues {
   const values: RequestValues = {
     params: req.params,
@@ -71,8 +83,10 @@ function validate(route: RouteMetadata, req: Request): RequestValues {
   return values;
 }
 
-// Resolves a single injected parameter. A decorator with no `name` injects the
-// whole bag (e.g. `@Param()` → all params).
+/**
+ * Resolves a single injected parameter. A decorator with no `name` injects the
+ * whole bag (e.g. `@Param()` → all params).
+ */
 function resolveParam(
   param: ParamMetadata,
   values: RequestValues,
@@ -95,8 +109,10 @@ function resolveParam(
   }
 }
 
-// Builds the handler argument array, placing each injected value at its own
-// parameter index. Indexes without a decorator stay `undefined`.
+/**
+ * Builds the handler argument array, placing each injected value at its own
+ * parameter index. Indexes without a decorator stay `undefined`.
+ */
 function buildArgs(
   params: ParamMetadata[],
   values: RequestValues,
@@ -110,24 +126,50 @@ function buildArgs(
   return args;
 }
 
+/**
+ * Owns a set of controllers and wires them to Express and OpenAPI. Construct
+ * one instance, `register` your controllers, then `mount` an Express app and/or
+ * call `swagger`.
+ *
+ * @example
+ * ```ts
+ * const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+ * api.register(new UsersController(db));
+ * api.mount(app);
+ * app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
+ * ```
+ */
 export class Zodec {
   private readonly controllers: object[] = [];
 
+  /**
+   * @param options - Instance options, including the OpenAPI `info` block.
+   */
   public constructor(private readonly options: ZodecOptions) {}
 
+  /** The OpenAPI `info` block this instance was constructed with. */
   public get info(): ZodecInfo {
     return this.options.info;
   }
 
-  // Records a pre-constructed controller instance. The caller owns construction
-  // and dependency injection; mount() does the wiring later.
+  /**
+   * Records a pre-constructed controller instance. The caller owns construction
+   * and dependency injection; {@link Zodec.mount} does the wiring later.
+   *
+   * @param instance - A controller instance (not a class).
+   * @returns This instance, for chaining.
+   */
   public register(instance: object): this {
     this.controllers.push(instance);
     return this;
   }
 
-  // Builds the OpenAPI document from the registered controllers' metadata.
-  // Independent of mount() — does not require routes to be wired.
+  /**
+   * Builds the OpenAPI document from the registered controllers' metadata.
+   * Independent of {@link Zodec.mount} — does not require routes to be wired.
+   *
+   * @returns The assembled OpenAPI 3.1 document.
+   */
   public swagger(): OpenApiDocument {
     const prototypes = this.controllers.map(
       (instance) => Object.getPrototypeOf(instance) as object,
@@ -135,8 +177,13 @@ export class Zodec {
     return generateOpenApiDocument(prototypes, this.options.info);
   }
 
-  // Walks every registered controller's metadata and binds its routes onto the
-  // Express app.
+  /**
+   * Walks every registered controller's metadata and binds its routes (with
+   * validation middleware) onto the Express app.
+   *
+   * @param app - The Express application to register routes on.
+   * @returns This instance, for chaining.
+   */
   public mount(app: Express): this {
     for (const instance of this.controllers) {
       const proto = Object.getPrototypeOf(instance) as object;
@@ -151,6 +198,11 @@ export class Zodec {
     return this;
   }
 
+  /**
+   * Builds the Express request handler for one route: validate the request,
+   * assemble the handler arguments, invoke it, then validate and send the
+   * response (unless the handler used `@Res()`).
+   */
   private makeHandler(instance: object, proto: object, route: RouteMetadata): RequestHandler {
     const status = successStatus(route.responses);
     const fn = (instance as Record<string, HandlerFn | undefined>)[route.handlerName];
