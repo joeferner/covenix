@@ -161,41 +161,31 @@ class DocumentBuilder {
       ...(route.params ? this.parameters(route.params, 'path') : []),
       ...(route.query ? this.parameters(route.query, 'query') : []),
     ];
-    const descriptions = route.responseDescriptions ?? {};
     const responses: Record<string, OpenAPIV3_1.ResponseObject> = {};
-    for (const [status, schema] of Object.entries(route.responses)) {
+    for (const [status, decl] of Object.entries(route.responses)) {
+      // A file response wins the description fallback; otherwise the @Returns one.
       const response: OpenAPIV3_1.ResponseObject = {
-        description: descriptions[Number(status)] ?? '',
+        description: decl.file?.description ?? decl.description ?? '',
       };
-      // A status declared with no schema (e.g. 204) has no response body.
-      if (schema) {
+      if (decl.file) {
+        // Binary/file response (@ReturnsFile) advertises a binary body.
+        response.content = {
+          [decl.file.contentType]: { schema: { type: 'string', format: 'binary' } },
+        };
+      } else if (decl.schema) {
+        // A status declared with no schema (e.g. 204) has no response body.
         const example = examples.find((e) => e.status === Number(status));
-        response.content = { 'application/json': this.media(schema, example) };
+        response.content = { 'application/json': this.media(decl.schema, example) };
       }
-      responses[status] = response;
-    }
-    // Binary/file responses (@ReturnsFile) advertise a binary body.
-    for (const [status, decl] of Object.entries(route.fileResponses ?? {})) {
-      responses[status] = {
-        description: decl.description ?? descriptions[Number(status)] ?? '',
-        content: {
-          [decl.contentType]: {
-            schema: { type: 'string', format: 'binary' },
-          },
-        },
-      };
-    }
-    // Response headers (@Returns(..., { headers })) attach to their response.
-    for (const [status, headers] of Object.entries(route.responseHeaders ?? {})) {
-      const response = responses[status];
-      if (response) {
+      if (decl.headers) {
         response.headers = Object.fromEntries(
-          Object.entries(headers).map(([name, schema]) => [
+          Object.entries(decl.headers).map(([name, schema]) => [
             name,
             { schema: asParameterSchema(this.toJson(schema)) },
           ]),
         );
       }
+      responses[status] = response;
     }
 
     const operation: OpenAPIV3_1.OperationObject = { responses };

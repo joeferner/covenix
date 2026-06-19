@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Returns,
+  ReturnsFile,
   Summary,
   Route,
   Tags,
@@ -75,6 +76,19 @@ describe('metadata assembly', () => {
     expect(route.examples).toContainEqual({ status: 201, value: { id: 'out' } });
   });
 
+  it('throws when one status is declared by both @Returns and @ReturnsFile', () => {
+    expect(() => {
+      @Route('x')
+      class Conflicting {
+        @Get()
+        @Returns(200, Thing)
+        @ReturnsFile(200)
+        public m(): void {}
+      }
+      return Conflicting;
+    }).toThrow(/both @Returns and @ReturnsFile/);
+  });
+
   it('captures @Params / @Query / @Body schemas via decorators', () => {
     const ParamsSchema = z.object({ id: z.string() });
     const QuerySchema = z.object({ page: z.coerce.number() });
@@ -98,8 +112,8 @@ describe('metadata assembly', () => {
     expect(route.body).toBe(BodySchema);
   });
 
-  // The core correctness property: decorators key metadata on their own symbol,
-  // so applying them in any order produces identical metadata.
+  // The core correctness property: each decorator sets its own field on the
+  // route's record, so applying them in any order produces identical metadata.
   it('produces identical metadata regardless of decorator order', () => {
     @Route('a')
     class Forward {
@@ -151,7 +165,7 @@ describe('metadata store concerns', () => {
     expect(route.params).toBe(Params);
     expect(route.query).toBe(Query);
     expect(route.body).toBe(Body);
-    expect(route.responses[201]).toBe(Thing);
+    expect(route.responses[201]?.schema).toBe(Thing);
   });
 
   it('leaves unset concerns undefined', () => {

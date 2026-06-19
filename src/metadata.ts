@@ -4,6 +4,23 @@ import type { ZodType } from 'zod';
 /** HTTP methods zodec routes can be mapped to. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
+/**
+ * Everything declared for a single response status. Exactly one of `schema`
+ * (a JSON body from `@Returns`, possibly `undefined` for a no-content status like
+ * `204`) or `file` (a binary body from `@ReturnsFile`) describes the body —
+ * declaring both for one status is an error. `description`/`headers` annotate it.
+ */
+export interface ResponseMetadata {
+  /** `@Returns` body schema; `undefined` means the status has no body. */
+  schema?: ZodType | undefined;
+  /** `@ReturnsFile` binary body declaration. */
+  file?: FileResponseDecl | undefined;
+  /** Response description (`@Returns(..., { description })`). */
+  description?: string | undefined;
+  /** Response headers (`@Returns(..., { headers })`), name → Zod schema. */
+  headers?: Record<string, ZodType> | undefined;
+}
+
 /** Assembled metadata for a single route, as returned by {@link getRoutes}. */
 export interface RouteMetadata {
   /** HTTP method. */
@@ -18,11 +35,8 @@ export interface RouteMetadata {
   query?: ZodType | undefined;
   /** `@Body` schema, if any. */
   body?: ZodType | undefined;
-  /**
-   * Declared responses, keyed by status code (from `@Returns`). A value of
-   * `undefined` means the status was declared with no body (e.g. `204`).
-   */
-  responses: Record<number, ZodType | undefined>;
+  /** Declared responses, keyed by status code. One entry per declared status. */
+  responses: Record<number, ResponseMetadata>;
   /** Class-level `@Tags`, folded onto each route. */
   tags?: string[] | undefined;
   /** `@Summary` text, if any. */
@@ -35,18 +49,6 @@ export interface RouteMetadata {
   deprecated?: boolean | undefined;
   /** Example values (from `@Example`) for the request body and/or responses. */
   examples?: ExampleMetadata[] | undefined;
-  /** Binary/file responses (from `@ReturnsFile`), keyed by status code. */
-  fileResponses?: Record<number, FileResponseDecl> | undefined;
-  /**
-   * Response headers (from `@Returns(..., { headers })`), keyed by status code,
-   * then header name → Zod schema. Documented in OpenAPI; not validated.
-   */
-  responseHeaders?: Record<number, Record<string, ZodType>> | undefined;
-  /**
-   * Response descriptions (from `@Returns(..., { description })`), keyed by status
-   * code. Emitted as the OpenAPI Response Object `description`.
-   */
-  responseDescriptions?: Record<number, string> | undefined;
   /**
    * Security requirements (from `@Security`), each a scheme name + required
    * scopes. Stacked `@Security` decorators are alternatives (OR); the route is
@@ -96,35 +98,85 @@ export interface ParamMetadata {
   name?: string | undefined;
 }
 
-/*
- * One symbol per concern. Each decorator writes under its own key, so two
- * decorators on the same method can never clobber each other regardless of the
- * order they run in.
+/**
+ * Metadata is stored as one mutable record per scope, rather than one symbol per
+ * concern: {@link ROUTE_KEY} holds a method's whole route entry, {@link CONTROLLER_KEY}
+ * holds the class-level entry. Decorators get-or-create their record and set
+ * their own field on it (synchronously, in decorator-evaluation order), so the
+ * shape is assembled in one place — {@link getRoutes} — instead of stitched back
+ * together from many keys. {@link HANDLER_NAMES_KEY} is the registry of which
+ * methods are routes (reflect-metadata can't enumerate decorated members).
  */
-const HTTP_METHOD_KEY = Symbol('zodec:httpMethod');
-const PARAMS_SCHEMA_KEY = Symbol('zodec:paramsSchema');
-const QUERY_SCHEMA_KEY = Symbol('zodec:querySchema');
-const BODY_KEY = Symbol('zodec:body');
-const RETURNS_KEY = Symbol('zodec:returns');
-const RESPONSE_HEADERS_KEY = Symbol('zodec:responseHeaders');
-const RESPONSE_DESCRIPTIONS_KEY = Symbol('zodec:responseDescriptions');
-const FILE_RESPONSES_KEY = Symbol('zodec:fileResponses');
-const EXAMPLES_KEY = Symbol('zodec:examples');
-const SUMMARY_KEY = Symbol('zodec:summary');
-const DESCRIPTION_KEY = Symbol('zodec:description');
-const OPERATION_ID_KEY = Symbol('zodec:operationId');
-const DEPRECATED_KEY = Symbol('zodec:deprecated');
-const SECURITY_KEY = Symbol('zodec:security');
+const ROUTE_KEY = Symbol('zodec:route');
+const CONTROLLER_KEY = Symbol('zodec:controller');
 const HANDLER_NAMES_KEY = Symbol('zodec:handlerNames');
-const PARAM_INJECTIONS_KEY = Symbol('zodec:paramInjections');
-const PREFIX_KEY = Symbol('zodec:prefix');
-const TAGS_KEY = Symbol('zodec:tags');
 
-/** Internal storage shape for a method's HTTP verb + path. */
-interface HttpMethodEntry {
-  method: HttpMethod;
-  path: string;
+/** Mutable per-method storage, accumulated by the method/parameter decorators. */
+interface RouteEntry {
+  method?: HttpMethod;
+  path?: string;
+  params?: ZodType;
+  query?: ZodType;
+  body?: ZodType;
+  responses?: Record<number, ResponseMetadata>;
+  summary?: string;
+  description?: string;
+  operationId?: string;
+  deprecated?: boolean;
+  examples?: ExampleMetadata[];
+  security?: SecurityRequirement[];
+  paramInjections?: ParamMetadata[];
 }
+
+/** Mutable class-level storage, accumulated by the class decorators. */
+interface ControllerEntry {
+  prefix?: string;
+  tags?: string[];
+  security?: SecurityRequirement[];
+}
+
+/** Reads a method's route entry without creating one. */
+function readRoute(target: object, handlerName: string): RouteEntry | undefined {
+  return Reflect.getOwnMetadata(ROUTE_KEY, target, handlerName) as RouteEntry | undefined;
+}
+
+/** Gets (creating + storing if needed) a method's mutable route entry. */
+function routeEntry(target: object, handlerName: string): RouteEntry {
+  const existing = readRoute(target, handlerName);
+  if (existing) {
+    return existing;
+  }
+  const created: RouteEntry = {};
+  Reflect.defineMetadata(ROUTE_KEY, created, target, handlerName);
+  return created;
+}
+
+/** Gets (creating + storing if needed) the per-status entry within a route. */
+function responseEntry(entry: RouteEntry, status: number): ResponseMetadata {
+  entry.responses ??= {};
+  return (entry.responses[status] ??= {});
+}
+
+/** Reads the controller entry without creating one. */
+function readController(target: object): ControllerEntry | undefined {
+  return Reflect.getOwnMetadata(CONTROLLER_KEY, target) as ControllerEntry | undefined;
+}
+
+/** Gets (creating + storing if needed) the controller's mutable entry. */
+function controllerEntry(target: object): ControllerEntry {
+  const existing = readController(target);
+  if (existing) {
+    return existing;
+  }
+  const created: ControllerEntry = {};
+  Reflect.defineMetadata(CONTROLLER_KEY, created, target);
+  return created;
+}
+
+const STATUS_CONFLICT = (handlerName: string, status: number): Error =>
+  new Error(
+    `zodec: status ${status} on "${handlerName}" is declared by both @Returns and @ReturnsFile`,
+  );
 
 /**
  * Records a handler's HTTP method + path and registers its name in the route
@@ -136,12 +188,9 @@ export function setHttpMethod(
   method: HttpMethod,
   path: string,
 ): void {
-  Reflect.defineMetadata(
-    HTTP_METHOD_KEY,
-    { method, path } satisfies HttpMethodEntry,
-    target,
-    handlerName,
-  );
+  const entry = routeEntry(target, handlerName);
+  entry.method = method;
+  entry.path = path;
   const names = (Reflect.getOwnMetadata(HANDLER_NAMES_KEY, target) ?? []) as string[];
   if (!names.includes(handlerName)) {
     names.push(handlerName);
@@ -159,27 +208,26 @@ export function addReturnSchema(
   status: number,
   schema?: ZodType,
 ): void {
-  const returns = (Reflect.getOwnMetadata(RETURNS_KEY, target, handlerName) ?? {}) as Record<
-    number,
-    ZodType | undefined
-  >;
-  returns[status] = schema;
-  Reflect.defineMetadata(RETURNS_KEY, returns, target, handlerName);
+  const response = responseEntry(routeEntry(target, handlerName), status);
+  if (response.file) {
+    throw STATUS_CONFLICT(handlerName, status);
+  }
+  response.schema = schema;
 }
 
 /** Stores the `req.params` schema for a handler. Called by `@Params`. */
 export function setParamsSchema(target: object, handlerName: string, schema: ZodType): void {
-  Reflect.defineMetadata(PARAMS_SCHEMA_KEY, schema, target, handlerName);
+  routeEntry(target, handlerName).params = schema;
 }
 
 /** Stores the `req.query` schema for a handler. Called by `@Query`. */
 export function setQuerySchema(target: object, handlerName: string, schema: ZodType): void {
-  Reflect.defineMetadata(QUERY_SCHEMA_KEY, schema, target, handlerName);
+  routeEntry(target, handlerName).query = schema;
 }
 
 /** Stores the `req.body` schema for a handler. Called by `@Body`. */
 export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
-  Reflect.defineMetadata(BODY_KEY, schema, target, handlerName);
+  routeEntry(target, handlerName).body = schema;
 }
 
 /** Records response headers for a status code. Called by `@Returns`. */
@@ -189,12 +237,8 @@ export function addResponseHeaders(
   status: number,
   headers: Record<string, ZodType>,
 ): void {
-  const all = (Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) ?? {}) as Record<
-    number,
-    Record<string, ZodType>
-  >;
-  all[status] = { ...all[status], ...headers };
-  Reflect.defineMetadata(RESPONSE_HEADERS_KEY, all, target, handlerName);
+  const response = responseEntry(routeEntry(target, handlerName), status);
+  response.headers = { ...response.headers, ...headers };
 }
 
 /** Records a response description for a status code. Called by `@Returns`. */
@@ -204,10 +248,7 @@ export function addResponseDescription(
   status: number,
   description: string,
 ): void {
-  const all = (Reflect.getOwnMetadata(RESPONSE_DESCRIPTIONS_KEY, target, handlerName) ??
-    {}) as Record<number, string>;
-  all[status] = description;
-  Reflect.defineMetadata(RESPONSE_DESCRIPTIONS_KEY, all, target, handlerName);
+  responseEntry(routeEntry(target, handlerName), status).description = description;
 }
 
 /** Records a binary/file response for a status code. Called by `@ReturnsFile`. */
@@ -217,63 +258,53 @@ export function addFileResponse(
   status: number,
   decl: FileResponseDecl,
 ): void {
-  const fileResponses = (Reflect.getOwnMetadata(FILE_RESPONSES_KEY, target, handlerName) ??
-    {}) as Record<number, FileResponseDecl>;
-  fileResponses[status] = decl;
-  Reflect.defineMetadata(FILE_RESPONSES_KEY, fileResponses, target, handlerName);
+  const response = responseEntry(routeEntry(target, handlerName), status);
+  if ('schema' in response) {
+    throw STATUS_CONFLICT(handlerName, status);
+  }
+  response.file = decl;
 }
 
 /** Appends an example value for a handler. Called by `@Example`. */
 export function addExample(target: object, handlerName: string, example: ExampleMetadata): void {
-  const examples = (Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) ??
-    []) as ExampleMetadata[];
-  examples.push(example);
-  Reflect.defineMetadata(EXAMPLES_KEY, examples, target, handlerName);
+  const entry = routeEntry(target, handlerName);
+  (entry.examples ??= []).push(example);
 }
 
 /** Stores the operation summary for a handler. Called by `@Summary`. */
 export function setSummary(target: object, handlerName: string, text: string): void {
-  Reflect.defineMetadata(SUMMARY_KEY, text, target, handlerName);
+  routeEntry(target, handlerName).summary = text;
 }
 
 /** Stores the operation description for a handler. Called by `@Description`. */
 export function setDescription(target: object, handlerName: string, text: string): void {
-  Reflect.defineMetadata(DESCRIPTION_KEY, text, target, handlerName);
+  routeEntry(target, handlerName).description = text;
 }
 
 /** Stores the operation id for a handler. Called by `@OperationId`. */
 export function setOperationId(target: object, handlerName: string, id: string): void {
-  Reflect.defineMetadata(OPERATION_ID_KEY, id, target, handlerName);
+  routeEntry(target, handlerName).operationId = id;
 }
 
 /** Marks a handler's operation as deprecated. Called by `@Deprecated`. */
 export function setDeprecated(target: object, handlerName: string): void {
-  Reflect.defineMetadata(DEPRECATED_KEY, true, target, handlerName);
+  routeEntry(target, handlerName).deprecated = true;
 }
 
 /**
  * Adds a security requirement. Called by `@Security`. When `handlerName` is
  * omitted the requirement is class-level (applies to every route that doesn't
  * declare its own). Stacked decorators accumulate as alternatives (OR), kept in
- * source order.
+ * source order (decorators evaluate bottom-up, so we `unshift`).
  */
 export function addSecurity(
   target: object,
   handlerName: string | undefined,
   requirement: SecurityRequirement,
 ): void {
-  const read = (): SecurityRequirement[] =>
-    ((handlerName === undefined
-      ? Reflect.getOwnMetadata(SECURITY_KEY, target)
-      : Reflect.getOwnMetadata(SECURITY_KEY, target, handlerName)) ?? []) as SecurityRequirement[];
-  // Decorators evaluate bottom-up; unshift so the list reads top-to-bottom.
-  const list = read();
-  list.unshift(requirement);
-  if (handlerName === undefined) {
-    Reflect.defineMetadata(SECURITY_KEY, list, target);
-  } else {
-    Reflect.defineMetadata(SECURITY_KEY, list, target, handlerName);
-  }
+  const entry =
+    handlerName === undefined ? controllerEntry(target) : routeEntry(target, handlerName);
+  (entry.security ??= []).unshift(requirement);
 }
 
 /**
@@ -283,12 +314,12 @@ export function addSecurity(
  * @returns The requirements, or `[]` if none were set.
  */
 export function getClassSecurity(target: object): SecurityRequirement[] {
-  return (Reflect.getOwnMetadata(SECURITY_KEY, target) ?? []) as SecurityRequirement[];
+  return readController(target)?.security ?? [];
 }
 
 /** Stores the controller path prefix on a prototype. Called by `@Route`. */
 export function setPrefix(target: object, prefix: string): void {
-  Reflect.defineMetadata(PREFIX_KEY, prefix, target);
+  controllerEntry(target).prefix = prefix;
 }
 
 /**
@@ -298,12 +329,12 @@ export function setPrefix(target: object, prefix: string): void {
  * @returns The prefix, or `''` if none was set.
  */
 export function getPrefix(target: object): string {
-  return (Reflect.getOwnMetadata(PREFIX_KEY, target) ?? '') as string;
+  return readController(target)?.prefix ?? '';
 }
 
 /** Stores the controller tags on a prototype. Called by `@Tags`. */
 export function setTags(target: object, tags: string[]): void {
-  Reflect.defineMetadata(TAGS_KEY, tags, target);
+  controllerEntry(target).tags = tags;
 }
 
 /**
@@ -313,7 +344,7 @@ export function setTags(target: object, tags: string[]): void {
  * @returns The tags, or `[]` if none were set.
  */
 export function getTags(target: object): string[] {
-  return (Reflect.getOwnMetadata(TAGS_KEY, target) ?? []) as string[];
+  return readController(target)?.tags ?? [];
 }
 
 /**
@@ -321,10 +352,8 @@ export function getTags(target: object): string[] {
  * decorators (`@Param`, `@QueryParam`, etc.).
  */
 export function addParam(target: object, handlerName: string, param: ParamMetadata): void {
-  const params = (Reflect.getOwnMetadata(PARAM_INJECTIONS_KEY, target, handlerName) ??
-    []) as ParamMetadata[];
-  params.push(param);
-  Reflect.defineMetadata(PARAM_INJECTIONS_KEY, params, target, handlerName);
+  const entry = routeEntry(target, handlerName);
+  (entry.paramInjections ??= []).push(param);
 }
 
 /**
@@ -337,66 +366,41 @@ export function addParam(target: object, handlerName: string, param: ParamMetada
  * @returns The parameter metadata entries (possibly empty).
  */
 export function getParams(target: object, handlerName: string): ParamMetadata[] {
-  return (Reflect.getOwnMetadata(PARAM_INJECTIONS_KEY, target, handlerName) ??
-    []) as ParamMetadata[];
+  return readRoute(target, handlerName)?.paramInjections ?? [];
 }
 
 /**
- * Assembles {@link RouteMetadata}[] at read time from the per-concern entries.
- * The handler-name list is the source of truth for which methods are routes.
+ * Assembles {@link RouteMetadata}[] at read time from each route's stored entry.
+ * The handler-name list is the source of truth for which methods are routes;
+ * class-level tags/security are folded onto every route so each result is
+ * self-contained for downstream consumers (e.g. swagger).
  *
  * @param target - The controller prototype.
  * @returns One entry per route declared on the controller.
  */
 export function getRoutes(target: object): RouteMetadata[] {
   const names = (Reflect.getOwnMetadata(HANDLER_NAMES_KEY, target) ?? []) as string[];
-  // Tags are declared once at the class level; fold them onto every route so a
-  // RouteMetadata is self-contained for downstream consumers (e.g. swagger).
-  const tags = getTags(target);
-  // Class-level @Security is the default; a method's own @Security overrides it.
-  const classSecurity = getClassSecurity(target);
+  const controller = readController(target) ?? {};
+  const tags = controller.tags && controller.tags.length > 0 ? controller.tags : undefined;
+  const classSecurity = controller.security;
   return names.map((handlerName) => {
-    const entry = Reflect.getOwnMetadata(HTTP_METHOD_KEY, target, handlerName) as HttpMethodEntry;
+    const entry = readRoute(target, handlerName) ?? {};
     return {
-      method: entry.method,
-      path: entry.path,
+      method: entry.method as HttpMethod,
+      path: entry.path ?? '',
       handlerName,
-      params: Reflect.getOwnMetadata(PARAMS_SCHEMA_KEY, target, handlerName) as ZodType | undefined,
-      query: Reflect.getOwnMetadata(QUERY_SCHEMA_KEY, target, handlerName) as ZodType | undefined,
-      body: Reflect.getOwnMetadata(BODY_KEY, target, handlerName) as ZodType | undefined,
-      responses: (Reflect.getOwnMetadata(RETURNS_KEY, target, handlerName) ?? {}) as Record<
-        number,
-        ZodType | undefined
-      >,
-      tags: tags.length > 0 ? tags : undefined,
-      summary: Reflect.getOwnMetadata(SUMMARY_KEY, target, handlerName) as string | undefined,
-      description: Reflect.getOwnMetadata(DESCRIPTION_KEY, target, handlerName) as
-        | string
-        | undefined,
-      operationId: Reflect.getOwnMetadata(OPERATION_ID_KEY, target, handlerName) as
-        | string
-        | undefined,
-      deprecated: Reflect.getOwnMetadata(DEPRECATED_KEY, target, handlerName) as
-        | boolean
-        | undefined,
-      examples: Reflect.getOwnMetadata(EXAMPLES_KEY, target, handlerName) as
-        | ExampleMetadata[]
-        | undefined,
-      fileResponses: Reflect.getOwnMetadata(FILE_RESPONSES_KEY, target, handlerName) as
-        | Record<number, FileResponseDecl>
-        | undefined,
-      responseHeaders: Reflect.getOwnMetadata(RESPONSE_HEADERS_KEY, target, handlerName) as
-        | Record<number, Record<string, ZodType>>
-        | undefined,
-      responseDescriptions: Reflect.getOwnMetadata(
-        RESPONSE_DESCRIPTIONS_KEY,
-        target,
-        handlerName,
-      ) as Record<number, string> | undefined,
-      security:
-        (Reflect.getOwnMetadata(SECURITY_KEY, target, handlerName) as
-          | SecurityRequirement[]
-          | undefined) ?? (classSecurity.length > 0 ? classSecurity : undefined),
-    };
+      params: entry.params,
+      query: entry.query,
+      body: entry.body,
+      responses: entry.responses ?? {},
+      tags,
+      summary: entry.summary,
+      description: entry.description,
+      operationId: entry.operationId,
+      deprecated: entry.deprecated,
+      examples: entry.examples,
+      // A method's own @Security overrides the class-level default.
+      security: entry.security ?? classSecurity,
+    } satisfies RouteMetadata;
   });
 }

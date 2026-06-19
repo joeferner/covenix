@@ -611,7 +611,7 @@ export class Zodec {
           // declared @Returns schema. A mismatch is a server bug, so it throws
           // a 500 ValidationError through the same error pipeline as everything
           // else — zodec never decides what to do with it.
-          const schema = route.responses[status];
+          const schema = route.responses[status]?.schema;
           if (schema) {
             const result = schema.safeParse(value);
             if (!result.success) {

@@ -56,6 +56,7 @@ export type {
   HttpMethod,
   ParamMetadata,
   ParamSource,
+  ResponseMetadata,
   RouteMetadata,
   SecurityRequirement,
 } from './metadata.js';
