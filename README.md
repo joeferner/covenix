@@ -2,6 +2,8 @@
 
 **Zod-powered decorators for Express APIs — typed routes, runtime validation, and accurate OpenAPI from a single source of truth.**
 
+**[Documentation](https://joeferner.github.io/zodec/guide/getting-started)** · [API Reference](https://joeferner.github.io/zodec/api/)
+
 `zodec` lets you describe each endpoint with explicit [Zod](https://zod.dev)
 schemas and ergonomic decorators. From that one description it wires Express
 routes, validates every request, and generates a `swagger.json` that always
