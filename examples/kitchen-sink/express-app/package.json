@@ -8,7 +8,9 @@
     "swagger": "tsx src/generate-swagger-instance.ts",
     "swagger:static": "tsx src/generate-swagger-static.ts",
     "contract": "tsx src/generate-contract-instance.ts",
-    "contract:static": "tsx src/generate-contract-static.ts"
+    "contract:static": "tsx src/generate-contract-static.ts",
+    "client": "tsx src/generate-client-instance.ts",
+    "verify:client": "tsx src/verify-client.ts"
   },
   "dependencies": {
     "@kitchen-sink/schemas": "*",

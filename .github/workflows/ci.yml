@@ -24,3 +24,17 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+
+  # End-to-end: builds zodec, boots the kitchen-sink server, exercises every
+  # feature with curl + the generated client, and checks the generated artifacts
+  # (swagger / contract / api.gen.ts) against their committed snapshots.
+  kitchen-sink:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: bash examples/kitchen-sink/verify.sh

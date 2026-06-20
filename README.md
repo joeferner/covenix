@@ -55,6 +55,9 @@ also produces its OpenAPI definition, so the two can never drift.
   store metadata via `reflect-metadata`; swagger is generated at startup.
 - **Zero extra deps for schema conversion.** Zod 4 ships `z.toJSONSchema()`
   natively, so schema → JSON Schema needs no helper library.
+- **A typed client, generated.** The same metadata produces a standalone,
+  dependency-free TypeScript client — replacing a `tsoa → swagger → openapi-generator`
+  pipeline with one accurate hop.
 
 ---
 
@@ -325,6 +328,40 @@ generateSwagger([UsersController], info, { specVersion: '3.0' });
 
 See [OpenAPI / Swagger](https://joeferner.github.io/zodec/guide/swagger) for the
 full conversion table.
+
+---
+
+## Typed client
+
+zodec can generate a **standalone, fully-typed TypeScript client** — the modern
+replacement for a `tsoa → swagger → openapi-generator-cli` pipeline. The generated
+file has **no runtime dependency**, so a front end imports it and calls your API
+with full types:
+
+```typescript
+import { generateContract, generateTypeScriptClient } from 'zodec';
+
+// controllers → contract (a codegen-oriented IR) → standalone client
+const contract = generateContract([UsersController, AuthController]); // or api.contract()
+await writeFile('api.gen.ts', generateTypeScriptClient(contract));
+```
+
+```typescript
+import { createClient, ZodecClientError } from './api.gen'; // no zodec import
+
+const api = createClient({ baseUrl: 'https://api.example.com' });
+
+const user = await api.users.get({ params: { id } }); // → User (throws on non-2xx)
+const res = await api.users.get.raw({ params: { id } }); // → { status, body } union
+for await (const event of await api.health.events()) {
+  /* @Sse → AsyncIterable */
+}
+```
+
+Operations are grouped by tag; methods return the success body and throw a typed
+`ZodecClientError` on non-2xx (use `.raw()` for the status-discriminated union).
+File responses come back as `Blob` (with HTTP `Range`), SSE as an
+`AsyncIterable`. See [Typed Client](https://joeferner.github.io/zodec/guide/typed-client).
 
 ---
 

@@ -53,6 +53,7 @@ export type SchemaNode =
       kind: 'object';
       properties: Record<string, PropertyNode>;
       additionalProperties?: SchemaNode | false | undefined;
+      description?: string | undefined;
     }
   | {
       kind: 'array';
@@ -79,6 +80,7 @@ export interface PropertyNode {
   schema: SchemaNode;
   optional?: boolean | undefined;
   default?: unknown;
+  description?: string | undefined;
 }
 
 /** Validator for a single object property. */
@@ -86,6 +88,7 @@ const PropertyNodeSchema: z.ZodType<PropertyNode> = z.object({
   schema: z.lazy(() => SchemaNodeSchema),
   optional: z.boolean().optional(),
   default: z.unknown().optional(),
+  description: z.string().optional(),
 });
 
 /** Runtime validator for {@link SchemaNode}. */
@@ -118,6 +121,7 @@ export const SchemaNodeSchema: z.ZodType<SchemaNode> = z.lazy(() =>
       kind: z.literal('object'),
       properties: z.record(z.string(), PropertyNodeSchema),
       additionalProperties: z.union([z.lazy(() => SchemaNodeSchema), z.literal(false)]).optional(),
+      description: z.string().optional(),
     }),
     z.object({
       kind: z.literal('array'),

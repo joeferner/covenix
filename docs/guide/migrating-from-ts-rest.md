@@ -13,21 +13,23 @@ validation from schemas, but they optimize for **opposite ends of the wire**:
   primary artifact — the thing other teams, languages, and codegen tools consume.
 
 The migration is mostly mechanical (Zod stays Zod; the route fields line up with
-the decorators). The one thing that does **not** carry over is the typed client —
-read the honesty section first, because for some apps it's a reason not to migrate.
+the decorators). The main thing that works differently is the **typed client** —
+read the honesty section first.
 
 ## Should you migrate? (the honest version)
 
-zodec does **not** ship a typed client, and by design never will (see the
-[rationale](https://github.com/joeferner/zodec/issues/9)): decorators are erased
-at the type level, so `typeof Controller` can't carry the request/response
-contract the way ts-rest's contract-as-a-value can. This is ts-rest's single
-biggest advantage, and it's real.
+zodec **does** ship a typed client — a generated, standalone
+[TypeScript client](/guide/typed-client) — but it gets there differently than
+ts-rest. ts-rest's contract is a _value_ the client infers from directly (zero
+codegen); zodec's contract comes from _decorators_ (erased at the type level), so
+its client is a **generated file** you regenerate when the API changes. In return,
+zodec's client is fully standalone (no runtime dependency) and the contract it's
+built from is an open artifact any generator can target.
 
-**Stay on ts-rest if** your main win is the inferred client in a monorepo where
-the front end imports the contract directly. Nothing zodec offers replaces that
-DX, and "generate a client from the spec" is a step backwards from importing the
-contract.
+**Stay on ts-rest if** your main win is the _zero-codegen_ inferred client in a
+monorepo where the front end imports the contract directly — that one-import,
+nothing-to-regenerate DX is ts-rest's edge, and zodec's codegen step is a small
+tax against it (though far lighter than the `openapi-generator-cli` route).
 
 **zodec is the better fit if** any of these dominate:
 
@@ -43,9 +45,9 @@ contract.
 - **You need first-class auth, file, range, or SSE responses in the spec** (see
   below) — all built into zodec, all DIY in ts-rest.
 
-You can also have both: run zodec and point `openapi-typescript` (or any codegen)
-at the spec it emits, recovering a typed client for TS consumers while keeping
-zodec's spec-first, framework-native server.
+You get both worlds: zodec's [generated client](/guide/typed-client) for
+first-party TS consumers, **and** an accurate OpenAPI document for everyone else
+(other teams, languages, or any standard codegen) — from the one source.
 
 ## The fundamental shift: contract object → decorators
 
@@ -133,32 +135,32 @@ Three differences to internalize:
 
 ## At a glance
 
-| ts-rest                                                | zodec                                                  | Notes                                                     |
-| ------------------------------------------------------ | ------------------------------------------------------ | --------------------------------------------------------- |
-| `initContract()` + `c.router({...})`                   | decorators on a controller class                       | Contract is metadata on methods, not a standalone value.  |
-| `method: 'GET'`, `path: '/users/:id'`                  | `@Get('{id}')` + `@Route('users')`                     | Prefix on the class; `:id` → `{id}`.                      |
-| `pathParams: z.object({...})`                          | `@Params(z.object({...}))` + `@Param('id')`            | Schema on the method, injection on the parameter.         |
-| `query: z.object({...})`                               | `@Query(z.object({...}))` + `@QueryParam('q')`         | Same split.                                               |
-| `body: Schema`                                         | `@Body(Schema)` + `@BodyParam()`                       | Same split.                                               |
-| `headers: { 'x-id': z.string() }`                      | `@Header('x-id')` (+ validate in a schema if needed)   | ts-rest validates request headers; zodec injects them.    |
-| `responses: { 200: S, 404: E }`                        | `@Returns(200, S)` `@Returns(404, E)`                  | Stackable, one per status.                                |
-| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec   | zodec has dedicated decorators for binary/stream.         |
-| `c.noBody()` (e.g. `204`)                              | `@Returns(204)` (omit the schema)                      | No-content response.                                      |
-| `return { status, body }`                              | `return body` (status from `@Returns`; `throw` to err) | No status/body envelope.                                  |
-| `contentType: 'multipart/form-data'` + `body`          | `z.file()` in `@Body` + `@File`/`@Files`               | Auto-detected multipart; web-standard `File`.             |
-| `summary` / `metadata`                                 | `@Summary` / `@Description` / `@OperationId`           | First-class decorators.                                   |
-| `strictStatusCodes`                                    | always validates the matched `@Returns`                | zodec validates the response you actually send.           |
-| `pathPrefix: '/v1'` (router option)                    | `api.group('/v1', …)` / `register(c, { prefix })`      | See [Grouping & Versioning](/guide/versioning).           |
-| `commonResponses` / `baseHeaders`                      | shared Zod schemas + `@Returns` (no built-in merge)    | Compose with plain schema reuse.                          |
-| `initServer().router(contract, {...})`                 | `new C(deps)` + `api.register(c)`                      | Implementation lives on the class; explicit construction. |
-| `createExpressEndpoints(contract, router, app)`        | `api.mount(app)`                                       | Wires routes + validation.                                |
-| `globalMiddleware` / per-route middleware              | `@Use(...)` (class or method)                          | Express middleware.                                       |
-| `requestValidationErrorHandler`                        | `ValidationError` → `zodecErrorHandler()`              | 400 params/query, 422 body, 500 bad response.             |
-| `generateOpenApi(contract, ...)` (`@ts-rest/open-api`) | `api.swagger()` / `generateSwagger([...])`             | Native, no extra package or transformer.                  |
-| `initClient(contract)` (typed client)                  | **no equivalent** — emit OpenAPI, use codegen          | The deliberate gap; see below.                            |
-| `@ts-rest/react-query`                                 | **no equivalent**                                      | Generate hooks from the spec, or keep ts-rest's client.   |
-| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                       | zodec targets Express 5.                                  |
-| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                           | zodec is Zod-4-native.                                    |
+| ts-rest                                                | zodec                                                  | Notes                                                          |
+| ------------------------------------------------------ | ------------------------------------------------------ | -------------------------------------------------------------- |
+| `initContract()` + `c.router({...})`                   | decorators on a controller class                       | Contract is metadata on methods, not a standalone value.       |
+| `method: 'GET'`, `path: '/users/:id'`                  | `@Get('{id}')` + `@Route('users')`                     | Prefix on the class; `:id` → `{id}`.                           |
+| `pathParams: z.object({...})`                          | `@Params(z.object({...}))` + `@Param('id')`            | Schema on the method, injection on the parameter.              |
+| `query: z.object({...})`                               | `@Query(z.object({...}))` + `@QueryParam('q')`         | Same split.                                                    |
+| `body: Schema`                                         | `@Body(Schema)` + `@BodyParam()`                       | Same split.                                                    |
+| `headers: { 'x-id': z.string() }`                      | `@Header('x-id')` (+ validate in a schema if needed)   | ts-rest validates request headers; zodec injects them.         |
+| `responses: { 200: S, 404: E }`                        | `@Returns(200, S)` `@Returns(404, E)`                  | Stackable, one per status.                                     |
+| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec   | zodec has dedicated decorators for binary/stream.              |
+| `c.noBody()` (e.g. `204`)                              | `@Returns(204)` (omit the schema)                      | No-content response.                                           |
+| `return { status, body }`                              | `return body` (status from `@Returns`; `throw` to err) | No status/body envelope.                                       |
+| `contentType: 'multipart/form-data'` + `body`          | `z.file()` in `@Body` + `@File`/`@Files`               | Auto-detected multipart; web-standard `File`.                  |
+| `summary` / `metadata`                                 | `@Summary` / `@Description` / `@OperationId`           | First-class decorators.                                        |
+| `strictStatusCodes`                                    | always validates the matched `@Returns`                | zodec validates the response you actually send.                |
+| `pathPrefix: '/v1'` (router option)                    | `api.group('/v1', …)` / `register(c, { prefix })`      | See [Grouping & Versioning](/guide/versioning).                |
+| `commonResponses` / `baseHeaders`                      | shared Zod schemas + `@Returns` (no built-in merge)    | Compose with plain schema reuse.                               |
+| `initServer().router(contract, {...})`                 | `new C(deps)` + `api.register(c)`                      | Implementation lives on the class; explicit construction.      |
+| `createExpressEndpoints(contract, router, app)`        | `api.mount(app)`                                       | Wires routes + validation.                                     |
+| `globalMiddleware` / per-route middleware              | `@Use(...)` (class or method)                          | Express middleware.                                            |
+| `requestValidationErrorHandler`                        | `ValidationError` → `zodecErrorHandler()`              | 400 params/query, 422 body, 500 bad response.                  |
+| `generateOpenApi(contract, ...)` (`@ts-rest/open-api`) | `api.swagger()` / `generateSwagger([...])`             | Native, no extra package or transformer.                       |
+| `initClient(contract)` (typed client)                  | `generateTypeScriptClient(contract)` (generated)       | Standalone client; codegen step vs ts-rest's inference.        |
+| `@ts-rest/react-query`                                 | **no equivalent** (yet)                                | The contract is open for a hooks generator; or keep ts-rest's. |
+| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                       | zodec targets Express 5.                                       |
+| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                           | zodec is Zod-4-native.                                         |
 
 ## Validation: mostly a copy-paste
 
@@ -235,30 +237,35 @@ response objects that also document themselves in the spec:
   - return an async iterable; zodec frames, validates, and documents it as
     `text/event-stream`.
 
-## The typed client — the gap, and what to do instead
+## The typed client
 
 ts-rest's `initClient(contract)` and `@ts-rest/react-query` are its crown jewel:
 import the contract, get a typed `client.getUser({ params: { id } })` returning a
-status-discriminated union, with zero codegen.
+status-discriminated union, with **zero codegen**.
 
-**zodec has no equivalent and won't add one.** The honest replacement is the
-spec-first path zodec is built around:
+zodec's answer is a **generated** [standalone TypeScript client](/guide/typed-client) —
+the same ergonomics, reached by a build step instead of inference:
 
 ```typescript
-// zodec server still emits the contract — as OpenAPI
-app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
-
-// consumers generate a typed client from it (any language/tool), e.g.:
-//   npx openapi-typescript http://localhost:3000/swagger.json -o api.d.ts
-//   # then openapi-fetch / orval / kubb for the runtime client
+import { generateTypeScriptClient } from 'zodec';
+await writeFile('api.gen.ts', generateTypeScriptClient(api.contract()));
 ```
 
-For a TS-to-TS monorepo this is strictly more setup than importing a ts-rest
-contract, and you should weigh that honestly. The trade you're making: you give
-up the no-codegen client in exchange for a spec that any consumer — not just a TS
-one that imports your contract — can target. If most of your consumers are
-external or non-TS, that's a good trade; if it's one TS front end in your repo,
-it may not be.
+```typescript
+import { createClient } from './api.gen'; // standalone — no zodec/runtime dep
+
+const api = createClient({ baseUrl: 'https://api.example.com' });
+const user = await api.users.get({ params: { id } }); // → User; throws on non-2xx
+const res = await api.users.get.raw({ params: { id } }); // → { status, body } union
+```
+
+The honest difference: ts-rest infers the client from a contract _value_ (nothing
+to regenerate); zodec generates the client from _decorator_ metadata (regenerate
+on change). In exchange, zodec's client is fully standalone, and the contract it's
+built from is an open artifact any generator can target. v1 is types-only (opt-in
+runtime validation is [planned](https://github.com/joeferner/zodec/issues/22)) and
+there are no React-Query hooks yet. See [Typed Client](/guide/typed-client) for
+the full picture.
 
 ## OpenAPI generation
 
@@ -353,16 +360,17 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 
 | Leaving ts-rest you give up…                            | …and you gain in zodec                                                             |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| The no-codegen **typed client** + React Query hooks     | Accurate **OpenAPI 3.1/3.0** as the primary artifact (any consumer, any lang)      |
+| **Zero-codegen** client inference + React Query hooks   | A generated standalone client **and** accurate **OpenAPI 3.1/3.0** from one source |
 | Multiple validation libs (Valibot/Arktype/Effect)       | Zod-4-native conversion with first-class `.meta({ id })` components                |
 | Multiple server adapters (Fastify/Nest/Next/serverless) | Deep Express integration + middleware via `@Use`                                   |
 | Contract-as-a-value sharing/combining                   | Controllers with constructor DI; `@Security`/`@Principal` auth                     |
 | —                                                       | **Response validation on by default** (no silent drift)                            |
 | —                                                       | Built-in `FileResponse`, `RangeFileResponse`, `@Sse`, Problem Details, `serveDocs` |
 
-If most of your value is the typed client in a monorepo, that first row is heavy —
-weigh it honestly before migrating. If the OpenAPI document is what your
-consumers actually depend on, the rest of the table is why zodec exists.
+The first row is now a _difference in approach_, not a missing feature: ts-rest
+infers the client with no build step; zodec generates one. If the zero-codegen,
+nothing-to-regenerate loop is your core value, ts-rest keeps its edge — otherwise
+the rest of the table is why zodec exists.
 
 If you hit a ts-rest feature without an obvious zodec equivalent, please
 [open an issue](https://github.com/joeferner/zodec/issues).

@@ -21,6 +21,7 @@ export default defineConfig({
             { text: 'Validation & Errors', link: '/guide/validation' },
             { text: 'Authentication', link: '/guide/authentication' },
             { text: 'OpenAPI / Swagger', link: '/guide/swagger' },
+            { text: 'Typed Client', link: '/guide/typed-client' },
             { text: 'File Downloads', link: '/guide/file-downloads' },
             { text: 'File Uploads', link: '/guide/file-uploads' },
             { text: 'Server-Sent Events', link: '/guide/server-sent-events' },

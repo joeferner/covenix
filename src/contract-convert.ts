@@ -50,6 +50,12 @@ function idOf(schema: ZodType): string | undefined {
   return typeof id === 'string' ? id : undefined;
 }
 
+/** The `.describe()` / `.meta({ description })` text of a schema, if any. */
+function descriptionOf(schema: ZodType): string | undefined {
+  const description = schema.meta()?.description;
+  return typeof description === 'string' ? description : undefined;
+}
+
 /** The def of each check on a schema (the object holding `check`, `minimum`, …). */
 function checkDefs(def: ZodDef): Record<string, unknown>[] {
   return (def.checks ?? [])
@@ -113,8 +119,11 @@ export class SchemaConverter {
             { kind: 'enum' }
           >['values'],
         };
-      case 'object':
-        return this.objectNode(def);
+      case 'object': {
+        const node = this.objectNode(def);
+        const description = descriptionOf(schema);
+        return description ? { ...node, description } : node;
+      }
       case 'array':
         return this.arrayNode(def);
       case 'tuple':
@@ -240,10 +249,16 @@ export class SchemaConverter {
         break;
       }
     }
+    // A field-level description applies only when the property is inline; a named
+    // (`.meta({ id })`) property becomes a `$ref`, and its description belongs to
+    // that schema's own declaration (avoids duplicating it on every reference).
+    const description =
+      idOf(current) === undefined ? (descriptionOf(schema) ?? descriptionOf(current)) : undefined;
     return {
       schema: this.toNode(current),
       ...(optional ? { optional: true } : {}),
       ...(hasDefault ? { default: defaultValue } : {}),
+      ...(description ? { description } : {}),
     };
   }
 
