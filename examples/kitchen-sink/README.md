@@ -47,6 +47,7 @@ schema is just a value and works across module boundaries with no special wiring
 | `@ReturnsFile` + `FileResponse`; `RangeFileResponse` (HTTP Range) | `UsersController.ts`                                         |
 | `@Security` + `@Principal`, scopes, `bearer()` handler            | `AuthController.ts`, `UsersController.ts`, `api-security.ts` |
 | `@Use` middleware (controller-level)                              | `HealthController.ts`                                        |
+| `@Sse` Server-Sent Events stream                                  | `HealthController.ts`                                        |
 | `serveDocs` (docs UI + spec), standalone `schemas`                | `main.ts`, `api-schemas.ts`                                  |
 | `@Req` / `@Res` escape hatch                                      | `HealthController.ts`                                        |
 | `new Zodec({ info })`, `register`, `mount`, `swagger`             | `api.ts`, `main.ts`, `generate-swagger.ts`                   |

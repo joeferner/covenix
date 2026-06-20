@@ -59,6 +59,18 @@ echo "==> Exercising endpoints"
 expect 200 "GET /health" "$BASE/health"
 expect 200 "GET /health/raw (@Res escape hatch)" "$BASE/health/raw"
 
+# @Sse streams text/event-stream; the finite stream completes so curl returns.
+SSE_HEADERS="$TMP/sse.headers"
+SSE_BODY="$(curl -s -N -D "$SSE_HEADERS" "$BASE/health/events")"
+if grep -qi '^content-type: *text/event-stream' "$SSE_HEADERS" &&
+  printf '%s' "$SSE_BODY" | grep -q '^data: {"status":"ok"'; then
+  echo "    ✓ GET /health/events streams Server-Sent Events"
+else
+  echo "    ✗ GET /health/events SSE stream failed"
+  sed -n '1,6p' "$SSE_HEADERS"
+  fail=1
+fi
+
 # @Use middleware on the controller stamps a header on every route.
 if curl -s -D - -o /dev/null "$BASE/health" | grep -qi '^x-health-source: *zodec'; then
   echo "    ✓ @Use middleware sets the X-Health-Source header"

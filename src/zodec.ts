@@ -7,6 +7,7 @@ import {
   type ParamMetadata,
   type RouteMetadata,
   type SecurityRequirement,
+  type SseResponseDecl,
 } from './metadata.js';
 import { Readable } from 'node:stream';
 import { Blob, File } from 'node:buffer';
@@ -17,6 +18,7 @@ import contentDisposition from 'content-disposition';
 import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse, type RangeBody, type RangePathBody } from './range-file-response.js';
+import { SseEvent } from './sse.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import { mountDocs, type ServeDocsOptions } from './serve-docs.js';
 import type { SecurityConfig } from './security.js';
@@ -387,6 +389,108 @@ function sendBinary(res: Response, chunk: Uint8Array | Readable): void {
 }
 
 /**
+ * Serializes one SSE event to its wire frame. A {@link SseEvent} sets the
+ * `event`/`id`/`retry` lines; the data is validated/parsed against `eventSchema`
+ * (a mismatch is a server bug → `500`), then emitted as one `data:` line per line
+ * of the payload (string as-is, otherwise JSON).
+ */
+function frameSseEvent(value: unknown, eventSchema: ZodType | undefined): string {
+  let data: unknown = value;
+  let frame = '';
+  if (value instanceof SseEvent) {
+    data = value.data;
+    if (value.event !== undefined) {
+      frame += `event: ${value.event}\n`;
+    }
+    if (value.id !== undefined) {
+      frame += `id: ${String(value.id)}\n`;
+    }
+    if (value.retry !== undefined) {
+      frame += `retry: ${value.retry}\n`;
+    }
+  }
+  if (eventSchema) {
+    const result = eventSchema.safeParse(data);
+    if (!result.success) {
+      throw new ValidationError(500, result.error.issues);
+    }
+    data = result.data;
+  }
+  const payload = typeof data === 'string' ? data : (JSON.stringify(data) ?? 'null');
+  for (const line of payload.split('\n')) {
+    frame += `data: ${line}\n`;
+  }
+  return `${frame}\n`;
+}
+
+/**
+ * Streams a `text/event-stream` (SSE) response from an async-iterable of events.
+ * Sets the SSE headers, frames each event, and — crucially for long-lived
+ * streams — on client disconnect calls the iterator's `return()` so an async
+ * generator's `finally` runs (e.g. aborting an upstream call). An optional
+ * heartbeat keeps idle connections alive.
+ */
+async function streamSse(
+  res: Response,
+  value: unknown,
+  decl: SseResponseDecl,
+  status: number,
+): Promise<void> {
+  const iterable = value as AsyncIterable<unknown> | null | undefined;
+  if (!iterable || typeof iterable[Symbol.asyncIterator] !== 'function') {
+    throw new Error('zodec: an @Sse handler must return an AsyncIterable of events');
+  }
+
+  res.status(status);
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable proxy (nginx) buffering
+  res.flushHeaders();
+
+  const iterator = iterable[Symbol.asyncIterator]();
+  let ended = false;
+  const stop = (): void => {
+    if (ended) {
+      return;
+    }
+    ended = true;
+    // Run the generator's finally (cleanup/abort) once the in-flight await settles.
+    void iterator.return?.(undefined);
+  };
+  res.on('close', stop);
+
+  let heartbeat: ReturnType<typeof setInterval> | undefined;
+  if (decl.keepAlive && decl.keepAlive > 0) {
+    heartbeat = setInterval(() => {
+      if (!res.writableEnded) {
+        res.write(': keep-alive\n\n');
+      }
+    }, decl.keepAlive);
+    heartbeat.unref?.();
+  }
+
+  try {
+    while (!ended) {
+      const result = await iterator.next();
+      if (ended || result.done) {
+        break;
+      }
+      res.write(frameSseEvent(result.value, decl.eventSchema));
+    }
+  } finally {
+    if (heartbeat) {
+      clearInterval(heartbeat);
+    }
+    res.removeListener('close', stop);
+    stop();
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }
+}
+
+/**
  * Builds the handler argument array, placing each injected value at its own
  * parameter index. Indexes without a decorator stay `undefined`.
  */
@@ -644,6 +748,12 @@ export class Zodec {
           // A RangeFileResponse additionally honors HTTP Range (async-capable).
           if (value instanceof RangeFileResponse) {
             sendRangeFile(req, res, value, status).catch(next);
+            return;
+          }
+          // An @Sse route streams the returned async-iterable as text/event-stream.
+          const sse = route.responses[status]?.sse;
+          if (sse) {
+            streamSse(res, value, sse, status).catch(next);
             return;
           }
           // Always-on response validation: the return value must match its

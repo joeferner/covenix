@@ -136,6 +136,7 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@Body(schema)`                                                             | Validate `req.body`                                                    |
 | `@Returns(status, schema?)`                                                 | Declare a response — stackable; omit `schema` for no body (e.g. `204`) |
 | `@ReturnsFile(status, options?)`                                            | Declare a binary/file response (return a `FileResponse`)               |
+| `@Sse(schema?, options?)`                                                   | Stream a Server-Sent Events (`text/event-stream`) response             |
 | `@Security(scheme, scopes?)`                                                | Require a named auth scheme — class or method, stackable = OR          |
 | `@Use(...middleware)`                                                       | Run Express middleware before the handler — class or method            |
 | `@Summary(text)`                                                            | Operation summary in swagger                                           |

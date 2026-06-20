@@ -183,6 +183,13 @@ class DocumentBuilder {
         response.content = {
           [decl.file.contentType]: { schema: { type: 'string', format: 'binary' } },
         };
+      } else if (decl.sse) {
+        // SSE (@Sse) — text/event-stream; document the per-event data shape.
+        response.content = {
+          'text/event-stream': decl.sse.eventSchema
+            ? this.media(decl.sse.eventSchema)
+            : { schema: { type: 'string' } },
+        };
       } else if (decl.schema) {
         // A status declared with no schema (e.g. 204) has no response body.
         const example = examples.find((e) => e.status === Number(status));

@@ -13,13 +13,16 @@ export {
   ReturnsFile,
   Security,
   Use,
+  Sse,
   Summary,
   Description,
   OperationId,
   Deprecated,
   Example,
 } from './decorators.js';
-export type { ReturnsOptions, ReturnsFileOptions } from './decorators.js';
+export type { ReturnsOptions, ReturnsFileOptions, SseOptions } from './decorators.js';
+export { SseEvent } from './sse.js';
+export type { SseEventInit } from './sse.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
 export { RangeFileResponse } from './range-file-response.js';

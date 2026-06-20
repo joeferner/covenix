@@ -1,6 +1,6 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { z } from 'zod';
-import { Route, Tags, Get, Returns, Summary, Use, Req, Res, Header } from 'zodec';
+import { Route, Tags, Get, Returns, Summary, Sse, Use, Req, Res, Header } from 'zodec';
 
 const HealthSchema = z
   .object({
@@ -28,6 +28,20 @@ export class HealthController {
   public check(@Header('user-agent') userAgent: string | undefined): z.infer<typeof HealthSchema> {
     void userAgent;
     return { status: 'ok', uptimeMs: Date.now() - this.startedAt };
+  }
+
+  // Server-Sent Events: the handler returns an async generator and zodec frames
+  // each yielded value as an SSE event (text/event-stream), validating it against
+  // HealthSchema. This one is finite; a real stream (e.g. LLM tokens) would loop,
+  // and its `finally` would run when the client disconnects.
+  @Get('events')
+  @Summary('Stream a few health pings (Server-Sent Events)')
+  @Sse(HealthSchema, { keepAlive: 15000 })
+  public async *events(): AsyncGenerator<z.infer<typeof HealthSchema>> {
+    for (let i = 0; i < 3; i++) {
+      yield { status: 'ok', uptimeMs: Date.now() - this.startedAt };
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   }
 
   // Escape hatch: no @Returns, no schema — grab the raw Express objects and

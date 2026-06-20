@@ -8,6 +8,7 @@ import {
   addResponseDescription,
   addReturnSchema,
   addSecurity,
+  addSseResponse,
   setBodySchema,
   setDeprecated,
   setDescription,
@@ -180,6 +181,48 @@ export function ReturnsFile(status: number, options: ReturnsFileOptions = {}): M
     addFileResponse(target, String(propertyKey), status, {
       contentType: options.contentType ?? 'application/octet-stream',
       description: options.description,
+    });
+  };
+}
+
+/** Options for {@link Sse}. */
+export interface SseOptions {
+  /** HTTP status for the stream response. Defaults to `200`. */
+  status?: number;
+  /**
+   * Heartbeat interval in milliseconds. When set, zodec sends a comment frame
+   * (`: \n\n`) this often to keep idle connections alive through proxies.
+   */
+  keepAlive?: number;
+}
+
+/**
+ * Declares the route as a **Server-Sent Events** (`text/event-stream`) stream.
+ * The handler returns an `AsyncIterable` of events (typically an async
+ * generator); zodec sets the SSE headers, frames each yielded value as an event,
+ * and on client disconnect calls the iterator's `return()` so the generator's
+ * `finally` runs (cleanup/abort). Yield a plain value to emit a `data:` frame, or
+ * a {@link import('./sse.js').SseEvent} to set `event`/`id`/`retry`.
+ *
+ * @param schema - Zod schema each event's data is validated against (and emitted
+ *   in the OpenAPI `text/event-stream` response); omit for raw/string events.
+ * @param options - Stream options (`status`, `keepAlive`).
+ *
+ * @example
+ * ```ts
+ * @Get('chat/{id}/stream')
+ * @Sse(TokenSchema, { keepAlive: 15000 })
+ * async *stream(@Param('id') id: string): AsyncGenerator<Token> {
+ *   try { for await (const t of llm.stream(id)) yield t; }
+ *   finally { /* runs on disconnect *\/ }
+ * }
+ * ```
+ */
+export function Sse(schema?: ZodType, options: SseOptions = {}): MethodDecorator {
+  return (target, propertyKey) => {
+    addSseResponse(target, String(propertyKey), options.status ?? 200, {
+      eventSchema: schema,
+      keepAlive: options.keepAlive,
     });
   };
 }

@@ -8,18 +8,29 @@ export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 /**
  * Everything declared for a single response status. Exactly one of `schema`
  * (a JSON body from `@Returns`, possibly `undefined` for a no-content status like
- * `204`) or `file` (a binary body from `@ReturnsFile`) describes the body —
- * declaring both for one status is an error. `description`/`headers` annotate it.
+ * `204`), `file` (a binary body from `@ReturnsFile`), or `sse` (a `text/event-stream`
+ * from `@Sse`) describes the body — declaring more than one for a status is an
+ * error. `description`/`headers` annotate it.
  */
 export interface ResponseMetadata {
   /** `@Returns` body schema; `undefined` means the status has no body. */
   schema?: ZodType | undefined;
   /** `@ReturnsFile` binary body declaration. */
   file?: FileResponseDecl | undefined;
+  /** `@Sse` server-sent-events stream declaration. */
+  sse?: SseResponseDecl | undefined;
   /** Response description (`@Returns(..., { description })`). */
   description?: string | undefined;
   /** Response headers (`@Returns(..., { headers })`), name → Zod schema. */
   headers?: Record<string, ZodType> | undefined;
+}
+
+/** A `text/event-stream` response declaration recorded by `@Sse`. */
+export interface SseResponseDecl {
+  /** Zod schema each event's data is validated/serialized against, if any. */
+  eventSchema?: ZodType | undefined;
+  /** Heartbeat interval (ms): send a comment frame this often to keep alive. */
+  keepAlive?: number | undefined;
 }
 
 /** Assembled metadata for a single route, as returned by {@link getRoutes}. */
@@ -183,7 +194,7 @@ function controllerEntry(target: object): ControllerEntry {
 
 const STATUS_CONFLICT = (handlerName: string, status: number): Error =>
   new Error(
-    `zodec: status ${status} on "${handlerName}" is declared by both @Returns and @ReturnsFile`,
+    `zodec: status ${status} on "${handlerName}" has more than one body kind — only one of @Returns / @ReturnsFile / @Sse is allowed per status`,
   );
 
 /**
@@ -217,7 +228,7 @@ export function addReturnSchema(
   schema?: ZodType,
 ): void {
   const response = responseEntry(routeEntry(target, handlerName), status);
-  if (response.file) {
+  if (response.file || response.sse) {
     throw STATUS_CONFLICT(handlerName, status);
   }
   response.schema = schema;
@@ -267,10 +278,24 @@ export function addFileResponse(
   decl: FileResponseDecl,
 ): void {
   const response = responseEntry(routeEntry(target, handlerName), status);
-  if ('schema' in response) {
+  if ('schema' in response || response.sse) {
     throw STATUS_CONFLICT(handlerName, status);
   }
   response.file = decl;
+}
+
+/** Records a `text/event-stream` response for a status code. Called by `@Sse`. */
+export function addSseResponse(
+  target: object,
+  handlerName: string,
+  status: number,
+  decl: SseResponseDecl,
+): void {
+  const response = responseEntry(routeEntry(target, handlerName), status);
+  if ('schema' in response || response.file) {
+    throw STATUS_CONFLICT(handlerName, status);
+  }
+  response.sse = decl;
 }
 
 /** Appends an example value for a handler. Called by `@Example`. */

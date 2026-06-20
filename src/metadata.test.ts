@@ -76,7 +76,7 @@ describe('metadata assembly', () => {
     expect(route.examples).toContainEqual({ status: 201, value: { id: 'out' } });
   });
 
-  it('throws when one status is declared by both @Returns and @ReturnsFile', () => {
+  it('throws when one status has more than one body kind (@Returns + @ReturnsFile)', () => {
     expect(() => {
       @Route('x')
       class Conflicting {
@@ -86,7 +86,7 @@ describe('metadata assembly', () => {
         public m(): void {}
       }
       return Conflicting;
-    }).toThrow(/both @Returns and @ReturnsFile/);
+    }).toThrow(/more than one body kind/);
   });
 
   it('captures @Params / @Query / @Body schemas via decorators', () => {

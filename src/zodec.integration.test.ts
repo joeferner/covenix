@@ -6,6 +6,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
+import http from 'node:http';
+import type { AddressInfo } from 'node:net';
 import multer, { type Options } from 'multer';
 import { z } from 'zod';
 import {
@@ -18,6 +20,7 @@ import {
   ReturnsFile,
   Route,
   Security,
+  Sse,
   Tags,
   Use,
 } from './decorators.js';
@@ -37,6 +40,7 @@ import { bearer, apiKey } from './security.js';
 import { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse } from './range-file-response.js';
+import { SseEvent } from './sse.js';
 
 const Greeting = z.object({ message: z.string() });
 
@@ -925,6 +929,96 @@ describe('serveDocs', () => {
       '/docs/openapi.json',
     );
     expect((res.body as { openapi: string }).openapi).toBe('3.0.3');
+  });
+});
+
+describe('@Sse (server-sent events)', () => {
+  const TokenSchema = z.object({ text: z.string() });
+
+  @Route('sse')
+  class SseController {
+    @Get('tokens')
+    @Sse(TokenSchema)
+    public async *tokens(): AsyncGenerator<unknown> {
+      await Promise.resolve();
+      yield { text: 'hello' };
+      yield new SseEvent({ text: 'world' }, { event: 'token', id: '1' });
+      yield { text: 'kept', secret: 'drop' }; // extra field stripped by the schema
+    }
+
+    @Get('raw')
+    @Sse()
+    public async *raw(): AsyncGenerator<unknown> {
+      await Promise.resolve();
+      yield 'ping';
+      yield 'pong';
+    }
+  }
+
+  it('streams framed events as text/event-stream (validated + serialized)', async () => {
+    const res = await request(makeApp(new SseController())).get('/sse/tokens');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.text).toContain('data: {"text":"hello"}\n\n');
+    // SseEvent envelope → event/id lines precede the data line.
+    expect(res.text).toContain('event: token\nid: 1\ndata: {"text":"world"}\n\n');
+    // Schema strips undeclared fields from each event too.
+    expect(res.text).toContain('data: {"text":"kept"}\n\n');
+    expect(res.text).not.toContain('secret');
+  });
+
+  it('frames plain string events as data: lines when there is no schema', async () => {
+    const res = await request(makeApp(new SseController())).get('/sse/raw');
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('data: ping\n\n');
+    expect(res.text).toContain('data: pong\n\n');
+  });
+
+  it("runs the generator's finally on client disconnect", async () => {
+    let cleanedUp = false;
+    let resolveCleanup!: () => void;
+    const cleanup = new Promise<void>((resolve) => {
+      resolveCleanup = resolve;
+    });
+
+    @Route('live')
+    class LiveController {
+      @Get('stream')
+      @Sse(TokenSchema)
+      public async *stream(): AsyncGenerator<unknown> {
+        try {
+          for (let i = 0; ; i++) {
+            yield { text: `t${i}` };
+            await new Promise((r) => setTimeout(r, 10));
+          }
+        } finally {
+          cleanedUp = true;
+          resolveCleanup();
+        }
+      }
+    }
+
+    const server = makeApp(new LiveController()).listen(0);
+    const { port } = server.address() as AddressInfo;
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('cleanup did not run')), 2000);
+      const req = http.get(`http://127.0.0.1:${port}/live/stream`, (res) => {
+        res.once('data', () => req.destroy()); // got the first frame → disconnect
+        res.on('error', () => {});
+      });
+      req.on('error', () => {}); // destroy() surfaces an aborted-request error
+      cleanup.then(
+        () => {
+          clearTimeout(timer);
+          server.close();
+          resolve();
+        },
+        () => {},
+      );
+    });
+
+    expect(cleanedUp).toBe(true);
   });
 });
 
