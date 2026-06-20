@@ -18,6 +18,7 @@ export default defineConfig({
           text: 'Guide',
           items: [
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Route Handlers', link: '/guide/route-handlers' },
             { text: 'Validation & Errors', link: '/guide/validation' },
             { text: 'Authentication', link: '/guide/authentication' },
             { text: 'OpenAPI / Swagger', link: '/guide/swagger' },

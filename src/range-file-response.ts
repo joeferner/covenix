@@ -1,5 +1,6 @@
 import type { Readable } from 'node:stream';
 import type { FileResponseOptions } from './file-response.js';
+import { ResponseBase } from './response.js';
 
 /** An inclusive byte range, as requested by an HTTP `Range` header. */
 export interface ByteRange {
@@ -60,7 +61,7 @@ export type RangeBody = Uint8Array | RangeStreamBody | RangePathBody;
  * }
  * ```
  */
-export class RangeFileResponse {
+export class RangeFileResponse extends ResponseBase {
   /** The range-capable body (bytes, a stream source, or a disk path). */
   public readonly body: RangeBody;
   /** `Content-Type` for the response, if set. */
@@ -69,18 +70,13 @@ export class RangeFileResponse {
   public readonly filename: string | undefined;
   /** `Content-Disposition` type (`'inline'`/`'attachment'`), if set. */
   public readonly disposition: 'inline' | 'attachment' | undefined;
-  /** Explicit HTTP status for a full (non-range) response, if set. */
-  public readonly status: number | undefined;
-  /** Extra response headers, applied last (override the derived ones). */
-  public readonly headers: Record<string, string | number> | undefined;
 
   public constructor(body: Uint8Array | RangeStreamBody, options: FileResponseOptions = {}) {
+    super(options);
     this.body = body;
     this.contentType = options.contentType;
     this.filename = options.filename;
     this.disposition = options.disposition;
-    this.status = options.status;
-    this.headers = options.headers;
   }
 
   /**

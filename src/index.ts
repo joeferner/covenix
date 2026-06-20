@@ -23,6 +23,10 @@ export {
 export type { ReturnsOptions, ReturnsFileOptions, SseOptions } from './decorators.js';
 export { SseEvent } from './sse.js';
 export type { SseEventInit } from './sse.js';
+export { HttpResponse } from './http-response.js';
+export type { HttpResponseOptions } from './http-response.js';
+export { ResponseBase } from './response.js';
+export type { ResponseBaseOptions, ResponseCookie, HeaderValue } from './response.js';
 export { FileResponse } from './file-response.js';
 export type { FileResponseOptions } from './file-response.js';
 export { RangeFileResponse } from './range-file-response.js';

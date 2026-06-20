@@ -206,19 +206,22 @@ public async list(): Promise<User[]> {
 ```
 
 zodec declares each response with a stackable `@Returns`, declares headers as part
-of the success response, and sets the header value through the `@Res` escape
-hatch:
+of the success response, and sets the header value by returning an `HttpResponse`
+(no `@Res`, and the declared header schema coerces the value — `number` → string):
 
 ```typescript
 // zodec
 @Get()
 @Returns(200, UserListSchema, { headers: { 'X-Total-Count': z.number().int() } })
 @Returns(404, ErrorSchema)
-public async list(@Res() res: Response): Promise<UserList> {
-  res.set('X-Total-Count', String(total));
-  return list;
+public async list(): Promise<HttpResponse<UserList>> {
+  return new HttpResponse(list, { headers: { 'X-Total-Count': total } });
 }
 ```
+
+`HttpResponse<T>` also carries `status` (to pick a non-default declared `@Returns`)
+and `cookies`; the body is still validated/serialized by `@Returns` exactly like a
+bare return. The `@Res` escape hatch remains for anything lower-level.
 
 ## Errors
 

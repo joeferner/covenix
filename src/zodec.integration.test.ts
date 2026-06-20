@@ -40,6 +40,7 @@ import { bearer, apiKey } from './security.js';
 import { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse } from './range-file-response.js';
+import { HttpResponse } from './http-response.js';
 import { SseEvent } from './sse.js';
 
 const Greeting = z.object({ message: z.string() });
@@ -309,6 +310,122 @@ describe('zodecErrorHandler', () => {
     expect(res.headers['content-type']).toContain('application/json');
     expect(res.headers['content-type']).not.toContain('problem');
     expect(body).toEqual({ ok: false, count: 1 });
+  });
+});
+
+describe('HttpResponse', () => {
+  const User = z.object({ id: z.string(), name: z.string() }).meta({ id: 'HttpUser' });
+  const Accepted = z.object({ queued: z.boolean() });
+
+  @Route('hr')
+  class HrController {
+    // Bare return still works alongside HttpResponse on the same controller.
+    @Get('bare')
+    @Returns(200, User)
+    public bare(): z.infer<typeof User> {
+      return { id: '1', name: 'bare' };
+    }
+
+    @Get('wrapped')
+    @Returns(200, User, { headers: { 'X-Count': z.number().int() } })
+    public wrapped(): HttpResponse<z.infer<typeof User>> {
+      return new HttpResponse(
+        { id: '1', name: 'wrapped' },
+        {
+          headers: { 'X-Count': 5, 'X-Custom': 'hi' }, // declared (number) + undeclared
+          cookies: [{ name: 'sid', value: 'abc', options: { httpOnly: true, sameSite: 'lax' } }],
+        },
+      );
+    }
+
+    // Extra fields on the body are stripped by the @Returns schema, as for a bare return.
+    @Get('leaky')
+    @Returns(200, User)
+    public leaky(): HttpResponse<z.infer<typeof User>> {
+      return new HttpResponse({ id: '1', name: 'leaky', secret: 'x' } as z.infer<typeof User>);
+    }
+
+    @Get('multi')
+    @Returns(200, User)
+    public multi(): HttpResponse<z.infer<typeof User>> {
+      return new HttpResponse({ id: '1', name: 'multi' }, { headers: { Link: ['<a>', '<b>'] } });
+    }
+
+    // Status selection: send a non-default declared status, validated by ITS schema.
+    @Post('create')
+    @Returns(200, User)
+    @Returns(202, Accepted)
+    public create(): HttpResponse<z.infer<typeof Accepted>> {
+      return new HttpResponse({ queued: true }, { status: 202 });
+    }
+
+    // An explicit status with no matching @Returns is a server bug → 500.
+    @Get('undeclared-status')
+    @Returns(200, User)
+    public undeclaredStatus(): HttpResponse<z.infer<typeof User>> {
+      return new HttpResponse({ id: '1', name: 'x' }, { status: 599 });
+    }
+
+    // A header value that fails its declared schema is a server bug → 500.
+    @Get('bad-header')
+    @Returns(200, User, { headers: { 'X-Count': z.number().int() } })
+    public badHeader(): HttpResponse<z.infer<typeof User>> {
+      return new HttpResponse({ id: '1', name: 'x' }, { headers: { 'X-Count': 'not-a-number' } });
+    }
+  }
+
+  it('sends the body with a coerced declared header and an undeclared header', async () => {
+    const res = await request(makeApp(new HrController())).get('/hr/wrapped');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: '1', name: 'wrapped' });
+    expect(res.headers['x-count']).toBe('5'); // number coerced to string
+    expect(res.headers['x-custom']).toBe('hi'); // undeclared, allowed
+  });
+
+  it('sets cookies as Set-Cookie headers', async () => {
+    const res = await request(makeApp(new HrController())).get('/hr/wrapped');
+
+    const cookies = res.headers['set-cookie'] ?? [];
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]).toContain('sid=abc');
+    expect(cookies[0]).toContain('HttpOnly');
+  });
+
+  it('emits an array header value as a repeated header', async () => {
+    const res = await request(makeApp(new HrController())).get('/hr/multi');
+
+    expect(res.status).toBe(200);
+    // superagent joins repeated headers with ", "
+    expect(res.headers['link']).toBe('<a>, <b>');
+  });
+
+  it('strips body fields not in the @Returns schema (same as a bare return)', async () => {
+    const res = await request(makeApp(new HrController())).get('/hr/leaky');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: '1', name: 'leaky' });
+  });
+
+  it('selects a non-default declared status and validates against its schema', async () => {
+    const res = await request(makeApp(new HrController())).post('/hr/create');
+
+    expect(res.status).toBe(202);
+    expect(res.body).toEqual({ queued: true });
+  });
+
+  it('500s when the explicit status has no matching @Returns', async () => {
+    const res = await request(makeAppWithErrorHandler(new HrController())).get(
+      '/hr/undeclared-status',
+    );
+
+    expect(res.status).toBe(500);
+  });
+
+  it('500s when a header value fails its declared schema', async () => {
+    const res = await request(makeAppWithErrorHandler(new HrController())).get('/hr/bad-header');
+
+    expect(res.status).toBe(500);
   });
 });
 

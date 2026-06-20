@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { Response } from 'express';
 import createError from 'http-errors';
 import {
   Route,
@@ -24,12 +23,12 @@ import {
   QueryParam,
   BodyParam,
   Header,
-  Res,
   File,
   Files,
   Principal,
   FileResponse,
   RangeFileResponse,
+  HttpResponse,
 } from 'zodec';
 import {
   CreateUserSchema,
@@ -62,19 +61,19 @@ export class UsersController {
   @Get()
   @Summary('List users (paginated)')
   @Query(PaginationQuerySchema)
-  // Declare a response header — documented in the OpenAPI `responses.200.headers`
-  // (zodec doesn't set it for you; the handler does, via @Res or res).
+  // Declare a response header — documented in the OpenAPI `responses.200.headers`.
   @Returns(200, UserListSchema, {
     headers: { 'X-Total-Count': z.number().int() },
   })
+  // Return an HttpResponse to set the declared header without reaching for @Res:
+  // the number is coerced to a string and validated against the header schema,
+  // and the body is still parsed by UserListSchema like a bare return.
   public async list(
     @QueryParam('page') page: number,
     @QueryParam('limit') limit: number,
-    @Res() res: Response,
-  ): Promise<UserList> {
+  ): Promise<HttpResponse<UserList>> {
     const list = await this.users.list(page, limit);
-    res.set('X-Total-Count', String(list.total));
-    return list;
+    return new HttpResponse(list, { headers: { 'X-Total-Count': list.total } });
   }
 
   @Get('{id}')

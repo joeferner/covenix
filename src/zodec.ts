@@ -1,4 +1,4 @@
-import type { Express, Request, RequestHandler, Response } from 'express';
+import type { Express, NextFunction, Request, RequestHandler, Response } from 'express';
 import type { ZodType } from 'zod';
 import {
   getParams,
@@ -18,6 +18,8 @@ import contentDisposition from 'content-disposition';
 import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse, type RangeBody, type RangePathBody } from './range-file-response.js';
+import { HttpResponse } from './http-response.js';
+import type { HeaderValue, ResponseCookie } from './response.js';
 import { SseEvent } from './sse.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
 import { mountDocs, type ServeDocsOptions } from './serve-docs.js';
@@ -314,7 +316,22 @@ interface FileHeaderFields {
   contentType: string | undefined;
   filename: string | undefined;
   disposition: 'inline' | 'attachment' | undefined;
-  headers: Record<string, string | number> | undefined;
+  headers: Record<string, HeaderValue> | undefined;
+}
+
+/** Converts a {@link HeaderValue} to what `res.setHeader` accepts (numbers stringified). */
+function toHeaderValue(value: HeaderValue): string | string[] {
+  return Array.isArray(value) ? value.map(String) : String(value);
+}
+
+/** Sets each cookie via Express (which formats and appends a `Set-Cookie` per call). */
+function applyCookies(res: Response, cookies: ResponseCookie[] | undefined): void {
+  if (!cookies) {
+    return;
+  }
+  for (const cookie of cookies) {
+    res.cookie(cookie.name, cookie.value, cookie.options ?? {});
+  }
 }
 
 /**
@@ -342,7 +359,7 @@ function applyFileHeaders(res: Response, file: FileHeaderFields): void {
   }
   if (file.headers) {
     for (const [name, value] of Object.entries(file.headers)) {
-      res.setHeader(name, typeof value === 'number' ? String(value) : value);
+      res.setHeader(name, toHeaderValue(value));
     }
   }
 }
@@ -356,6 +373,7 @@ function applyFileHeaders(res: Response, file: FileHeaderFields): void {
 function sendFile(res: Response, file: FileResponse, fallbackStatus: number): void {
   res.status(file.status ?? fallbackStatus);
   applyFileHeaders(res, file);
+  applyCookies(res, file.cookies);
   if (file.body instanceof Readable) {
     file.body.pipe(res);
   } else {
@@ -383,7 +401,7 @@ async function sendRangeFile(
   fallbackStatus: number,
 ): Promise<void> {
   if (isPathBody(file.body)) {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string | string[]> = {};
     const disposition = file.disposition ?? (file.filename ? 'attachment' : undefined);
     if (disposition) {
       headers['Content-Disposition'] = file.filename
@@ -395,9 +413,11 @@ async function sendRangeFile(
     }
     if (file.headers) {
       for (const [name, value] of Object.entries(file.headers)) {
-        headers[name] = String(value);
+        headers[name] = toHeaderValue(value);
       }
     }
+    // Cookies queue a Set-Cookie header before sendFile writes the response.
+    applyCookies(res, file.cookies);
     const absolute = resolvePath(file.body.path);
     await new Promise<void>((resolve, reject) => {
       res.sendFile(absolute, { headers }, (err?: Error) => (err ? reject(err) : resolve()));
@@ -429,6 +449,7 @@ async function sendRangeFile(
         : await body.stream({ start, end });
     res.status(206);
     applyFileHeaders(res, file);
+    applyCookies(res, file.cookies);
     res.setHeader('Content-Range', `bytes ${start}-${end}/${size}`);
     res.setHeader('Content-Length', String(end - start + 1));
     sendBinary(res, chunk);
@@ -439,6 +460,7 @@ async function sendRangeFile(
   const chunk = body instanceof Uint8Array ? body : await body.stream();
   res.status(file.status ?? fallbackStatus);
   applyFileHeaders(res, file);
+  applyCookies(res, file.cookies);
   res.setHeader('Content-Length', String(size));
   sendBinary(res, chunk);
 }
@@ -450,6 +472,82 @@ function sendBinary(res: Response, chunk: Uint8Array | Readable): void {
   } else {
     res.end(Buffer.from(chunk));
   }
+}
+
+/**
+ * Coerces an {@link HttpResponse} header to the wire form. A header that matches a
+ * declared `@Returns(..., { headers })` schema is validated/parsed against it (a
+ * mismatch is a `500` — a server bug); numbers are stringified. Undeclared headers
+ * pass through (numbers still stringified). Throws {@link ValidationError} on a
+ * declared-schema mismatch.
+ */
+function coerceHeaderValue(value: HeaderValue, schema: ZodType | undefined): string | string[] {
+  const one = (v: string | number): string => {
+    if (schema) {
+      const result = schema.safeParse(v);
+      if (!result.success) {
+        throw new ValidationError(500, result.error.issues);
+      }
+      return String(result.data);
+    }
+    return String(v);
+  };
+  // Array.isArray doesn't narrow a ReadonlyArray out of the else branch, so the
+  // scalar case is asserted (it can only be string | number here).
+  return Array.isArray(value) ? value.map(one) : one(value as string | number);
+}
+
+/**
+ * Sends an {@link HttpResponse}: picks the status (which must be a declared
+ * `@Returns`), validates/serializes the body against that status's schema, coerces
+ * headers, sets cookies, and writes the JSON. All validation runs before `res` is
+ * touched, so a failure surfaces cleanly through `next` without a half-written
+ * response.
+ */
+function sendHttpResponse(
+  res: Response,
+  response: HttpResponse,
+  route: RouteMetadata,
+  fallbackStatus: number,
+  next: NextFunction,
+): void {
+  const responseStatus = response.status ?? fallbackStatus;
+  const decl = route.responses[responseStatus];
+  // An explicit status must correspond to a declared @Returns (catches typos).
+  if (response.status !== undefined && !decl) {
+    next(
+      new Error(
+        `zodec: HttpResponse status ${response.status} has no matching @Returns on ` +
+          `${route.method.toUpperCase()} /${route.path}`,
+      ),
+    );
+    return;
+  }
+  // Validate the body and headers up front; only mutate res once all checks pass.
+  let output: unknown = response.body;
+  if (decl?.schema) {
+    const result = decl.schema.safeParse(response.body);
+    if (!result.success) {
+      next(new ValidationError(500, result.error.issues));
+      return;
+    }
+    output = result.data;
+  }
+  let headerEntries: [string, string | string[]][];
+  try {
+    headerEntries = Object.entries(response.headers ?? {}).map(
+      ([name, value]) =>
+        [name, coerceHeaderValue(value, decl?.headers?.[name])] as [string, string | string[]],
+    );
+  } catch (err) {
+    next(err);
+    return;
+  }
+  for (const [name, value] of headerEntries) {
+    res.setHeader(name, value);
+  }
+  applyCookies(res, response.cookies);
+  res.status(responseStatus).json(output);
 }
 
 /**
@@ -859,6 +957,12 @@ export class Zodec {
           // A RangeFileResponse additionally honors HTTP Range (async-capable).
           if (value instanceof RangeFileResponse) {
             sendRangeFile(req, res, value, status).catch(next);
+            return;
+          }
+          // An HttpResponse carries status/headers/cookies alongside a validated
+          // JSON body — status-selected, body parsed by the matched @Returns.
+          if (value instanceof HttpResponse) {
+            sendHttpResponse(res, value, route, status, next);
             return;
           }
           // An @Sse route streams the returned async-iterable as text/event-stream.
