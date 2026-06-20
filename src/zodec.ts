@@ -18,6 +18,7 @@ import { SecurityError, ValidationError } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse, type RangeBody, type RangePathBody } from './range-file-response.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
+import { mountDocs, type ServeDocsOptions } from './serve-docs.js';
 import type { SecurityConfig } from './security.js';
 import type { OpenAPIV3_1 } from 'openapi-types';
 import {
@@ -472,6 +473,32 @@ export class Zodec {
       tags: this.options.tags,
       schemas: options.schemas,
     });
+  }
+
+  /**
+   * Mounts a documentation UI (and the spec it renders) onto an Express app. The
+   * UI HTML is served at `path` and the spec at `${path}/openapi.json`.
+   *
+   * By default the assets are self-hosted from the chosen UI's package (an
+   * optional peer dependency: `@scalar/api-reference` for `'scalar'`,
+   * `swagger-ui-dist` for `'swagger-ui'`, `redoc` for `'redoc'`) — install the
+   * one you use, or pass `{ cdn: true }` to load it from a CDN instead.
+   *
+   * @param app - The Express application to mount onto.
+   * @param path - Mount path for the UI. Defaults to `'/docs'`.
+   * @param options - UI choice, `cdn`, `specVersion`, `title`.
+   * @returns This instance, for chaining.
+   *
+   * @example
+   * ```ts
+   * api.serveDocs(app);                          // Scalar at /docs
+   * api.serveDocs(app, '/docs', { ui: 'swagger-ui' });
+   * ```
+   */
+  public serveDocs(app: Express, path = '/docs', options: ServeDocsOptions = {}): this {
+    const specOptions = options.specVersion ? { specVersion: options.specVersion } : {};
+    mountDocs(app, path, () => this.swagger(specOptions), options);
+    return this;
   }
 
   /**

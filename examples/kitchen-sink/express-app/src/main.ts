@@ -13,6 +13,11 @@ api.mount(app);
 // `schemas` adds route-less types (see api-schemas.ts) to the document.
 app.get('/swagger.json', (_req, res) => res.json(api.swagger({ schemas: additionalSchemas })));
 
+// Serve a docs UI (Scalar) at /docs, with the spec at /docs/openapi.json. Using
+// `cdn: true` keeps this example dependency-free; drop it to self-host the UI
+// from node_modules (the default — install @scalar/api-reference for that).
+api.serveDocs(app, '/docs', { cdn: true });
+
 // zodec never sends an error response itself — failed validation and thrown
 // http-errors flow through Express. This convenience handler renders the
 // standard { status, errors } shape; swap it for your own to control the output.

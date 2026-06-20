@@ -257,6 +257,11 @@ need to list controllers a second time:
 app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 ```
 
+Or mount a browsable docs UI in one line with `api.serveDocs(app)` (Scalar by
+default; `{ ui: 'swagger-ui' | 'redoc' }`). The UI is self-hosted from an optional
+peer dependency, or `{ cdn: true }` for no install. See
+[OpenAPI / Swagger](https://joeferner.github.io/zodec/guide/swagger).
+
 `api.swagger()` builds the OpenAPI document from the registered controllers'
 metadata. It doesn't depend on routes being mounted, so for CI or frontend
 client generation a `generate-swagger` script can register controllers and call

@@ -27,6 +27,29 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 from the registered controllers' metadata. It doesn't depend on routes being
 mounted.
 
+## Browsable docs UI
+
+`api.serveDocs(app, path?)` mounts a documentation UI plus the spec it renders —
+the UI HTML at `path` (default `/docs`), the spec at `${path}/openapi.json`:
+
+```typescript
+api.serveDocs(app); // Scalar at /docs
+api.serveDocs(app, '/docs', { ui: 'swagger-ui' }); // or 'redoc'
+```
+
+The UI assets are **self-hosted from `node_modules`** by default (works offline /
+under strict CSP), so install the one you use — it's an optional peer dependency:
+`@scalar/api-reference` (Scalar, the default), `swagger-ui-dist` (Swagger UI), or
+`redoc`. If it isn't installed, `serveDocs` throws a message telling you which to
+install — or pass `{ cdn: true }` to load the bundle from a CDN with no install:
+
+```typescript
+api.serveDocs(app, '/docs', { ui: 'scalar', cdn: true }); // no peer dep needed
+```
+
+`specVersion` is honored too (`{ specVersion: '3.0' }`), so the browsable spec
+matches whatever your clients consume.
+
 ## Static generation — no instances required
 
 Swagger is derived entirely from class-level metadata, so if you only need the

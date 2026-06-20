@@ -863,6 +863,71 @@ describe('@Use middleware', () => {
   });
 });
 
+describe('serveDocs', () => {
+  function docsApp(path: string, options?: Parameters<Zodec['serveDocs']>[2]): express.Express {
+    const app = express();
+    const api = new Zodec({ info: { title: 'Docs API', version: '1.0.0' } });
+    api.register(new HelloController());
+    api.serveDocs(app, path, options);
+    return app;
+  }
+
+  it('serves the spec at <path>/openapi.json', async () => {
+    const res = await request(docsApp('/docs')).get('/docs/openapi.json');
+    expect(res.status).toBe(200);
+    expect((res.body as { openapi: string }).openapi).toBe('3.1.0');
+  });
+
+  it('serves the Scalar UI (default) + its self-hosted bundle', async () => {
+    const app = docsApp('/docs');
+    const html = await request(app).get('/docs');
+    expect(html.status).toBe(200);
+    expect(html.headers['content-type']).toContain('text/html');
+    expect(html.text).toContain('id="api-reference"');
+    expect(html.text).toContain('data-url="/docs/openapi.json"');
+    expect(html.text).toContain('src="/docs/scalar.js"');
+
+    const bundle = await request(app).get('/docs/scalar.js');
+    expect(bundle.status).toBe(200);
+  });
+
+  it('serves the Swagger UI + static assets', async () => {
+    const app = docsApp('/docs', { ui: 'swagger-ui' });
+    const html = await request(app).get('/docs');
+    expect(html.text).toContain('SwaggerUIBundle');
+    expect(html.text).toContain('"/docs/openapi.json"');
+
+    const js = await request(app).get('/docs/assets/swagger-ui-bundle.js');
+    expect(js.status).toBe(200);
+    expect(js.headers['content-type']).toContain('javascript');
+  });
+
+  it('serves the Redoc UI + its self-hosted bundle', async () => {
+    const app = docsApp('/docs', { ui: 'redoc' });
+    const html = await request(app).get('/docs');
+    expect(html.text).toContain('<redoc spec-url="/docs/openapi.json">');
+
+    const js = await request(app).get('/docs/redoc.standalone.js');
+    expect(js.status).toBe(200);
+  });
+
+  it('uses a CDN script and serves no local asset when { cdn: true }', async () => {
+    const app = docsApp('/docs', { ui: 'scalar', cdn: true });
+    const html = await request(app).get('/docs');
+    expect(html.text).toContain('https://cdn.jsdelivr.net/npm/@scalar/api-reference');
+
+    const local = await request(app).get('/docs/scalar.js');
+    expect(local.status).toBe(404); // no self-hosted asset route in cdn mode
+  });
+
+  it('honors specVersion for the served spec', async () => {
+    const res = await request(docsApp('/docs', { cdn: true, specVersion: '3.0' })).get(
+      '/docs/openapi.json',
+    );
+    expect((res.body as { openapi: string }).openapi).toBe('3.0.3');
+  });
+});
+
 describe('@Res escape hatch', () => {
   @Route('raw')
   class RawController {

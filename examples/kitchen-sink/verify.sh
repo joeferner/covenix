@@ -74,6 +74,15 @@ expect 422 "POST /users (invalid body)" -X POST "$BASE/users" \
 expect 400 "GET /users/not-a-uuid (bad path param)" "$BASE/users/not-a-uuid"
 expect 200 "GET /swagger.json" "$BASE/swagger.json"
 
+# serveDocs: the UI HTML at /docs references the spec at /docs/openapi.json.
+expect 200 "GET /docs/openapi.json (serveDocs spec)" "$BASE/docs/openapi.json"
+if curl -s "$BASE/docs" | grep -q '/docs/openapi.json'; then
+  echo "    ✓ GET /docs serves UI HTML referencing the spec"
+else
+  echo "    ✗ GET /docs did not reference the spec"
+  fail=1
+fi
+
 # @Security: /auth/me requires a bearer token.
 expect 401 "GET /auth/me (no token) → 401" "$BASE/auth/me"
 # Create an admin + a plain user, then mint their fake tokens (login returns one).

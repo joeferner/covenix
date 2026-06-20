@@ -63,6 +63,7 @@ export type {
 } from './metadata.js';
 export { Zodec } from './zodec.js';
 export type { ZodecInfo, ZodecOptions } from './zodec.js';
+export type { DocsUi, ServeDocsOptions } from './serve-docs.js';
 export { SecurityError, ValidationError, ZodecError, zodecErrorHandler } from './errors.js';
 export type { ProblemDetails, ZodecErrorHandlerOptions } from './errors.js';
 export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
