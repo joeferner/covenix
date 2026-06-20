@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import type { ZodType } from 'zod';
+import type { RequestHandler } from 'express';
 
 /** HTTP methods zodec routes can be mapped to. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
@@ -55,6 +56,11 @@ export interface RouteMetadata {
    * allowed if any one is satisfied. Empty/absent means the route is public.
    */
   security?: SecurityRequirement[] | undefined;
+  /**
+   * Express middleware (from `@Use`) to run before the handler — class-level
+   * first, then method-level, in source order.
+   */
+  middleware?: RequestHandler[] | undefined;
 }
 
 /** A single `@Security` requirement: a scheme name and the scopes it requires. */
@@ -125,6 +131,7 @@ interface RouteEntry {
   deprecated?: boolean;
   examples?: ExampleMetadata[];
   security?: SecurityRequirement[];
+  middleware?: RequestHandler[];
   paramInjections?: ParamMetadata[];
 }
 
@@ -133,6 +140,7 @@ interface ControllerEntry {
   prefix?: string;
   tags?: string[];
   security?: SecurityRequirement[];
+  middleware?: RequestHandler[];
 }
 
 /** Reads a method's route entry without creating one. */
@@ -308,6 +316,21 @@ export function addSecurity(
 }
 
 /**
+ * Adds middleware to run before the handler. Called by `@Use`. Class-level
+ * (`handlerName` omitted) applies to every route; method-level adds to it. Kept
+ * in source order (decorators evaluate bottom-up, so each call prepends).
+ */
+export function addMiddleware(
+  target: object,
+  handlerName: string | undefined,
+  middleware: RequestHandler[],
+): void {
+  const entry =
+    handlerName === undefined ? controllerEntry(target) : routeEntry(target, handlerName);
+  entry.middleware = [...middleware, ...(entry.middleware ?? [])];
+}
+
+/**
  * Reads the class-level `@Security` requirements from a prototype.
  *
  * @param target - The controller prototype.
@@ -383,8 +406,11 @@ export function getRoutes(target: object): RouteMetadata[] {
   const controller = readController(target) ?? {};
   const tags = controller.tags && controller.tags.length > 0 ? controller.tags : undefined;
   const classSecurity = controller.security;
+  const classMiddleware = controller.middleware ?? [];
   return names.map((handlerName) => {
     const entry = readRoute(target, handlerName) ?? {};
+    // Class-level @Use runs before the route's own.
+    const middleware = [...classMiddleware, ...(entry.middleware ?? [])];
     return {
       method: entry.method as HttpMethod,
       path: entry.path ?? '',
@@ -401,6 +427,7 @@ export function getRoutes(target: object): RouteMetadata[] {
       examples: entry.examples,
       // A method's own @Security overrides the class-level default.
       security: entry.security ?? classSecurity,
+      middleware: middleware.length > 0 ? middleware : undefined,
     } satisfies RouteMetadata;
   });
 }

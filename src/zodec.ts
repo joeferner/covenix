@@ -488,9 +488,14 @@ export class Zodec {
       for (const route of getRoutes(proto)) {
         const path = toExpressPath(prefix, route.path);
         const middlewares: RequestHandler[] = [];
-        // Authenticate first — reject unauthorized requests before parsing a body.
+        // Chain order: security → @Use → multipart → handler.
+        // Authenticate first — reject unauthorized requests before anything else.
         if (route.security && route.security.length > 0) {
           middlewares.push(this.securityMiddleware(route.security));
+        }
+        // User middleware (@Use) — auth has run, body not yet parsed.
+        if (route.middleware && route.middleware.length > 0) {
+          middlewares.push(...route.middleware);
         }
         // A route whose @Body has a file field is multipart: parse it with multer
         // before the handler runs, so req.body/req.files are populated.

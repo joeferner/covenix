@@ -58,6 +58,14 @@ expect() { # expect <status> <description> <curl args...>
 echo "==> Exercising endpoints"
 expect 200 "GET /health" "$BASE/health"
 expect 200 "GET /health/raw (@Res escape hatch)" "$BASE/health/raw"
+
+# @Use middleware on the controller stamps a header on every route.
+if curl -s -D - -o /dev/null "$BASE/health" | grep -qi '^x-health-source: *zodec'; then
+  echo "    ✓ @Use middleware sets the X-Health-Source header"
+else
+  echo "    ✗ @Use middleware did not set X-Health-Source"
+  fail=1
+fi
 expect 201 "POST /users (valid)" -X POST "$BASE/users" \
   -H 'content-type: application/json' \
   -d '{"username":"ada","email":"ada@example.com"}'

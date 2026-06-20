@@ -1,7 +1,9 @@
 import type { ZodObject, ZodType } from 'zod';
+import type { RequestHandler } from 'express';
 import {
   addExample,
   addFileResponse,
+  addMiddleware,
   addResponseHeaders,
   addResponseDescription,
   addReturnSchema,
@@ -208,6 +210,40 @@ export function Security(scheme: string, scopes: string[] = []): ClassDecorator 
       addSecurity((target as { prototype: object }).prototype, undefined, { scheme, scopes });
     } else {
       addSecurity(target, String(propertyKey), { scheme, scopes });
+    }
+  };
+}
+
+/**
+ * Attaches Express middleware to run before the handler — auth beyond
+ * `@Security`, rate limiting, caching, logging, etc. Plain `RequestHandler`s, so
+ * the whole Express ecosystem composes.
+ *
+ * Usable on a method or on the controller class (applies to every route).
+ * Class-level runs first, then method-level, in source order. In the full chain
+ * zodec builds, `@Use` runs **after** `@Security` and **before** multipart parsing
+ * (`security → @Use → multipart → handler`). Middleware that sends a response
+ * (or doesn't call `next`) short-circuits — the handler won't run.
+ *
+ * @param middleware - One or more Express `RequestHandler`s.
+ *
+ * @example
+ * ```ts
+ * @Route('admin')
+ * @Use(rateLimit({ max: 100 }))   // every route in the controller
+ * class AdminController {
+ *   @Delete('{id}')
+ *   @Use(auditLog())              // just this route
+ *   remove() {}
+ * }
+ * ```
+ */
+export function Use(...middleware: RequestHandler[]): ClassDecorator & MethodDecorator {
+  return (target: object, propertyKey?: string | symbol): void => {
+    if (propertyKey === undefined) {
+      addMiddleware((target as { prototype: object }).prototype, undefined, middleware);
+    } else {
+      addMiddleware(target, String(propertyKey), middleware);
     }
   };
 }

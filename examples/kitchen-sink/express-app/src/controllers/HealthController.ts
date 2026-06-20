@@ -1,6 +1,6 @@
-import type { Request, Response } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import { z } from 'zod';
-import { Route, Tags, Get, Returns, Summary, Req, Res, Header } from 'zodec';
+import { Route, Tags, Get, Returns, Summary, Use, Req, Res, Header } from 'zodec';
 
 const HealthSchema = z
   .object({
@@ -9,8 +9,16 @@ const HealthSchema = z
   })
   .meta({ id: 'Health' });
 
+// Plain Express middleware — runs before every route in this controller via the
+// class-level @Use below. Stamps a header so callers can tell zodec served it.
+const stampSource: RequestHandler = (_req, res, next) => {
+  res.setHeader('X-Health-Source', 'zodec');
+  next();
+};
+
 @Route('health')
 @Tags('Health')
+@Use(stampSource)
 export class HealthController {
   private readonly startedAt = Date.now();
 

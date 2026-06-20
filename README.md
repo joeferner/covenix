@@ -137,6 +137,7 @@ swagger (see below). Request data is parsed by Zod before each handler runs.
 | `@Returns(status, schema?)`                                                 | Declare a response — stackable; omit `schema` for no body (e.g. `204`) |
 | `@ReturnsFile(status, options?)`                                            | Declare a binary/file response (return a `FileResponse`)               |
 | `@Security(scheme, scopes?)`                                                | Require a named auth scheme — class or method, stackable = OR          |
+| `@Use(...middleware)`                                                       | Run Express middleware before the handler — class or method            |
 | `@Summary(text)`                                                            | Operation summary in swagger                                           |
 | `@Description(text)`                                                        | Operation description (longer prose) in swagger                        |
 | `@OperationId(id)`                                                          | Operation id (defaults to the handler method name)                     |
@@ -172,6 +173,11 @@ security: { bearerAuth: bearer(handler) } })`) and mark routes with
 `@Security('bearerAuth', scopes?)`; the handler's result is injected via
 `@Principal()`. See
 [Authentication](https://joeferner.github.io/zodec/guide/authentication).
+
+For arbitrary Express middleware (rate limiting, caching, logging, custom auth),
+use `@Use(...middleware)` on a method or controller. zodec runs the chain
+`@Security → @Use → multipart → handler`; class-level `@Use` runs before
+method-level, and middleware that sends a response short-circuits the handler.
 
 ---
 

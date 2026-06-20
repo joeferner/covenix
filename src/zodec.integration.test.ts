@@ -19,6 +19,7 @@ import {
   Route,
   Security,
   Tags,
+  Use,
 } from './decorators.js';
 import {
   BodyParam,
@@ -774,6 +775,91 @@ describe('@Security', () => {
     // Invalid body too, but auth fails first → 401, not 422.
     const res = await request(app).post('/guarded').send({ name: 'x' });
     expect(res.status).toBe(401);
+  });
+});
+
+describe('@Use middleware', () => {
+  const order: string[] = [];
+  const tag =
+    (name: string): express.RequestHandler =>
+    (_req, _res, next) => {
+      order.push(name);
+      next();
+    };
+
+  @Route('mw')
+  @Use(tag('class-a'), tag('class-b'))
+  class MwController {
+    @Get('run')
+    @Use(tag('method'))
+    @Returns(200, z.object({ ok: z.boolean() }))
+    public run(): { ok: boolean } {
+      order.push('handler');
+      return { ok: true };
+    }
+
+    // Middleware that short-circuits by sending a response.
+    @Get('guard')
+    @Use((_req, res) => {
+      res.status(403).json({ blocked: true });
+    })
+    @Returns(200, z.object({ ok: z.boolean() }))
+    public guard(): { ok: boolean } {
+      order.push('guard-handler');
+      return { ok: true };
+    }
+  }
+
+  it('runs class middleware (in order), then method middleware, then the handler', async () => {
+    order.length = 0;
+    const res = await request(makeApp(new MwController())).get('/mw/run');
+
+    expect(res.status).toBe(200);
+    expect(order).toEqual(['class-a', 'class-b', 'method', 'handler']);
+  });
+
+  it('short-circuits when middleware sends a response (handler not called)', async () => {
+    order.length = 0;
+    const res = await request(makeApp(new MwController())).get('/mw/guard');
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({ blocked: true });
+    expect(order).not.toContain('guard-handler');
+  });
+
+  it('runs @Security before @Use', async () => {
+    const seen: string[] = [];
+
+    @Route('secured-mw')
+    class SecuredMwController {
+      @Get()
+      @Security('bearer')
+      @Use((_req, _res, next) => {
+        seen.push('use');
+        next();
+      })
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public run(): { ok: boolean } {
+        return { ok: true };
+      }
+    }
+
+    const app = express();
+    const api = new Zodec({
+      info: { title: 'T', version: '1.0.0' },
+      security: {
+        bearer: bearer((_req) => {
+          seen.push('security');
+          return { id: 'u' };
+        }),
+      },
+    });
+    api.register(new SecuredMwController());
+    api.mount(app);
+
+    const res = await request(app).get('/secured-mw').set('authorization', 'Bearer x');
+    expect(res.status).toBe(200);
+    expect(seen).toEqual(['security', 'use']); // auth ran before @Use
   });
 });
 

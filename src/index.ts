@@ -12,6 +12,7 @@ export {
   Returns,
   ReturnsFile,
   Security,
+  Use,
   Summary,
   Description,
   OperationId,
