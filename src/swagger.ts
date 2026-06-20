@@ -33,6 +33,13 @@ export interface OpenApiOptions {
    * on operations come from `@Tags`; this adds their descriptions/metadata.
    */
   tags?: OpenAPIV3_1.TagObject[] | undefined;
+  /**
+   * Standalone schemas to emit under `components.schemas`, in addition to those
+   * referenced by routes. Each must be named via `.meta({ id })`. Useful for
+   * types not tied to any HTTP route (e.g. WebSocket message shapes) so client
+   * generators still produce them.
+   */
+  schemas?: ZodType[] | undefined;
 }
 
 /**
@@ -131,6 +138,10 @@ class DocumentBuilder {
         (item as Record<string, OpenAPIV3_1.OperationObject>)[route.method] = this.operation(route);
         paths[path] = item;
       }
+    }
+    // Standalone schemas (not referenced by any route) → components.schemas.
+    for (const schema of options.schemas ?? []) {
+      this.registerStandaloneSchema(schema);
     }
     const components: OpenAPIV3_1.ComponentsObject = { schemas: this.schemas };
     if (options.securitySchemes && Object.keys(options.securitySchemes).length > 0) {
@@ -253,6 +264,19 @@ class DocumentBuilder {
       return { $ref: `#/components/schemas/${id}` } as OpenAPIV3_1.SchemaObject;
     }
     return asSchemaObject(json);
+  }
+
+  /**
+   * Registers a standalone schema into `components.schemas`. It must be named via
+   * `.meta({ id })` — an anonymous schema has no key to register under, so it's
+   * rejected rather than silently dropped.
+   */
+  private registerStandaloneSchema(schema: ZodType): void {
+    if (typeof schema.meta()?.id !== 'string') {
+      throw new Error('zodec: schemas passed to registerSchemas must be named via .meta({ id })');
+    }
+    // `schema()` converts, hoists nested named schemas, and registers this one.
+    this.schema(schema);
   }
 
   /**

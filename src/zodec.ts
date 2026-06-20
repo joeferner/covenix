@@ -1,4 +1,5 @@
 import type { Express, Request, RequestHandler, Response } from 'express';
+import type { ZodType } from 'zod';
 import {
   getParams,
   getPrefix,
@@ -445,10 +446,15 @@ export class Zodec {
    * Builds the OpenAPI document from the registered controllers' metadata.
    * Independent of {@link Zodec.mount} — does not require routes to be wired.
    *
-   * @param options - Generation options, e.g. `specVersion` (defaults to `'3.1'`).
+   * @param options - Generation options. `specVersion` defaults to `'3.1'`.
+   *   `schemas` adds standalone (route-less) named schemas to
+   *   `components.schemas` — pass the same list to {@link generateSwagger} to keep
+   *   instance and static output identical.
    * @returns The assembled OpenAPI document.
    */
-  public swagger(options: { specVersion?: SpecVersion } = {}): OpenApiDocument {
+  public swagger(
+    options: { specVersion?: SpecVersion; schemas?: ZodType[] } = {},
+  ): OpenApiDocument {
     const prototypes = this.controllers.map(
       (instance) => Object.getPrototypeOf(instance) as object,
     );
@@ -464,6 +470,7 @@ export class Zodec {
       servers: this.options.servers,
       externalDocs: this.options.externalDocs,
       tags: this.options.tags,
+      schemas: options.schemas,
     });
   }
 

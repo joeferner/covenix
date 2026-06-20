@@ -45,6 +45,43 @@ await writeFile('swagger.json', JSON.stringify(swagger, null, 2));
 This is the lightest path for CI spec checks and client codegen: no `Zodec`
 instance, no service wiring, no Express — just the classes and their decorators.
 
+## Schemas not tied to a route
+
+Schemas reach `components.schemas` because a route references them. To document a
+type that **no route uses** — a WebSocket/event message shape, a shared DTO, a
+polymorphic variant — pass it via the `schemas` option so client generators still
+emit a type for it. Each must be named with `.meta({ id })` (an anonymous schema
+has no component key, so it's rejected):
+
+```typescript
+const Notification = z
+  .discriminatedUnion('type', [
+    z.object({ type: z.literal('message'), text: z.string() }),
+    z.object({ type: z.literal('presence'), userId: z.string(), online: z.boolean() }),
+  ])
+  .meta({ id: 'Notification' });
+
+api.swagger({ schemas: [Notification] }); // → components.schemas.Notification
+```
+
+`generateSwagger` takes the **same** option, so share one list across both paths
+to keep instance and static output identical:
+
+```typescript
+export const extraSchemas = [Notification];
+
+api.swagger({ schemas: extraSchemas });
+generateSwagger([UsersController], info, { schemas: extraSchemas });
+```
+
+::: tip
+Most generators (including `openapi-generator`'s `typescript-fetch`) emit a model
+per `components/schemas` entry even when no operation references it — though
+pruning of unreferenced schemas varies by tool. This documents the type's
+**shape** only; for channels/direction of an event API, AsyncAPI is the right
+tool.
+:::
+
 ## Spec version: 3.1 (default) or 3.0
 
 zodec emits **OpenAPI 3.1.0 by default**. This is its native form: Zod 4's

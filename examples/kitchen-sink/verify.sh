@@ -95,6 +95,16 @@ else
   fail=1
 fi
 
+# A standalone schema (registerSchemas) appears under components.schemas even
+# though no route references it.
+if curl -s "$BASE/swagger.json" |
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s).components?.schemas?.Notification;process.exit(c&&Array.isArray(c.oneOf)?0:1)})'; then
+  echo "    ✓ swagger includes the standalone Notification schema in components"
+else
+  echo "    ✗ swagger missing standalone Notification schema"
+  fail=1
+fi
+
 # Swagger advertises the bearer scheme + the per-operation requirement.
 if curl -s "$BASE/swagger.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/auth/me"].get.security);process.exit(ok?0:1)})'; then

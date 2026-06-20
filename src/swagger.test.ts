@@ -444,6 +444,44 @@ describe('api.swagger()', () => {
     });
   });
 
+  describe('registerSchemas (standalone components)', () => {
+    const WsChatMessage = z
+      .object({ kind: z.literal('chat'), text: z.string() })
+      .meta({ id: 'WsChatMessage' });
+
+    @Route('things')
+    class ThingController {
+      @Get()
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public list(): unknown {
+        return null;
+      }
+    }
+
+    it('emits a standalone schema under components.schemas (via api.swagger({ schemas }))', () => {
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new ThingController());
+      const doc = api.swagger({ schemas: [WsChatMessage] });
+
+      expect(doc.components?.schemas?.['WsChatMessage']).toMatchObject({
+        type: 'object',
+        properties: { kind: { const: 'chat' }, text: { type: 'string' } },
+      });
+    });
+
+    it('emits a standalone schema via generateSwagger options (same shape)', () => {
+      const doc = generateSwagger([ThingController], undefined, { schemas: [WsChatMessage] });
+      expect(doc.components?.schemas).toHaveProperty('WsChatMessage');
+    });
+
+    it('throws when a standalone schema is not named via .meta({ id })', () => {
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      expect(() => api.swagger({ schemas: [z.object({ x: z.string() })] })).toThrow(
+        /named via \.meta/,
+      );
+    });
+  });
+
   it('generateSwagger(classes) matches api.swagger() for the same controllers', () => {
     const info = { title: 'My API', version: '1.0.0' };
 

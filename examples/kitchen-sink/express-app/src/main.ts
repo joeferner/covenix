@@ -1,6 +1,7 @@
 import express from 'express';
 import { zodecErrorHandler } from 'zodec';
 import { api } from './api.js';
+import { additionalSchemas } from './api-schemas.js';
 
 const app = express();
 app.use(express.json());
@@ -9,7 +10,8 @@ app.use(express.json());
 api.mount(app);
 
 // Same instance generates the spec from the controllers it already holds.
-app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
+// `schemas` adds route-less types (see api-schemas.ts) to the document.
+app.get('/swagger.json', (_req, res) => res.json(api.swagger({ schemas: additionalSchemas })));
 
 // zodec never sends an error response itself — failed validation and thrown
 // http-errors flow through Express. This convenience handler renders the

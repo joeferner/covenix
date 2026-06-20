@@ -19,20 +19,20 @@ artifact.
 
 ## Document structure
 
-| OpenAPI document field                         | zodec                                                                   |
-| ---------------------------------------------- | ----------------------------------------------------------------------- |
-| `openapi: '3.1.0'`                             | Emitted automatically (3.1 default; `swagger({ specVersion: '3.0' })`). |
-| `info.title` / `info.version`                  | `new Zodec({ info: { title, version } })`                               |
-| `info.description` / `contact` / `license` / … | `new Zodec({ info })` takes the full OpenAPI Info Object                |
-| `servers`                                      | `new Zodec({ servers: [{ url }] })`                                     |
-| `paths`                                        | `@Route` prefix + `@Get`/`@Post`/… (with `{id}` path params)            |
-| `components.schemas`                           | Any Zod schema named with `.meta({ id: 'Name' })`                       |
-| `components.securitySchemes`                   | The `security` map on `new Zodec({ security })` (or the builders)       |
-| `security` (global)                            | `@Security` on the controller class (applies to all its routes)         |
-| `tags` (names)                                 | `@Tags(...)` on the controller class                                    |
-| `tags` (descriptions)                          | `new Zodec({ tags: [{ name, description }] })`                          |
-| `externalDocs`                                 | `new Zodec({ externalDocs: { url } })`                                  |
-| `webhooks` / `x-*`                             | Post-process the generated document                                     |
+| OpenAPI document field                         | zodec                                                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `openapi: '3.1.0'`                             | Emitted automatically (3.1 default; `swagger({ specVersion: '3.0' })`).                                             |
+| `info.title` / `info.version`                  | `new Zodec({ info: { title, version } })`                                                                           |
+| `info.description` / `contact` / `license` / … | `new Zodec({ info })` takes the full OpenAPI Info Object                                                            |
+| `servers`                                      | `new Zodec({ servers: [{ url }] })`                                                                                 |
+| `paths`                                        | `@Route` prefix + `@Get`/`@Post`/… (with `{id}` path params)                                                        |
+| `components.schemas`                           | Named (`.meta({ id })`) Zod schemas — referenced by routes, or passed via the `schemas` option for route-less types |
+| `components.securitySchemes`                   | The `security` map on `new Zodec({ security })` (or the builders)                                                   |
+| `security` (global)                            | `@Security` on the controller class (applies to all its routes)                                                     |
+| `tags` (names)                                 | `@Tags(...)` on the controller class                                                                                |
+| `tags` (descriptions)                          | `new Zodec({ tags: [{ name, description }] })`                                                                      |
+| `externalDocs`                                 | `new Zodec({ externalDocs: { url } })`                                                                              |
+| `webhooks` / `x-*`                             | Post-process the generated document                                                                                 |
 
 ## Operations
 
