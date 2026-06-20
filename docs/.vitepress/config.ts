@@ -33,6 +33,7 @@ export default defineConfig({
           text: 'Migrating',
           items: [
             { text: 'From tsoa', link: '/guide/migrating-from-tsoa' },
+            { text: 'From NestJS', link: '/guide/migrating-from-nestjs' },
             { text: 'From ts-rest', link: '/guide/migrating-from-ts-rest' },
             { text: 'From OpenAPI', link: '/guide/migrating-from-openapi' },
           ],
