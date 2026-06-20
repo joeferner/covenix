@@ -125,12 +125,13 @@ else
 fi
 
 # A standalone schema (registerSchemas) appears under components.schemas even
-# though no route references it.
+# though no route references it — and a named z.discriminatedUnion emits oneOf +
+# a discriminator with a $ref mapping.
 if curl -s "$BASE/swagger.json" |
-  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s).components?.schemas?.Notification;process.exit(c&&Array.isArray(c.oneOf)?0:1)})'; then
-  echo "    ✓ swagger includes the standalone Notification schema in components"
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s).components?.schemas?.Notification;const ok=c&&Array.isArray(c.oneOf)&&c.discriminator?.propertyName==="type"&&c.discriminator?.mapping?.message==="#/components/schemas/MessageNotification";process.exit(ok?0:1)})'; then
+  echo "    ✓ swagger emits the Notification union with oneOf + discriminator mapping"
 else
-  echo "    ✗ swagger missing standalone Notification schema"
+  echo "    ✗ swagger missing Notification discriminator/mapping"
   fail=1
 fi
 

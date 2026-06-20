@@ -105,6 +105,46 @@ pruning of unreferenced schemas varies by tool. This documents the type's
 tool.
 :::
 
+## Discriminated unions
+
+A `z.discriminatedUnion` is emitted as `oneOf`, and zodec also adds an OpenAPI
+**`discriminator`** read straight from the union (no guessing the key back out of
+the JSON). When every variant is named with `.meta({ id })`, the `discriminator`
+includes a `mapping` from each discriminator value to that variant's component
+`$ref`:
+
+```typescript
+const Message = z.object({ type: z.literal('message'), text: z.string() }).meta({ id: 'Message' });
+const Presence = z
+  .object({ type: z.literal('presence'), online: z.boolean() })
+  .meta({ id: 'Presence' });
+
+const Notification = z.discriminatedUnion('type', [Message, Presence]).meta({ id: 'Notification' });
+```
+
+```jsonc
+"Notification": {
+  "oneOf": [
+    { "$ref": "#/components/schemas/Message" },
+    { "$ref": "#/components/schemas/Presence" }
+  ],
+  "discriminator": {
+    "propertyName": "type",
+    "mapping": {
+      "message": "#/components/schemas/Message",
+      "presence": "#/components/schemas/Presence"
+    }
+  }
+}
+```
+
+This is what lets generators like `openapi-generator`'s `typescript-fetch` emit a
+proper discriminated **union** type with correct deserialization, rather than a
+flattened interface. Name the variants for the full `mapping`; an anonymous
+variant drops the `mapping` (the `propertyName` is still emitted). The
+`discriminator` is preserved through the 3.0 down-convert below, and a plain
+`z.union` (no discriminator) stays `anyOf`.
+
 ## Spec version: 3.1 (default) or 3.0
 
 zodec emits **OpenAPI 3.1.0 by default**. This is its native form: Zod 4's

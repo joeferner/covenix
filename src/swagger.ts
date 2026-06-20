@@ -3,6 +3,7 @@ import type { OpenAPIV3_1 } from 'openapi-types';
 import { getPrefix, getRoutes, type ExampleMetadata, type RouteMetadata } from './metadata.js';
 import { isMultipart } from './multipart.js';
 import { downConvertToV30 } from './downconvert.js';
+import { collectDiscriminators, type DiscriminatorInfo } from './discriminator.js';
 import type { SecuritySchemes } from './security.js';
 
 /**
@@ -135,6 +136,8 @@ function asParameterSchema(schema: JsonSchema): NonNullable<OpenAPIV3_1.Paramete
  */
 class DocumentBuilder {
   private readonly schemas: Record<string, OpenAPIV3_1.SchemaObject> = {};
+  /** Named discriminated unions found while converting, keyed by component id. */
+  private readonly discriminators = new Map<string, DiscriminatorInfo>();
 
   public build(
     sources: ControllerSource[],
@@ -157,6 +160,9 @@ class DocumentBuilder {
     for (const schema of options.schemas ?? []) {
       this.registerStandaloneSchema(schema);
     }
+    // All components are registered now; attach `discriminator` to any that came
+    // from a named `z.discriminatedUnion`.
+    this.applyDiscriminators();
     const components: OpenAPIV3_1.ComponentsObject = { schemas: this.schemas };
     if (options.securitySchemes && Object.keys(options.securitySchemes).length > 0) {
       components.securitySchemes = options.securitySchemes;
@@ -279,12 +285,35 @@ class DocumentBuilder {
   private schema(schema: ZodType): OpenAPIV3_1.SchemaObject {
     const json = z.toJSONSchema(schema) as unknown as JsonObject;
     this.hoist(json);
+    // Record any named discriminated unions reachable from here (incl. nested),
+    // so `discriminator` can be attached once every component is registered.
+    collectDiscriminators(schema, this.discriminators);
     const id = schema.meta()?.id;
     if (typeof id === 'string') {
       this.schemas[id] = asSchemaObject(json);
       return { $ref: `#/components/schemas/${id}` } as OpenAPIV3_1.SchemaObject;
     }
     return asSchemaObject(json);
+  }
+
+  /**
+   * Attaches `discriminator` to each registered component that came from a named
+   * `z.discriminatedUnion`. Only applies to a component whose body is a `oneOf`
+   * (the form `z.discriminatedUnion` produces); a `mapping` is set when every
+   * variant is named.
+   */
+  private applyDiscriminators(): void {
+    for (const [id, info] of this.discriminators) {
+      const target = this.schemas[id] as Record<string, unknown> | undefined;
+      if (!target || !Array.isArray(target['oneOf'])) {
+        continue;
+      }
+      const discriminator: Record<string, unknown> = { propertyName: info.propertyName };
+      if (info.mapping) {
+        discriminator['mapping'] = info.mapping;
+      }
+      target['discriminator'] = discriminator;
+    }
   }
 
   /**

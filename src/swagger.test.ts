@@ -482,6 +482,127 @@ describe('api.swagger()', () => {
     });
   });
 
+  describe('discriminator (z.discriminatedUnion)', () => {
+    const Message = z
+      .object({ type: z.literal('message'), text: z.string() })
+      .meta({ id: 'Message' });
+    const Presence = z
+      .object({ type: z.literal('presence'), online: z.boolean() })
+      .meta({ id: 'Presence' });
+    const Notification = z
+      .discriminatedUnion('type', [Message, Presence])
+      .meta({ id: 'Notification' });
+
+    @Route('events')
+    class EventController {
+      @Get()
+      @Returns(200, Notification)
+      public list(): unknown {
+        return null;
+      }
+    }
+
+    function notificationSchema(specVersion?: '3.0' | '3.1'): Record<string, unknown> {
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new EventController());
+      const doc = api.swagger(specVersion ? { specVersion } : {});
+      return doc.components?.schemas?.['Notification'] as Record<string, unknown>;
+    }
+
+    it('emits oneOf + discriminator with a $ref mapping for named variants', () => {
+      const schema = notificationSchema();
+      expect(schema['oneOf']).toEqual([
+        { $ref: '#/components/schemas/Message' },
+        { $ref: '#/components/schemas/Presence' },
+      ]);
+      expect(schema['discriminator']).toEqual({
+        propertyName: 'type',
+        mapping: {
+          message: '#/components/schemas/Message',
+          presence: '#/components/schemas/Presence',
+        },
+      });
+    });
+
+    it('survives the 3.0 down-convert', () => {
+      const schema = notificationSchema('3.0');
+      expect(schema['discriminator']).toEqual({
+        propertyName: 'type',
+        mapping: {
+          message: '#/components/schemas/Message',
+          presence: '#/components/schemas/Presence',
+        },
+      });
+      // The discriminator property is still 3.0-shaped on the variant.
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new EventController());
+      const doc = api.swagger({ specVersion: '3.0' });
+      expect(
+        (doc.components?.schemas?.['Message'] as Record<string, unknown>)['properties'],
+      ).toMatchObject({ type: { enum: ['message'] } });
+    });
+
+    it('detects a named union nested inside another schema', () => {
+      const Envelope = z.object({ id: z.string(), payload: Notification }).meta({ id: 'Envelope' });
+
+      @Route('envelopes')
+      class EnvelopeController {
+        @Get()
+        @Returns(200, Envelope)
+        public list(): unknown {
+          return null;
+        }
+      }
+
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new EnvelopeController());
+      const schema = api.swagger().components?.schemas?.['Notification'] as Record<string, unknown>;
+      expect(schema['discriminator']).toMatchObject({ propertyName: 'type' });
+    });
+
+    it('omits the mapping when a variant is anonymous, keeping propertyName', () => {
+      const NamedVariant = z.object({ kind: z.literal('a'), x: z.number() }).meta({ id: 'VarA' });
+      const AnonVariant = z.object({ kind: z.literal('b'), y: z.string() }); // no .meta({ id })
+      const Mixed = z.discriminatedUnion('kind', [NamedVariant, AnonVariant]).meta({ id: 'Mixed' });
+
+      @Route('mixed')
+      class MixedController {
+        @Get()
+        @Returns(200, Mixed)
+        public list(): unknown {
+          return null;
+        }
+      }
+
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new MixedController());
+      const schema = api.swagger().components?.schemas?.['Mixed'] as Record<string, unknown>;
+      expect(schema['discriminator']).toEqual({ propertyName: 'kind' });
+      expect(schema['discriminator']).not.toHaveProperty('mapping');
+    });
+
+    it('leaves a plain z.union without a discriminator', () => {
+      const A = z.object({ a: z.string() }).meta({ id: 'PlainA' });
+      const B = z.object({ b: z.number() }).meta({ id: 'PlainB' });
+      const Plain = z.union([A, B]).meta({ id: 'PlainUnion' });
+
+      @Route('plain')
+      class PlainController {
+        @Get()
+        @Returns(200, Plain)
+        public list(): unknown {
+          return null;
+        }
+      }
+
+      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      api.register(new PlainController());
+      const schema = api.swagger().components?.schemas?.['PlainUnion'] as Record<string, unknown>;
+      expect(schema).not.toHaveProperty('discriminator');
+      expect(schema).toHaveProperty('anyOf');
+    });
+  });
+
   it('generateSwagger(classes) matches api.swagger() for the same controllers', () => {
     const info = { title: 'My API', version: '1.0.0' };
 
