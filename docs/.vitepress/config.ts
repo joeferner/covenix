@@ -35,6 +35,7 @@ export default defineConfig({
             { text: 'From tsoa', link: '/guide/migrating-from-tsoa' },
             { text: 'From NestJS', link: '/guide/migrating-from-nestjs' },
             { text: 'From ts-rest', link: '/guide/migrating-from-ts-rest' },
+            { text: 'From Hono OpenAPI', link: '/guide/migrating-from-hono' },
             { text: 'From OpenAPI', link: '/guide/migrating-from-openapi' },
           ],
         },

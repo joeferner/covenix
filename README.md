@@ -375,6 +375,8 @@ Coming from another tool? See the migration guides:
   class-validator DTOs → Zod, dropping `@ApiProperty` drift and the DI container, and an honest gaps list.
 - **[Migrating from ts-rest](https://joeferner.github.io/zodec/guide/migrating-from-ts-rest)** —
   contract-object → decorators, the response-validation defaults, and an honest take on the typed-client gap.
+- **[Migrating from Hono OpenAPI](https://joeferner.github.io/zodec/guide/migrating-from-hono)** —
+  `createRoute` → decorators, response-validation defaults, and the multi-runtime (edge vs Node-only) stance.
 - **[Migrating from a hand-written OpenAPI doc](https://joeferner.github.io/zodec/guide/migrating-from-openapi)** —
   every OpenAPI feature mapped to its zodec/Zod equivalent, plus the post-process escape hatch.
 
