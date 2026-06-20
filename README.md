@@ -373,6 +373,10 @@ Coming from another tool? See the migration guides:
   decorator/concept mapping, JSDoc-tags → Zod, and how zodec drops the build step.
 - **[Migrating from NestJS](https://joeferner.github.io/zodec/guide/migrating-from-nestjs)** —
   class-validator DTOs → Zod, dropping `@ApiProperty` drift and the DI container, and an honest gaps list.
+- **[Migrating from routing-controllers](https://joeferner.github.io/zodec/guide/migrating-from-routing-controllers)** —
+  near 1:1 decorator mapping, class-validator → Zod, and staying container-agnostic.
+- **[Migrating from express-zod-api](https://joeferner.github.io/zodec/guide/migrating-from-express-zod-api)** —
+  endpoint-factory → decorators, splitting the merged `input` schema, and dropping the response envelope.
 - **[Migrating from ts-rest](https://joeferner.github.io/zodec/guide/migrating-from-ts-rest)** —
   contract-object → decorators, the response-validation defaults, and an honest take on the typed-client gap.
 - **[Migrating from Hono OpenAPI](https://joeferner.github.io/zodec/guide/migrating-from-hono)** —
