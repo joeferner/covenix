@@ -200,27 +200,31 @@ zodec never sends an error response itself. A failed validation calls
 `next(err)` with a `ValidationError` that carries the Zod issues and a status
 (`400` for params/query, `422` for body, `500` for a response that doesn't match
 its `@Returns` schema), so it travels the **same** Express error pipeline as
-anything your handlers throw. You stay in control of the
-response shape via your own error middleware:
+anything your handlers throw. `ValidationError` and `SecurityError` both extend
+`ZodecError` (carrying `.status`), so you stay in control of the response shape
+via your own error middleware:
 
 ```typescript
-import { ValidationError } from 'zodec';
+import { ZodecError } from 'zodec';
 
 app.use((err, req, res, next) => {
-  if (err instanceof ValidationError) {
-    return res.status(err.status).json({ status: err.status, errors: err.issues });
+  if (err instanceof ZodecError) {
+    return res.status(err.status).json({ status: err.status, message: err.message });
   }
   next(err); // your http-errors / fallback handling
 });
 ```
 
-If you don't want to write that, zodec ships an optional `zodecErrorHandler`
-convenience that renders the standard shape — but you're never tied to it:
+If you don't want to write that, zodec ships an optional `zodecErrorHandler` that
+renders errors as **RFC 9457 Problem Details** (`application/problem+json`) — the
+standard error shape, overridable via `formatError`:
 
 ```typescript
 import { zodecErrorHandler } from 'zodec';
 
-app.use(zodecErrorHandler()); // → { status, errors: [{ path, message }] }
+app.use(zodecErrorHandler());
+// 422 → { type: 'about:blank', title: 'Unprocessable Entity', status: 422,
+//         errors: [{ path: ['name'], message: '...' }] }
 ```
 
 ---

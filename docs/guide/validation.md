@@ -34,15 +34,16 @@ A route with no `@Returns` schema sends the value untouched.
 
 zodec never sends an error response itself. A failed validation calls
 `next(err)` with a `ValidationError` carrying the Zod issues and a status, so it
-travels the **same** Express error pipeline as anything your handlers throw. You
-stay in control of the response shape via your own error middleware:
+travels the **same** Express error pipeline as anything your handlers throw.
+`ValidationError` and `SecurityError` both extend [`ZodecError`](/api/classes/ZodecError)
+(which carries `.status`), so you can match on that in your own middleware:
 
 ```typescript
-import { ValidationError } from 'zodec';
+import { ZodecError } from 'zodec';
 
 app.use((err, req, res, next) => {
-  if (err instanceof ValidationError) {
-    return res.status(err.status).json({ status: err.status, errors: err.issues });
+  if (err instanceof ZodecError) {
+    return res.status(err.status).json({ status: err.status, message: err.message });
   }
   next(err);
 });
@@ -51,16 +52,32 @@ app.use((err, req, res, next) => {
 ## Convenience handler
 
 If you don't want to write that, zodec ships an optional
-[`zodecErrorHandler`](/api/functions/zodecErrorHandler) that renders the standard
-shape — and accepts a `formatError` override:
+[`zodecErrorHandler`](/api/functions/zodecErrorHandler) that renders errors as
+[RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457) **Problem Details**
+(`application/problem+json`) — the standard, interoperable error shape:
 
 ```typescript
 import { zodecErrorHandler } from 'zodec';
 
-app.use(zodecErrorHandler()); // → { status, errors: [{ path, message }] }
+app.use(zodecErrorHandler());
+// 422 → application/problem+json
+// {
+//   "type": "about:blank",          // a doc URI when you have one
+//   "title": "Unprocessable Entity", // the HTTP status reason phrase
+//   "status": 422,
+//   "errors": [{ "path": ["name"], "message": "Too short" }]
+// }
+```
 
-// or customize the body:
-app.use(zodecErrorHandler({ formatError: (err) => ({ ok: false, issues: err.issues }) }));
+`type` defaults to `about:blank` (meaning "the title is just the status phrase");
+the `errors` array (RFC 9457 extension) is present for validation failures.
+`SecurityError` renders the same way without `errors`.
+
+Override the body with `formatError` — which switches the response back to
+`application/json`, since your shape isn't Problem Details:
+
+```typescript
+app.use(zodecErrorHandler({ formatError: (err) => ({ ok: false, message: err.message }) }));
 ```
 
 Handlers themselves should throw standard

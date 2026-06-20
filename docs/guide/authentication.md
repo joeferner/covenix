@@ -128,9 +128,10 @@ class AdminController {
 
 zodec throws [`SecurityError`](/api/classes/SecurityError) (`401`, or `403` when
 a handler throws it) through the normal error pipeline. The optional
-[`zodecErrorHandler()`](/guide/validation) renders it as
-`{ status, message }`; handlers that throw `http-errors` (or any error with a
-`status`) compose with your own Express error middleware.
+[`zodecErrorHandler()`](/guide/validation) renders it as an RFC 9457
+`application/problem+json` body (`{ type, title, status }`); handlers that throw
+`http-errors` (or any error with a `status`) compose with your own Express error
+middleware.
 
 ## OpenAPI
 

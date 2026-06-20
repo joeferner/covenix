@@ -33,7 +33,7 @@ import {
 } from './parameters.js';
 import { Zodec } from './zodec.js';
 import { bearer, apiKey } from './security.js';
-import { SecurityError, zodecErrorHandler } from './errors.js';
+import { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse } from './range-file-response.js';
 
@@ -257,16 +257,21 @@ describe('zodecErrorHandler', () => {
     }
   }
 
-  it('renders a ValidationError as { status, errors: [{ path, message }] }', async () => {
+  it('renders a ValidationError as an RFC 9457 problem+json body', async () => {
     const res = await request(makeAppWithErrorHandler(new ThingController()))
       .post('/things')
       .send({ name: 'no' });
 
     const body = res.body as {
+      type: string;
+      title: string;
       status: number;
       errors: { path: unknown[]; message: string }[];
     };
     expect(res.status).toBe(422);
+    expect(res.headers['content-type']).toContain('application/problem+json');
+    expect(body.type).toBe('about:blank');
+    expect(body.title).toBe('Unprocessable Entity'); // status reason phrase
     expect(body.status).toBe(422);
     expect(body.errors).toHaveLength(1);
     expect(body.errors[0]?.path).toEqual(['name']);
@@ -281,11 +286,14 @@ describe('zodecErrorHandler', () => {
     expect(res.body).not.toHaveProperty('errors');
   });
 
-  it('honors a custom formatError', async () => {
+  it('honors a custom formatError (and falls back to application/json)', async () => {
     const app = makeApp(new ThingController());
     app.use(
       zodecErrorHandler({
-        formatError: (error) => ({ ok: false, count: error.issues.length }),
+        formatError: (error) => ({
+          ok: false,
+          count: error instanceof ValidationError ? error.issues.length : 0,
+        }),
       }),
     );
 
@@ -293,6 +301,8 @@ describe('zodecErrorHandler', () => {
     const body = res.body as { ok: boolean; count: number };
 
     expect(res.status).toBe(422);
+    expect(res.headers['content-type']).toContain('application/json');
+    expect(res.headers['content-type']).not.toContain('problem');
     expect(body).toEqual({ ok: false, count: 1 });
   });
 });
@@ -710,9 +720,12 @@ describe('@Security', () => {
     expect(res.body).toMatchObject({ id: 'u_user', role: 'user' });
   });
 
-  it('rejects a missing/invalid token with 401', async () => {
+  it('rejects a missing/invalid token with 401 problem+json', async () => {
     const res = await request(secureApp()).get('/secure/me');
     expect(res.status).toBe(401);
+    expect(res.headers['content-type']).toContain('application/problem+json');
+    expect(res.body).toMatchObject({ type: 'about:blank', title: 'Unauthorized', status: 401 });
+    expect(res.body).not.toHaveProperty('errors'); // SecurityError carries no field errors
   });
 
   it('allows an in-scope principal', async () => {
