@@ -24,6 +24,7 @@ export default defineConfig({
             { text: 'File Downloads', link: '/guide/file-downloads' },
             { text: 'File Uploads', link: '/guide/file-uploads' },
             { text: 'Server-Sent Events', link: '/guide/server-sent-events' },
+            { text: 'Grouping & Versioning', link: '/guide/versioning' },
             { text: 'API Reference', link: '/api/' },
           ],
         },

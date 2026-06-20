@@ -43,6 +43,18 @@ export interface OpenApiOptions {
 }
 
 /**
+ * A controller to document: its prototype (where decorator metadata lives) plus
+ * an optional registration-time `basePrefix` (e.g. a `/v1` version segment) that
+ * is prepended to the controller's own `@Route` prefix.
+ */
+export interface ControllerSource {
+  /** The controller prototype (where decorator metadata is stored). */
+  prototype: object;
+  /** Base path prepended to the controller's `@Route` prefix; defaults to none. */
+  basePrefix?: string | undefined;
+}
+
+/**
  * A JSON Schema document or fragment. Uses Zod's own JSON Schema type — it is
  * authoritative for what `z.toJSONSchema` emits (draft 2020-12) — so converting
  * schemas needs no extra conversion dependency.
@@ -125,13 +137,15 @@ class DocumentBuilder {
   private readonly schemas: Record<string, OpenAPIV3_1.SchemaObject> = {};
 
   public build(
-    prototypes: object[],
+    sources: ControllerSource[],
     info: OpenApiInfo,
     options: OpenApiOptions = {},
   ): OpenApiDocument {
     const paths: OpenAPIV3_1.PathsObject = {};
-    for (const proto of prototypes) {
-      const prefix = getPrefix(proto);
+    for (const { prototype: proto, basePrefix } of sources) {
+      // The registration-time base path (e.g. `/v1`) sits in front of the
+      // controller's own `@Route` prefix; the join collapses empty segments.
+      const prefix = basePrefix ? `${basePrefix}/${getPrefix(proto)}` : getPrefix(proto);
       for (const route of getRoutes(proto)) {
         const path = toOpenApiPath(prefix, route.path);
         const item: OpenAPIV3_1.PathItemObject = paths[path] ?? {};
@@ -320,18 +334,28 @@ class DocumentBuilder {
 }
 
 /**
- * Builds an OpenAPI 3.1 document from controller prototypes. Independent of
- * route mounting — only reads class-level metadata.
+ * Builds an OpenAPI 3.1 document from controller sources (prototype + optional
+ * registration `basePrefix`). Independent of route mounting — only reads
+ * class-level metadata.
  */
 export function generateOpenApiDocument(
-  prototypes: object[],
+  sources: ControllerSource[],
   info: OpenApiInfo,
   options: OpenApiOptions = {},
 ): OpenApiDocument {
-  const document = new DocumentBuilder().build(prototypes, info, options);
+  const document = new DocumentBuilder().build(sources, info, options);
   // The builder always emits 3.1 (zodec's native form); down-convert if asked.
   return options.specVersion === '3.0' ? downConvertToV30(document) : document;
 }
+
+/**
+ * One static controller for {@link generateSwagger}: either a controller class
+ * directly, or a class wrapped with a registration-time `prefix` (the static
+ * analogue of `api.register(c, { prefix })` / `api.group(prefix, …)`).
+ */
+export type StaticController =
+  | { prototype: object }
+  | { controller: { prototype: object }; prefix?: string | undefined };
 
 /**
  * Standalone, instance-free OpenAPI generation: pass the controller classes
@@ -340,6 +364,8 @@ export function generateOpenApiDocument(
  * CI spec checks and client codegen.
  *
  * @param controllers - The controller classes (constructors, not instances).
+ *   To mirror grouped/prefixed registration, wrap a class as
+ *   `{ controller, prefix }` to prepend a base path (e.g. `{ controller: UsersController, prefix: '/v1' }`).
  * @param info - OpenAPI `info` block. Defaults to `{ title: 'API', version: '1.0.0' }`.
  * @param options - Extra inputs: `securitySchemes` (needed when routes use
  *   `@Security`, since scheme definitions aren't carried on the classes) and
@@ -349,15 +375,20 @@ export function generateOpenApiDocument(
  * @example
  * ```ts
  * const doc = generateSwagger([UsersController, HealthController]);
+ * const v1 = generateSwagger([{ controller: UsersController, prefix: '/v1' }]);
  * ```
  */
 export function generateSwagger(
-  controllers: { prototype: object }[],
+  controllers: StaticController[],
   info: OpenApiInfo = { title: 'API', version: '1.0.0' },
   options: OpenApiOptions = {},
 ): OpenApiDocument {
   return generateOpenApiDocument(
-    controllers.map((controller) => controller.prototype),
+    controllers.map((c) =>
+      'controller' in c
+        ? { prototype: c.controller.prototype, basePrefix: c.prefix }
+        : { prototype: c.prototype },
+    ),
     info,
     options,
   );

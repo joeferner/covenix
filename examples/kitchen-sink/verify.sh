@@ -38,7 +38,7 @@ setsid sh -c "cd '$APP_DIR' && PORT='$PORT' exec npm start" >"$TMP/server.log" 2
 SERVER_PGID=$!
 
 for _ in $(seq 1 50); do
-  curl -sf "$BASE/health" >/dev/null 2>&1 && break
+  curl -sf "$BASE/v1/health" >/dev/null 2>&1 && break
   sleep 0.3
 done
 
@@ -56,34 +56,34 @@ expect() { # expect <status> <description> <curl args...>
 }
 
 echo "==> Exercising endpoints"
-expect 200 "GET /health" "$BASE/health"
-expect 200 "GET /health/raw (@Res escape hatch)" "$BASE/health/raw"
+expect 200 "GET /v1/health" "$BASE/v1/health"
+expect 200 "GET /v1/health/raw (@Res escape hatch)" "$BASE/v1/health/raw"
 
 # @Sse streams text/event-stream; the finite stream completes so curl returns.
 SSE_HEADERS="$TMP/sse.headers"
-SSE_BODY="$(curl -s -N -D "$SSE_HEADERS" "$BASE/health/events")"
+SSE_BODY="$(curl -s -N -D "$SSE_HEADERS" "$BASE/v1/health/events")"
 if grep -qi '^content-type: *text/event-stream' "$SSE_HEADERS" &&
   printf '%s' "$SSE_BODY" | grep -q '^data: {"status":"ok"'; then
-  echo "    ✓ GET /health/events streams Server-Sent Events"
+  echo "    ✓ GET /v1/health/events streams Server-Sent Events"
 else
-  echo "    ✗ GET /health/events SSE stream failed"
+  echo "    ✗ GET /v1/health/events SSE stream failed"
   sed -n '1,6p' "$SSE_HEADERS"
   fail=1
 fi
 
 # @Use middleware on the controller stamps a header on every route.
-if curl -s -D - -o /dev/null "$BASE/health" | grep -qi '^x-health-source: *zodec'; then
+if curl -s -D - -o /dev/null "$BASE/v1/health" | grep -qi '^x-health-source: *zodec'; then
   echo "    ✓ @Use middleware sets the X-Health-Source header"
 else
   echo "    ✗ @Use middleware did not set X-Health-Source"
   fail=1
 fi
-expect 201 "POST /users (valid)" -X POST "$BASE/users" \
+expect 201 "POST /v1/users (valid)" -X POST "$BASE/v1/users" \
   -H 'content-type: application/json' \
   -d '{"username":"ada","email":"ada@example.com"}'
-expect 422 "POST /users (invalid body)" -X POST "$BASE/users" \
+expect 422 "POST /v1/users (invalid body)" -X POST "$BASE/v1/users" \
   -H 'content-type: application/json' -d '{"username":"x"}'
-expect 400 "GET /users/not-a-uuid (bad path param)" "$BASE/users/not-a-uuid"
+expect 400 "GET /v1/users/not-a-uuid (bad path param)" "$BASE/v1/users/not-a-uuid"
 expect 200 "GET /swagger.json" "$BASE/swagger.json"
 
 # serveDocs: the UI HTML at /docs references the spec at /docs/openapi.json.
@@ -95,32 +95,32 @@ else
   fail=1
 fi
 
-# @Security: /auth/me requires a bearer token.
-expect 401 "GET /auth/me (no token) → 401" "$BASE/auth/me"
+# @Security: /v1/auth/me requires a bearer token.
+expect 401 "GET /v1/auth/me (no token) → 401" "$BASE/v1/auth/me"
 # Create an admin + a plain user, then mint their fake tokens (login returns one).
-curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+curl -s -X POST "$BASE/v1/users" -H 'content-type: application/json' \
   -d '{"username":"boss","email":"boss@example.com","role":"admin"}' >/dev/null
-curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+curl -s -X POST "$BASE/v1/users" -H 'content-type: application/json' \
   -d '{"username":"peon","email":"peon@example.com"}' >/dev/null
 ADMIN_TOKEN="Bearer fake-token-for-boss"
 USER_TOKEN="Bearer fake-token-for-peon"
-expect 200 "GET /auth/me (valid token) → 200" "$BASE/auth/me" -H "authorization: $ADMIN_TOKEN"
+expect 200 "GET /v1/auth/me (valid token) → 200" "$BASE/v1/auth/me" -H "authorization: $ADMIN_TOKEN"
 
 # Admin-only delete: @Security('bearer', ['admin']). A user token is 403; admin is 204.
 victim="$(
-  curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+  curl -s -X POST "$BASE/v1/users" -H 'content-type: application/json' \
     -d '{"username":"victim","email":"victim@example.com"}' |
     node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).id))'
 )"
-expect 403 "DELETE /users/:id (non-admin) → 403" -X DELETE "$BASE/users/$victim" -H "authorization: $USER_TOKEN"
-expect 204 "DELETE /users/:id (admin) → 204" -X DELETE "$BASE/users/$victim" -H "authorization: $ADMIN_TOKEN"
+expect 403 "DELETE /v1/users/:id (non-admin) → 403" -X DELETE "$BASE/v1/users/$victim" -H "authorization: $USER_TOKEN"
+expect 204 "DELETE /v1/users/:id (admin) → 204" -X DELETE "$BASE/v1/users/$victim" -H "authorization: $ADMIN_TOKEN"
 
 # @Deprecated + @OperationId surface on the legacy avatar URL operation.
 if curl -s "$BASE/swagger.json" |
-  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const op=JSON.parse(s).paths["/users/{id}/avatar"].get;process.exit(op.deprecated===true&&op.operationId==="getUserAvatarUrl"?0:1)})'; then
-  echo "    ✓ swagger marks GET /users/{id}/avatar deprecated with a custom operationId"
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const op=JSON.parse(s).paths["/v1/users/{id}/avatar"].get;process.exit(op.deprecated===true&&op.operationId==="getUserAvatarUrl"?0:1)})'; then
+  echo "    ✓ swagger marks GET /v1/users/{id}/avatar deprecated with a custom operationId"
 else
-  echo "    ✗ swagger missing deprecated/operationId on /users/{id}/avatar"
+  echo "    ✗ swagger missing deprecated/operationId on /v1/users/{id}/avatar"
   fail=1
 fi
 
@@ -136,37 +136,37 @@ fi
 
 # Swagger advertises the bearer scheme + the per-operation requirement.
 if curl -s "$BASE/swagger.json" |
-  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/auth/me"].get.security);process.exit(ok?0:1)})'; then
-  echo "    ✓ swagger documents the bearer scheme + /auth/me security"
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/v1/auth/me"].get.security);process.exit(ok?0:1)})'; then
+  echo "    ✓ swagger documents the bearer scheme + /v1/auth/me security"
 else
   echo "    ✗ swagger missing security scheme/requirement"
   fail=1
 fi
 
 # Response header declared via @Returns(..., { headers }) and set by the handler.
-if curl -s -D - -o /dev/null "$BASE/users" | grep -qi '^x-total-count:'; then
-  echo "    ✓ GET /users sets the X-Total-Count response header"
+if curl -s -D - -o /dev/null "$BASE/v1/users" | grep -qi '^x-total-count:'; then
+  echo "    ✓ GET /v1/users sets the X-Total-Count response header"
 else
-  echo "    ✗ GET /users missing X-Total-Count header"
+  echo "    ✗ GET /v1/users missing X-Total-Count header"
   fail=1
 fi
 
 # File download: create a user, then download it as CSV (@ReturnsFile / FileResponse).
 uid="$(
-  curl -s -X POST "$BASE/users" -H 'content-type: application/json' \
+  curl -s -X POST "$BASE/v1/users" -H 'content-type: application/json' \
     -d '{"username":"bob","email":"bob@example.com"}' |
     node -e 'let s="";process.stdin.on("data",(d)=>(s+=d)).on("end",()=>process.stdout.write(JSON.parse(s).id))'
 )"
 DL_HEADERS="$TMP/export.headers"
-DL_BODY="$(curl -s -D "$DL_HEADERS" "$BASE/users/$uid/export")"
+DL_BODY="$(curl -s -D "$DL_HEADERS" "$BASE/v1/users/$uid/export")"
 DL_CODE="$(awk 'NR==1{print $2}' "$DL_HEADERS")"
 if [ "$DL_CODE" = "200" ] &&
   grep -qi '^content-type: *text/csv' "$DL_HEADERS" &&
   grep -qi '^content-disposition: *attachment' "$DL_HEADERS" &&
   printf '%s' "$DL_BODY" | head -1 | grep -q '^id,username,email'; then
-  echo "    ✓ GET /users/:id/export streams CSV (200, content-type + attachment)"
+  echo "    ✓ GET /v1/users/:id/export streams CSV (200, content-type + attachment)"
 else
-  echo "    ✗ GET /users/:id/export failed (code=$DL_CODE)"
+  echo "    ✗ GET /v1/users/:id/export failed (code=$DL_CODE)"
   sed -n '1,8p' "$DL_HEADERS"
   fail=1
 fi
@@ -174,41 +174,41 @@ fi
 # Multipart upload (@Body with a z.file() field → multipart/form-data).
 PNG="$TMP/avatar.png"
 printf '\211PNG\r\n\032\n' >"$PNG" # minimal PNG signature; enough bytes to upload
-UP_BODY="$(curl -s -X POST "$BASE/users/$uid/avatar" \
+UP_BODY="$(curl -s -X POST "$BASE/v1/users/$uid/avatar" \
   -F "avatar=@$PNG;type=image/png" -F 'caption=hi there')"
 if printf '%s' "$UP_BODY" | grep -q '"contentType":"image/png"' &&
   printf '%s' "$UP_BODY" | grep -q '"caption":"hi there"'; then
-  echo "    ✓ POST /users/:id/avatar accepts a multipart upload"
+  echo "    ✓ POST /v1/users/:id/avatar accepts a multipart upload"
 else
-  echo "    ✗ POST /users/:id/avatar upload failed: $UP_BODY"
+  echo "    ✗ POST /v1/users/:id/avatar upload failed: $UP_BODY"
   fail=1
 fi
 
 # A non-image upload must be rejected by the schema's .mime() constraint (422).
-expect 422 "POST /users/:id/avatar (wrong mime type) → 422" \
-  -X POST "$BASE/users/$uid/avatar" -F "avatar=@$PNG;type=image/gif"
+expect 422 "POST /v1/users/:id/avatar (wrong mime type) → 422" \
+  -X POST "$BASE/v1/users/$uid/avatar" -F "avatar=@$PNG;type=image/gif"
 
 # Download the uploaded avatar with an HTTP Range (RangeFileResponse, inline).
 RAW_HEADERS="$TMP/avatar.headers"
-curl -s -D "$RAW_HEADERS" -o /dev/null -H 'Range: bytes=0-2' "$BASE/users/$uid/avatar/raw"
+curl -s -D "$RAW_HEADERS" -o /dev/null -H 'Range: bytes=0-2' "$BASE/v1/users/$uid/avatar/raw"
 RAW_CODE="$(awk 'NR==1{print $2}' "$RAW_HEADERS")"
 if [ "$RAW_CODE" = "206" ] &&
   grep -qi '^accept-ranges: *bytes' "$RAW_HEADERS" &&
   grep -qi '^content-range: *bytes 0-2/' "$RAW_HEADERS" &&
   grep -qi '^content-disposition: *inline' "$RAW_HEADERS"; then
-  echo "    ✓ GET /users/:id/avatar/raw serves a 206 partial range (inline)"
+  echo "    ✓ GET /v1/users/:id/avatar/raw serves a 206 partial range (inline)"
 else
-  echo "    ✗ GET /users/:id/avatar/raw range failed (code=$RAW_CODE)"
+  echo "    ✗ GET /v1/users/:id/avatar/raw range failed (code=$RAW_CODE)"
   sed -n '1,10p' "$RAW_HEADERS"
   fail=1
 fi
 
 # Swagger advertises the upload as a binary multipart body.
 if curl -s "$BASE/swagger.json" |
-  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const b=d.paths["/users/{id}/avatar"].post.requestBody.content["multipart/form-data"].schema.properties.avatar;process.exit(b.format==="binary"?0:1)})'; then
-  echo "    ✓ swagger documents /users/{id}/avatar as a binary multipart body"
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const b=d.paths["/v1/users/{id}/avatar"].post.requestBody.content["multipart/form-data"].schema.properties.avatar;process.exit(b.format==="binary"?0:1)})'; then
+  echo "    ✓ swagger documents /v1/users/{id}/avatar as a binary multipart body"
 else
-  echo "    ✗ swagger missing binary multipart body for /users/{id}/avatar"
+  echo "    ✗ swagger missing binary multipart body for /v1/users/{id}/avatar"
   fail=1
 fi
 

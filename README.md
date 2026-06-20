@@ -115,6 +115,24 @@ That's it. A single `Zodec` instance owns your controllers; `mount` wires the
 Express routes and validation middleware, and the same instance generates
 swagger (see below). Request data is parsed by Zod before each handler runs.
 
+### Grouping & versioning
+
+Give a set of controllers a shared base path — typically an API version segment —
+with a registration `prefix` or a `group`. It composes with each controller's own
+`@Route` prefix and shows up in both the routes and the spec:
+
+```typescript
+api.register(new UsersController(svc), { prefix: '/v1' }); // → /v1/users
+
+api.group('/v1', (v1) => {
+  v1.register(new UsersController(svc)); // → /v1/users
+  v1.register(new AuthController(auth)); // → /v1/auth/...
+});
+```
+
+Groups nest, and the same controller can be mounted under more than one version.
+See [Grouping & Versioning](https://joeferner.github.io/zodec/guide/versioning).
+
 ---
 
 ## Decorator reference

@@ -20,6 +20,12 @@ const authService = new AuthService(userService);
 // `security` names the auth schemes that @Security('bearer') routes reference.
 export const api = new Zodec({ info: apiInfo, security: buildSecurity(authService) });
 
-api.register(new HealthController());
-api.register(new UsersController(userService));
-api.register(new AuthController(authService));
+// Group registration: every controller is mounted under a shared `/v1` base
+// path, so the routes and the generated spec read `/v1/users`, `/v1/health`, …
+// To stand up a `/v2`, open another group with the next versions of the
+// controllers — the `/v1` group keeps serving unchanged.
+api.group('/v1', (v1) => {
+  v1.register(new HealthController());
+  v1.register(new UsersController(userService));
+  v1.register(new AuthController(authService));
+});

@@ -77,6 +77,69 @@ export interface ZodecOptions {
 /** A controller handler method, called with the assembled argument list. */
 type HandlerFn = (...args: unknown[]) => unknown;
 
+/** Options for {@link Zodec.register} / {@link ControllerGroup.register}. */
+export interface RegisterOptions {
+  /**
+   * Base path prepended to this controller's `@Route` prefix — e.g. `'/v1'` for
+   * versioning. Reflected in both the mounted Express routes and the generated
+   * `paths`. Composes with any enclosing {@link Zodec.group}.
+   */
+  prefix?: string | undefined;
+}
+
+/** A registered controller plus the registration-time base path it sits under. */
+interface RegisteredController {
+  instance: object;
+  prefix: string;
+}
+
+/** Joins a base path and a sub-path into one prefix; empty segments drop out. */
+function joinPrefix(base: string, extra?: string): string {
+  return [base, extra].filter((s): s is string => Boolean(s)).join('/');
+}
+
+/**
+ * A registration scope created by {@link Zodec.group}: registers controllers
+ * under a shared base path (e.g. a `/v1` version segment). Groups nest — a
+ * nested {@link ControllerGroup.group} appends its prefix to the enclosing one.
+ *
+ * @example
+ * ```ts
+ * api.group('/v1', (v1) => {
+ *   v1.register(new UsersController(svc));
+ *   v1.register(new AuthController(auth));
+ * });
+ * ```
+ */
+export class ControllerGroup {
+  /** @internal — constructed by {@link Zodec.group}. */
+  public constructor(
+    private readonly add: (instance: object, prefix: string) => void,
+    private readonly basePrefix: string,
+  ) {}
+
+  /**
+   * Registers a controller under this group's base path. An optional `prefix`
+   * is appended to the group's.
+   *
+   * @returns This group, for chaining.
+   */
+  public register(instance: object, options: RegisterOptions = {}): this {
+    this.add(instance, joinPrefix(this.basePrefix, options.prefix));
+    return this;
+  }
+
+  /**
+   * Opens a nested group whose prefix is appended to this group's.
+   *
+   * @returns This group, for chaining.
+   */
+  public group(prefix: string, fn: (group: ControllerGroup) => void): this {
+    fn(new ControllerGroup(this.add, joinPrefix(this.basePrefix, prefix)));
+    return this;
+  }
+}
+
 /**
  * Joins the controller prefix and route path into a single Express path,
  * collapsing duplicate slashes and translating `{id}` placeholders to `:id`.
@@ -521,7 +584,7 @@ function buildArgs(
  * ```
  */
 export class Zodec {
-  private readonly controllers: object[] = [];
+  private readonly controllers: RegisteredController[] = [];
   /** Lazily-built multer instance, shared across all multipart routes. */
   private uploader: Multer | undefined;
 
@@ -535,15 +598,43 @@ export class Zodec {
     return this.options.info;
   }
 
+  /** Records a controller under a base path. Shared by `register`/`group`. */
+  private addController(instance: object, prefix: string): void {
+    this.controllers.push({ instance, prefix });
+  }
+
   /**
    * Records a pre-constructed controller instance. The caller owns construction
    * and dependency injection; {@link Zodec.mount} does the wiring later.
    *
    * @param instance - A controller instance (not a class).
+   * @param options - Registration options, e.g. a `prefix` base path.
    * @returns This instance, for chaining.
    */
-  public register(instance: object): this {
-    this.controllers.push(instance);
+  public register(instance: object, options: RegisterOptions = {}): this {
+    this.addController(instance, joinPrefix('', options.prefix));
+    return this;
+  }
+
+  /**
+   * Registers a set of controllers under a shared base path — typically an API
+   * version segment. The callback receives a {@link ControllerGroup} scoped to
+   * `prefix`; groups nest. Reflected in both the routes and the generated spec.
+   *
+   * @param prefix - Base path for the group (e.g. `'/v1'`).
+   * @param fn - Receives the scoped group to register controllers on.
+   * @returns This instance, for chaining.
+   *
+   * @example
+   * ```ts
+   * api.group('/v1', (v1) => {
+   *   v1.register(new UsersController(svc));
+   *   v1.register(new AuthController(auth));
+   * });
+   * ```
+   */
+  public group(prefix: string, fn: (group: ControllerGroup) => void): this {
+    fn(new ControllerGroup(this.addController.bind(this), joinPrefix('', prefix)));
     return this;
   }
 
@@ -560,16 +651,17 @@ export class Zodec {
   public swagger(
     options: { specVersion?: SpecVersion; schemas?: ZodType[] } = {},
   ): OpenApiDocument {
-    const prototypes = this.controllers.map(
-      (instance) => Object.getPrototypeOf(instance) as object,
-    );
+    const sources = this.controllers.map(({ instance, prefix }) => ({
+      prototype: Object.getPrototypeOf(instance) as object,
+      basePrefix: prefix,
+    }));
     // The scheme definitions for components.securitySchemes come from the
     // instance's security config (each entry's `.scheme`).
     const security = this.options.security;
     const securitySchemes = security
       ? Object.fromEntries(Object.entries(security).map(([name, s]) => [name, s.scheme]))
       : undefined;
-    return generateOpenApiDocument(prototypes, this.options.info, {
+    return generateOpenApiDocument(sources, this.options.info, {
       securitySchemes,
       specVersion: options.specVersion,
       servers: this.options.servers,
@@ -613,9 +705,10 @@ export class Zodec {
    * @returns This instance, for chaining.
    */
   public mount(app: Express): this {
-    for (const instance of this.controllers) {
+    for (const { instance, prefix: basePrefix } of this.controllers) {
       const proto = Object.getPrototypeOf(instance) as object;
-      const prefix = getPrefix(proto);
+      // Registration base path (e.g. `/v1`) in front of the controller's @Route.
+      const prefix = joinPrefix(basePrefix, getPrefix(proto));
       for (const route of getRoutes(proto)) {
         const path = toExpressPath(prefix, route.path);
         const middlewares: RequestHandler[] = [];

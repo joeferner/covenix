@@ -18,7 +18,7 @@ kitchen-sink/
       index.ts             #   re-exports
   express-app/             # node module #2 — a typical Express app
     src/
-      api.ts               #   the configured Zodec instance + registered controllers (shared)
+      api.ts               #   the configured Zodec instance + controllers grouped under /v1 (shared)
       main.ts              #   server startup: mount + zodecErrorHandler + listen
       generate-swagger.ts  #   headless swagger.json generation (no server), reuses api.ts
       services/            #   UserService, AuthService — fake in-memory, constructor-injected
@@ -49,6 +49,7 @@ schema is just a value and works across module boundaries with no special wiring
 | `@Use` middleware (controller-level)                              | `HealthController.ts`                                        |
 | `@Sse` Server-Sent Events stream                                  | `HealthController.ts`                                        |
 | `serveDocs` (docs UI + spec), standalone `schemas`                | `main.ts`, `api-schemas.ts`                                  |
+| `group('/v1', …)` versioning — every route mounts under `/v1`     | `api.ts`, `generate-swagger-static.ts`                       |
 | `@Req` / `@Res` escape hatch                                      | `HealthController.ts`                                        |
 | `new Zodec({ info })`, `register`, `mount`, `swagger`             | `api.ts`, `main.ts`, `generate-swagger.ts`                   |
 | `zodecErrorHandler()`                                             | `main.ts`                                                    |

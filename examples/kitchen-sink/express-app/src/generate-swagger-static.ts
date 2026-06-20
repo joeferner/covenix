@@ -12,10 +12,17 @@ import { AuthController } from './controllers/AuthController.js';
 // *definitions* and standalone `schemas` are instance config, so we hand in the
 // same values the running server uses (api-security.ts / api.ts) — keeping this
 // output identical to api.swagger() without constructing any services.
-const swagger = generateSwagger([HealthController, UsersController, AuthController], apiInfo, {
-  securitySchemes,
-  schemas: additionalSchemas,
-});
+// Mirror the instance's `/v1` group (api.ts) by wrapping each class with its
+// registration prefix — keeping this static output identical to api.swagger().
+const swagger = generateSwagger(
+  [
+    { controller: HealthController, prefix: '/v1' },
+    { controller: UsersController, prefix: '/v1' },
+    { controller: AuthController, prefix: '/v1' },
+  ],
+  apiInfo,
+  { securitySchemes, schemas: additionalSchemas },
+);
 const out = process.argv[2] ?? 'swagger.json';
 await writeFile(out, JSON.stringify(swagger, null, 2));
 console.log(`Wrote ${out}`);
