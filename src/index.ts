@@ -70,6 +70,8 @@ export type {
 } from './metadata.js';
 export { Zodec, ControllerGroup } from './zodec.js';
 export type { ZodecInfo, ZodecOptions, RegisterOptions } from './zodec.js';
+export { toExpress, serve } from './express.js';
+export type { ToExpressOptions, ServeOptions } from './express.js';
 export type { DocsUi, ServeDocsOptions } from './serve-docs.js';
 export { SecurityError, ValidationError, ZodecError, zodecErrorHandler } from './errors.js';
 export type { ProblemDetails, ZodecErrorHandlerOptions } from './errors.js';

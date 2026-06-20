@@ -76,25 +76,45 @@ export class UsersController {
 ```typescript
 // app.ts
 import 'reflect-metadata';
-import express from 'express';
-import { Zodec } from 'zodec';
+import { Zodec, serve } from 'zodec';
 import { UsersController } from './users.controller.js';
-
-const app = express();
-app.use(express.json());
 
 const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
 
 // You own construction — inject dependencies explicitly.
 api.register(new UsersController(db));
 
-api.mount(app);
-
-app.listen(3000);
+// One call: builds an Express app (json body parser, mounted routes, docs,
+// error handler) and starts listening. Returns the http.Server.
+await serve(api, { port: 3000 });
 ```
 
 A single [`Zodec`](/api/classes/Zodec) instance owns your controllers;
-[`mount`](/api/classes/Zodec#mount) wires the Express routes and validation
-middleware, and the same instance generates swagger. Next: see
-[Validation & Errors](./validation), [OpenAPI / Swagger](./swagger), and the
-full [API Reference](/api/).
+[`serve`](/api/functions/serve) is opt-in convenience that assembles a ready Express
+app and listens. The same instance also generates swagger.
+
+### Or own the Express app yourself
+
+`serve`/[`toExpress`](/api/functions/toExpress) are sugar, not a requirement. When
+you need full control, build the app and call
+[`mount`](/api/classes/Zodec#mount) directly:
+
+```typescript
+import express from 'express';
+import { Zodec, zodecErrorHandler } from 'zodec';
+
+const app = express();
+app.use(express.json());
+
+const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+api.register(new UsersController(db));
+api.mount(app); // wires routes + validation
+api.serveDocs(app); // optional docs UI
+app.use(zodecErrorHandler());
+app.listen(3000);
+```
+
+`toExpress` returns the built app **without** listening — handy for supertest.
+See [Route Handlers](./route-handlers) for what goes in a controller, then
+[Validation & Errors](./validation), [OpenAPI / Swagger](./swagger), and the full
+[API Reference](/api/).

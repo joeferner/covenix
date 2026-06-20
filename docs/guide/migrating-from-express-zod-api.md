@@ -111,29 +111,29 @@ Differences to internalize:
 3. **`Routing` tree → `@Route` + `@Get`.** The path is `@Route('user')` +
    `@Get('{id}')`; the version prefix (`v1`) moves to
    [`api.group('/v1', …)`](/guide/versioning).
-4. **`createServer(config, routing)` → `api.mount(app)`** on an Express app you
-   own.
+4. **`createServer(config, routing)` → `serve(api, { port })`** (or build the app
+   yourself and call `api.mount(app)`).
 
 ## At a glance
 
-| express-zod-api                                          | zodec                                                    | Notes                                                 |
-| -------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------- |
-| `factory.build({ method, input, output, handler })`      | decorated method on a controller class                   | Endpoint is a method, not a value.                    |
-| `method: 'get'` + routing key                            | `@Get('{id}')` + `@Route('user')`                        | Prefix on the class; `:id` → `{id}`.                  |
-| `input: z.object({...})` (params+query+body merged)      | `@Params(S)` / `@Query(S)` / `@Body(S)` (split)          | One location per decorator.                           |
-| destructure `input` in `handler`                         | `@Param` / `@QueryParam` / `@BodyParam`                  | Injection by parameter decorator.                     |
-| `output: z.object({...})`                                | `@Returns(200, Schema)`                                  | Stackable, one per status.                            |
-| `return data` → `{ status: "success", data }`            | `return body` (bare)                                     | **No envelope** — see below.                          |
-| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `zodecErrorHandler()`   | Express error pipeline.                               |
-| `factory.addMiddleware(...)` / `.use(mw)`                | `@Use(...)` (class or method)                            | Express middleware.                                   |
-| auth middleware returning `options`                      | `@Security('jwt', scopes)` + `bearer()` + `@Principal()` | First-class scheme + spec.                            |
-| `Routing` nesting / `v1: {...}`                          | `api.group('/v1', …)` / `register(c, { prefix })`        | See [Grouping & Versioning](/guide/versioning).       |
-| `new Documentation({ routing, config }).getSpecAsYaml()` | `api.swagger()` / `generateSwagger([...])`               | Native; JSON (down-convert to 3.0 available).         |
-| `new Integration({ routing }).print()` (client gen)      | `generateTypeScriptClient(api.contract())`               | Both generate; zodec's is standalone + open-contract. |
-| `ez.upload()` in `input`                                 | `z.file()` in `@Body` + `@File`/`@Files`                 | Auto-detected multipart; web-standard `File`.         |
-| `ez.file()` / raw output for downloads                   | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse` | Disposition + range negotiation handled.              |
-| `EventStreamFactory` (SSE)                               | [`@Sse(schema?)`](/guide/server-sent-events)             | Validated + documented `text/event-stream`.           |
-| `createServer(config, routing)`                          | `api.mount(app)` on your Express app                     | You own the Express instance.                         |
+| express-zod-api                                          | zodec                                                        | Notes                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
+| `factory.build({ method, input, output, handler })`      | decorated method on a controller class                       | Endpoint is a method, not a value.                    |
+| `method: 'get'` + routing key                            | `@Get('{id}')` + `@Route('user')`                            | Prefix on the class; `:id` → `{id}`.                  |
+| `input: z.object({...})` (params+query+body merged)      | `@Params(S)` / `@Query(S)` / `@Body(S)` (split)              | One location per decorator.                           |
+| destructure `input` in `handler`                         | `@Param` / `@QueryParam` / `@BodyParam`                      | Injection by parameter decorator.                     |
+| `output: z.object({...})`                                | `@Returns(200, Schema)`                                      | Stackable, one per status.                            |
+| `return data` → `{ status: "success", data }`            | `return body` (bare)                                         | **No envelope** — see below.                          |
+| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `zodecErrorHandler()`       | Express error pipeline.                               |
+| `factory.addMiddleware(...)` / `.use(mw)`                | `@Use(...)` (class or method)                                | Express middleware.                                   |
+| auth middleware returning `options`                      | `@Security('jwt', scopes)` + `bearer()` + `@Principal()`     | First-class scheme + spec.                            |
+| `Routing` nesting / `v1: {...}`                          | `api.group('/v1', …)` / `register(c, { prefix })`            | See [Grouping & Versioning](/guide/versioning).       |
+| `new Documentation({ routing, config }).getSpecAsYaml()` | `api.swagger()` / `generateSwagger([...])`                   | Native; JSON (down-convert to 3.0 available).         |
+| `new Integration({ routing }).print()` (client gen)      | `generateTypeScriptClient(api.contract())`                   | Both generate; zodec's is standalone + open-contract. |
+| `ez.upload()` in `input`                                 | `z.file()` in `@Body` + `@File`/`@Files`                     | Auto-detected multipart; web-standard `File`.         |
+| `ez.file()` / raw output for downloads                   | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`     | Disposition + range negotiation handled.              |
+| `EventStreamFactory` (SSE)                               | [`@Sse(schema?)`](/guide/server-sent-events)                 | Validated + documented `text/event-stream`.           |
+| `createServer(config, routing)`                          | `serve(api, { port })` / `toExpress(api)` / `api.mount(app)` | One-call bootstrap, or own the app.                   |
 
 ## The response envelope — the one real gotcha
 
@@ -266,38 +266,34 @@ dependency). See [Typed Client](/guide/typed-client).
 
 ## Bootstrapping
 
+`createServer(config, routing)` maps onto zodec's [`serve`](/guide/getting-started#wire-it-up),
+which does the same one-call bootstrap (body parser, mounted routes, docs, error
+handler, listen):
+
 ```typescript
 // express-zod-api
 import { createConfig, createServer } from 'express-zod-api';
 const config = createConfig({ http: { listen: 3000 }, cors: true });
 await createServer(config, routing);
 
-// zodec — you own the Express app
+// zodec — one call, returns the http.Server
 import 'reflect-metadata';
-import express from 'express';
-import { Zodec, zodecErrorHandler } from 'zodec';
-
-const app = express();
-app.use(express.json());
+import { Zodec, serve } from 'zodec';
 
 const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service));
-api.mount(app);
-api.serveDocs(app);
-app.use(zodecErrorHandler());
-app.listen(3000);
+await serve(api, { port: 3000, configure: (app) => app.use(cors()) });
 ```
 
-zodec doesn't bootstrap the server for you — you keep your own Express instance and
-any existing middleware. That's a small amount of extra wiring in exchange for full
-control over the app.
+`configure` runs pre-route middleware (cors/helmet/logging), `after` runs a
+post-route fallback, and `app:` hands in your own Express instance — or use
+`toExpress(api, …)` to get the built app without listening (e.g. for tests). When
+you'd rather wire Express by hand, `api.mount(app)` is still there.
 
 ## Gaps: what express-zod-api does that zodec doesn't
 
 - **Built-in result-handler envelope.** zodec returns bare bodies; replicate the
   `{ status, data }` shape with a Zod wrapper schema if you need it (above).
-- **`createServer` / bootstrap helper.** zodec assumes you own the Express app;
-  there's no one-call server creator.
 - **Integrated logger / config object.** express-zod-api ships a config + logger
   abstraction; zodec leaves logging and config to you.
 - **The `EndpointsFactory` middleware-composition model.** zodec uses plain Express

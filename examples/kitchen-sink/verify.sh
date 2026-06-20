@@ -84,7 +84,6 @@ expect 201 "POST /v1/users (valid)" -X POST "$BASE/v1/users" \
 expect 422 "POST /v1/users (invalid body)" -X POST "$BASE/v1/users" \
   -H 'content-type: application/json' -d '{"username":"x"}'
 expect 400 "GET /v1/users/not-a-uuid (bad path param)" "$BASE/v1/users/not-a-uuid"
-expect 200 "GET /swagger.json" "$BASE/swagger.json"
 
 # serveDocs: the UI HTML at /docs references the spec at /docs/openapi.json.
 expect 200 "GET /docs/openapi.json (serveDocs spec)" "$BASE/docs/openapi.json"
@@ -116,7 +115,7 @@ expect 403 "DELETE /v1/users/:id (non-admin) → 403" -X DELETE "$BASE/v1/users/
 expect 204 "DELETE /v1/users/:id (admin) → 204" -X DELETE "$BASE/v1/users/$victim" -H "authorization: $ADMIN_TOKEN"
 
 # @Deprecated + @OperationId surface on the legacy avatar URL operation.
-if curl -s "$BASE/swagger.json" |
+if curl -s "$BASE/docs/openapi.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const op=JSON.parse(s).paths["/v1/users/{id}/avatar"].get;process.exit(op.deprecated===true&&op.operationId==="getUserAvatarUrl"?0:1)})'; then
   echo "    ✓ swagger marks GET /v1/users/{id}/avatar deprecated with a custom operationId"
 else
@@ -127,7 +126,7 @@ fi
 # A standalone schema (registerSchemas) appears under components.schemas even
 # though no route references it — and a named z.discriminatedUnion emits oneOf +
 # a discriminator with a $ref mapping.
-if curl -s "$BASE/swagger.json" |
+if curl -s "$BASE/docs/openapi.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const c=JSON.parse(s).components?.schemas?.Notification;const ok=c&&Array.isArray(c.oneOf)&&c.discriminator?.propertyName==="type"&&c.discriminator?.mapping?.message==="#/components/schemas/MessageNotification";process.exit(ok?0:1)})'; then
   echo "    ✓ swagger emits the Notification union with oneOf + discriminator mapping"
 else
@@ -136,7 +135,7 @@ else
 fi
 
 # Swagger advertises the bearer scheme + the per-operation requirement.
-if curl -s "$BASE/swagger.json" |
+if curl -s "$BASE/docs/openapi.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const ok=d.components?.securitySchemes?.bearer?.scheme==="bearer" && Array.isArray(d.paths["/v1/auth/me"].get.security);process.exit(ok?0:1)})'; then
   echo "    ✓ swagger documents the bearer scheme + /v1/auth/me security"
 else
@@ -205,7 +204,7 @@ else
 fi
 
 # Swagger advertises the upload as a binary multipart body.
-if curl -s "$BASE/swagger.json" |
+if curl -s "$BASE/docs/openapi.json" |
   node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const d=JSON.parse(s);const b=d.paths["/v1/users/{id}/avatar"].post.requestBody.content["multipart/form-data"].schema.properties.avatar;process.exit(b.format==="binary"?0:1)})'; then
   echo "    ✓ swagger documents /v1/users/{id}/avatar as a binary multipart body"
 else

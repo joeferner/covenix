@@ -808,7 +808,13 @@ export class Zodec {
    * ```
    */
   public serveDocs(app: Express, path = '/docs', options: ServeDocsOptions = {}): this {
-    const specOptions = options.specVersion ? { specVersion: options.specVersion } : {};
+    const specOptions: { specVersion?: SpecVersion; schemas?: ZodType[] } = {};
+    if (options.specVersion) {
+      specOptions.specVersion = options.specVersion;
+    }
+    if (options.schemas) {
+      specOptions.schemas = options.schemas;
+    }
     mountDocs(app, path, () => this.swagger(specOptions), options);
     return this;
   }

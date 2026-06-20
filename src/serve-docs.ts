@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import express, { type Express } from 'express';
+import type { ZodType } from 'zod';
 import type { OpenApiDocument, SpecVersion } from './swagger.js';
 
 const require = createRequire(import.meta.url);
@@ -22,6 +23,12 @@ export interface ServeDocsOptions {
   cdn?: boolean;
   /** OpenAPI spec version to serve. Defaults to `'3.1'`. */
   specVersion?: SpecVersion;
+  /**
+   * Route-less named schemas (`.meta({ id })`) to add to the served document's
+   * `components.schemas` — the same `schemas` accepted by {@link import('./zodec.js').Zodec.swagger}.
+   * Pass these so the docs spec includes types not referenced by any route.
+   */
+  schemas?: ZodType[];
   /** Page `<title>`. Defaults to `'API Reference'`. */
   title?: string;
 }
