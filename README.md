@@ -334,6 +334,8 @@ Coming from another tool? See the migration guides:
 
 - **[Migrating from tsoa](https://joeferner.github.io/zodec/guide/migrating-from-tsoa)** —
   decorator/concept mapping, JSDoc-tags → Zod, and how zodec drops the build step.
+- **[Migrating from ts-rest](https://joeferner.github.io/zodec/guide/migrating-from-ts-rest)** —
+  contract-object → decorators, the response-validation defaults, and an honest take on the typed-client gap.
 - **[Migrating from a hand-written OpenAPI doc](https://joeferner.github.io/zodec/guide/migrating-from-openapi)** —
   every OpenAPI feature mapped to its zodec/Zod equivalent, plus the post-process escape hatch.
 
