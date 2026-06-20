@@ -99,3 +99,4 @@ export type {
   SchemaNode,
   ZodecContract,
 } from './contract.js';
+export { generateTypeScriptClient } from './contract-client.js';

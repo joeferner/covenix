@@ -4,11 +4,13 @@ export const UserSchema = z
   .object({
     id: z.string().uuid(),
     username: z.string().min(3).max(32),
-    email: z.string().email(),
-    role: z.enum(['admin', 'user']).default('user'),
+    email: z.string().email().describe('Primary contact email; also the login identifier.'),
+    role: z.enum(['admin', 'user']).default('user').describe('Authorization role for the user.'),
     createdAt: z.string().datetime(),
   })
-  .meta({ id: 'User' });
+  // Descriptions (.describe() / .meta({ description })) flow into both the OpenAPI
+  // document and the generated client's JSDoc.
+  .meta({ id: 'User', description: 'A registered user account.' });
 
 export const CreateUserSchema = z
   .object({

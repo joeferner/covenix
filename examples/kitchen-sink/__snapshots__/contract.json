@@ -629,7 +629,8 @@
           "schema": {
             "kind": "string",
             "format": "email"
-          }
+          },
+          "description": "Primary contact email; also the login identifier."
         },
         "role": {
           "schema": {
@@ -639,7 +640,8 @@
               "user"
             ]
           },
-          "default": "user"
+          "default": "user",
+          "description": "Authorization role for the user."
         },
         "createdAt": {
           "schema": {
@@ -648,7 +650,8 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "description": "A registered user account."
     },
     "UserList": {
       "kind": "object",

@@ -266,6 +266,41 @@ artifact() {
 artifact swagger swagger swagger:static
 artifact contract contract contract:static
 
+# The generated TypeScript client: text-identical to its snapshot, type-checks
+# standalone under strict mode (the classic codegen failure to catch), and
+# actually works when pointed at the running server (verify-client.ts).
+GEN_CLIENT="$APP_DIR/src/api.gen.ts"
+npm --prefix "$APP_DIR" run --silent client -- "$GEN_CLIENT" >/dev/null
+if [ "${UPDATE_SNAPSHOTS:-}" = "1" ]; then
+  cp "$GEN_CLIENT" "$SNAP/api.gen.ts"
+  echo "    ↻ updated snapshot api.gen.ts"
+else
+  if diff -q "$SNAP/api.gen.ts" "$GEN_CLIENT" >/dev/null; then
+    echo "    ✓ client: output matches __snapshots__/api.gen.ts"
+  else
+    echo "    ✗ client: output differs from __snapshots__/api.gen.ts (run UPDATE_SNAPSHOTS=1 bash verify.sh)"
+    fail=1
+  fi
+  if node "$ROOT/node_modules/typescript/bin/tsc" --noEmit --ignoreConfig --strict \
+    --target es2022 --module nodenext --moduleResolution nodenext --lib es2022,dom \
+    "$GEN_CLIENT" 2>"$TMP/client-tsc.log"; then
+    echo "    ✓ client: type-checks standalone under strict mode"
+  else
+    echo "    ✗ client: generated client has type errors"
+    sed -n '1,20p' "$TMP/client-tsc.log"
+    fail=1
+  fi
+  # Run the generated client against the live server.
+  if npm --prefix "$APP_DIR" run --silent verify:client -- "$BASE" >"$TMP/client-run.log" 2>&1; then
+    sed 's/^/    /' "$TMP/client-run.log"
+  else
+    echo "    ✗ client: exercising the generated client against the server failed"
+    sed -n '1,30p' "$TMP/client-run.log"
+    fail=1
+  fi
+fi
+rm -f "$GEN_CLIENT" # generated artifact — not committed (see .gitignore)
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "✓ kitchen-sink verification passed"
