@@ -81,7 +81,9 @@ describe('handler argument assembly', () => {
     // Mixed parameter decorators, deliberately not in index order, plus a
     // plain undecorated trailing arg to prove gaps stay undefined.
     @Post('{id}')
-    @Returns(200, z.object({}))
+    // `.loose()` keeps the echoed payload — this test is about arg injection,
+    // not response shaping (zodec otherwise strips undeclared fields).
+    @Returns(200, z.object({}).loose())
     public echo(
       @Param('id') id: string,
       @QueryParam('q') q: string,
@@ -120,7 +122,7 @@ describe('request validation', () => {
     @Get('{id}')
     @Params(IdParams)
     @Query(Pagination)
-    @Returns(200, z.object({}))
+    @Returns(200, z.object({}).loose())
     public get(@Param('id') id: number, @QueryParam('page') page: number): Record<string, unknown> {
       // Echo the coerced/defaulted values along with their runtime types.
       return { id, page, idType: typeof id, pageType: typeof page };
@@ -128,7 +130,7 @@ describe('request validation', () => {
 
     @Post()
     @Body(CreateBody)
-    @Returns(201, z.object({}))
+    @Returns(201, z.object({}).loose())
     public create(@BodyParam() body: unknown): unknown {
       return body;
     }
@@ -182,6 +184,27 @@ describe('response validation', () => {
       // id should be a string — returning a number is a server-side contract bug.
       return { id: 123 };
     }
+
+    // Returns an extra `secret` field not declared in the schema.
+    @Get('leaky')
+    @Returns(200, Strict)
+    public leaky(): unknown {
+      return { id: 'ok', secret: 'do-not-leak' };
+    }
+
+    // A transform on the response schema runs during serialization.
+    @Get('transformed')
+    @Returns(200, z.object({ id: z.string().transform((s) => s.toUpperCase()) }))
+    public transformed(): unknown {
+      return { id: 'abc' };
+    }
+
+    // `.loose()` opts out of stripping — extra keys are preserved.
+    @Get('loose')
+    @Returns(200, z.object({ id: z.string() }).loose())
+    public loose(): unknown {
+      return { id: 'ok', extra: 'kept' };
+    }
   }
 
   it('passes a response that matches its @Returns schema', async () => {
@@ -193,6 +216,25 @@ describe('response validation', () => {
   it('throws 500 when the response violates its @Returns schema', async () => {
     const res = await request(makeApp(new OutController())).get('/out/bad');
     expect(res.status).toBe(500);
+  });
+
+  it('strips fields not declared in the response schema', async () => {
+    const res = await request(makeApp(new OutController())).get('/out/leaky');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'ok' }); // `secret` stripped
+    expect(res.body).not.toHaveProperty('secret');
+  });
+
+  it('applies response-schema transforms during serialization', async () => {
+    const res = await request(makeApp(new OutController())).get('/out/transformed');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'ABC' });
+  });
+
+  it('keeps extra keys when the schema is .loose()', async () => {
+    const res = await request(makeApp(new OutController())).get('/out/loose');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 'ok', extra: 'kept' });
   });
 });
 
@@ -466,7 +508,13 @@ describe('multipart file uploads', () => {
     @Body(AvatarUpload)
     @Returns(
       200,
-      z.object({ name: z.string(), type: z.string(), size: z.number(), text: z.string() }),
+      z.object({
+        name: z.string(),
+        type: z.string(),
+        size: z.number(),
+        text: z.string(),
+        caption: z.string().optional(),
+      }),
     )
     public async avatar(
       @File('avatar') avatar: globalThis.File,

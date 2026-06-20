@@ -610,16 +610,21 @@ export class Zodec {
           // Always-on response validation: the return value must match its
           // declared @Returns schema. A mismatch is a server bug, so it throws
           // a 500 ValidationError through the same error pipeline as everything
-          // else — zodec never decides what to do with it.
+          // else — zodec never decides what to do with it. The *parsed* value is
+          // what's sent, so the schema also serializes the response: unknown keys
+          // are stripped and transforms/defaults applied (use `.loose()` to keep
+          // extra keys). Without a schema, the value is sent as-is.
           const schema = route.responses[status]?.schema;
+          let output: unknown = value;
           if (schema) {
             const result = schema.safeParse(value);
             if (!result.success) {
               next(new ValidationError(500, result.error.issues));
               return;
             }
+            output = result.data;
           }
-          res.status(status).json(value);
+          res.status(status).json(output);
         }, next);
       } catch (err) {
         next(err);

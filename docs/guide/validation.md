@@ -16,6 +16,20 @@ return value is checked against the matching `@Returns` schema, and a mismatch
 **always throws** a [`ValidationError`](/api/classes/ValidationError) — in every
 environment.
 
+### The response schema also serializes the response
+
+zodec sends the **parsed** result, not the raw return value, so the `@Returns`
+schema doubles as a response serializer:
+
+- **Undeclared fields are stripped.** Return `{ id, passwordHash }` from a handler
+  whose schema is `z.object({ id: z.string() })` and only `{ id }` goes out — a
+  built-in guard against leaking internal fields.
+- **Transforms and defaults apply** on the way out, exactly like request parsing.
+- **Opt out with `.loose()`** (`z.object({ … }).loose()`) to pass extra keys
+  through unchanged.
+
+A route with no `@Returns` schema sends the value untouched.
+
 ## Errors flow through Express
 
 zodec never sends an error response itself. A failed validation calls
