@@ -29,6 +29,7 @@ import {
   type OpenApiInfo,
   type SpecVersion,
 } from './swagger.js';
+import { generateContractDocument, type ContractOptions, type ZodecContract } from './contract.js';
 
 /**
  * Per-request values the handler's injected parameters resolve from. Each source
@@ -669,6 +670,23 @@ export class Zodec {
       tags: this.options.tags,
       schemas: options.schemas,
     });
+  }
+
+  /**
+   * Builds the high-fidelity {@link ZodecContract} (the codegen IR) from the
+   * registered controllers' metadata — the contract sibling of {@link Zodec.swagger}.
+   * Independent of {@link Zodec.mount}; serialize it to `contract.json` for a
+   * client generator.
+   *
+   * @param options - Extra inputs, e.g. route-less `schemas` (named via `.meta({ id })`).
+   * @returns The validated contract document.
+   */
+  public contract(options: ContractOptions = {}): ZodecContract {
+    const sources = this.controllers.map(({ instance, prefix }) => ({
+      prototype: Object.getPrototypeOf(instance) as object,
+      basePrefix: prefix,
+    }));
+    return generateContractDocument(sources, this.options.info, options);
   }
 
   /**

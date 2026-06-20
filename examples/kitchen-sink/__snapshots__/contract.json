@@ -1,0 +1,923 @@
+{
+  "zodecContract": "0.1",
+  "info": {
+    "title": "Kitchen Sink API",
+    "version": "1.0.0",
+    "description": "Exercises every zodec feature end to end.",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "operations": [
+    {
+      "operationId": "check",
+      "method": "get",
+      "path": "/v1/health",
+      "tags": [
+        "Health"
+      ],
+      "summary": "Liveness probe",
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "Health"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "events",
+      "method": "get",
+      "path": "/v1/health/events",
+      "tags": [
+        "Health"
+      ],
+      "summary": "Stream a few health pings (Server-Sent Events)",
+      "responses": {
+        "200": {
+          "sse": {
+            "schema": {
+              "kind": "ref",
+              "id": "Health"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operationId": "rawPing",
+      "method": "get",
+      "path": "/v1/health/raw",
+      "tags": [
+        "Health"
+      ],
+      "summary": "Plain-text ping, written straight to the Express response",
+      "responses": {}
+    },
+    {
+      "operationId": "list",
+      "method": "get",
+      "path": "/v1/users",
+      "tags": [
+        "Users"
+      ],
+      "summary": "List users (paginated)",
+      "query": {
+        "kind": "ref",
+        "id": "PaginationQuery"
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "UserList"
+          },
+          "headers": {
+            "X-Total-Count": {
+              "kind": "number"
+            }
+          }
+        }
+      }
+    },
+    {
+      "operationId": "get",
+      "method": "get",
+      "path": "/v1/users/{id}",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Fetch a single user by id",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "User"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "related",
+      "method": "get",
+      "path": "/v1/users/{id}/related",
+      "tags": [
+        "Users"
+      ],
+      "summary": "List users related to a given user (paginated)",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "query": {
+        "kind": "ref",
+        "id": "PaginationQuery"
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "UserList"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "getUserAvatarUrl",
+      "method": "get",
+      "path": "/v1/users/{id}/avatar",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Avatar URL for a user (no method-level schema on this route)",
+      "description": "Returns a URL string. Superseded by `GET {id}/avatar/raw`, which streams the image with HTTP Range support.",
+      "deprecated": true,
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "object",
+            "properties": {
+              "url": {
+                "schema": {
+                  "kind": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    {
+      "operationId": "export",
+      "method": "get",
+      "path": "/v1/users/{id}/export",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Download a user as a CSV file",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "responses": {
+        "200": {
+          "file": {
+            "contentType": "text/csv"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "uploadAvatar",
+      "method": "post",
+      "path": "/v1/users/{id}/avatar",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Upload an avatar image for a user",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "body": {
+        "mediaType": "multipart/form-data",
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "avatar": {
+              "schema": {
+                "kind": "file"
+              }
+            },
+            "caption": {
+              "schema": {
+                "kind": "string",
+                "maxLength": 140
+              },
+              "optional": true
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "UploadResult"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "uploadPhotos",
+      "method": "post",
+      "path": "/v1/users/{id}/photos",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Upload multiple photos for a user",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "body": {
+        "mediaType": "multipart/form-data",
+        "schema": {
+          "kind": "object",
+          "properties": {
+            "photos": {
+              "schema": {
+                "kind": "array",
+                "element": {
+                  "kind": "file"
+                },
+                "maxItems": 8
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "object",
+            "properties": {
+              "uploaded": {
+                "schema": {
+                  "kind": "number"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "getAvatar",
+      "method": "get",
+      "path": "/v1/users/{id}/avatar/raw",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Download a user avatar (supports HTTP Range)",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "responses": {
+        "200": {
+          "file": {
+            "contentType": "application/octet-stream"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "create",
+      "method": "post",
+      "path": "/v1/users",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Create a user",
+      "body": {
+        "mediaType": "application/json",
+        "schema": {
+          "kind": "ref",
+          "id": "CreateUser"
+        }
+      },
+      "responses": {
+        "201": {
+          "schema": {
+            "kind": "ref",
+            "id": "User"
+          }
+        },
+        "422": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "replace",
+      "method": "put",
+      "path": "/v1/users/{id}",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Replace a user",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "body": {
+        "mediaType": "application/json",
+        "schema": {
+          "kind": "ref",
+          "id": "CreateUser"
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "User"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "update",
+      "method": "patch",
+      "path": "/v1/users/{id}",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Partially update a user",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "body": {
+        "mediaType": "application/json",
+        "schema": {
+          "kind": "ref",
+          "id": "UpdateUser"
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "User"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "remove",
+      "method": "delete",
+      "path": "/v1/users/{id}",
+      "tags": [
+        "Users"
+      ],
+      "summary": "Delete a user (admin only)",
+      "params": {
+        "kind": "object",
+        "properties": {
+          "id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "responses": {
+        "204": {},
+        "401": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        },
+        "403": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        },
+        "404": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      },
+      "security": [
+        {
+          "scheme": "bearer",
+          "scopes": [
+            "admin"
+          ]
+        }
+      ]
+    },
+    {
+      "operationId": "login",
+      "method": "post",
+      "path": "/v1/auth/login",
+      "tags": [
+        "Auth"
+      ],
+      "summary": "Exchange credentials for a bearer token",
+      "body": {
+        "mediaType": "application/json",
+        "schema": {
+          "kind": "ref",
+          "id": "Login"
+        }
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "Token"
+          }
+        },
+        "401": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      }
+    },
+    {
+      "operationId": "me",
+      "method": "get",
+      "path": "/v1/auth/me",
+      "tags": [
+        "Auth"
+      ],
+      "summary": "Return the currently authenticated user",
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "User"
+          }
+        },
+        "401": {
+          "schema": {
+            "kind": "ref",
+            "id": "Error"
+          }
+        }
+      },
+      "security": [
+        {
+          "scheme": "bearer",
+          "scopes": []
+        }
+      ]
+    }
+  ],
+  "schemas": {
+    "Health": {
+      "kind": "object",
+      "properties": {
+        "status": {
+          "schema": {
+            "kind": "literal",
+            "values": [
+              "ok"
+            ]
+          }
+        },
+        "uptimeMs": {
+          "schema": {
+            "kind": "number"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "User": {
+      "kind": "object",
+      "properties": {
+        "id": {
+          "schema": {
+            "kind": "string",
+            "format": "uuid"
+          }
+        },
+        "username": {
+          "schema": {
+            "kind": "string",
+            "minLength": 3,
+            "maxLength": 32
+          }
+        },
+        "email": {
+          "schema": {
+            "kind": "string",
+            "format": "email"
+          }
+        },
+        "role": {
+          "schema": {
+            "kind": "enum",
+            "values": [
+              "admin",
+              "user"
+            ]
+          },
+          "default": "user"
+        },
+        "createdAt": {
+          "schema": {
+            "kind": "string",
+            "format": "datetime"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "UserList": {
+      "kind": "object",
+      "properties": {
+        "items": {
+          "schema": {
+            "kind": "array",
+            "element": {
+              "kind": "ref",
+              "id": "User"
+            }
+          }
+        },
+        "page": {
+          "schema": {
+            "kind": "number"
+          }
+        },
+        "limit": {
+          "schema": {
+            "kind": "number"
+          }
+        },
+        "total": {
+          "schema": {
+            "kind": "number"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PaginationQuery": {
+      "kind": "object",
+      "properties": {
+        "page": {
+          "schema": {
+            "kind": "number",
+            "minimum": 1
+          },
+          "default": 1
+        },
+        "limit": {
+          "schema": {
+            "kind": "number",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "default": 20
+        }
+      },
+      "additionalProperties": false
+    },
+    "Error": {
+      "kind": "object",
+      "properties": {
+        "status": {
+          "schema": {
+            "kind": "number"
+          }
+        },
+        "errors": {
+          "schema": {
+            "kind": "array",
+            "element": {
+              "kind": "object",
+              "properties": {
+                "path": {
+                  "schema": {
+                    "kind": "array",
+                    "element": {
+                      "kind": "string"
+                    }
+                  }
+                },
+                "message": {
+                  "schema": {
+                    "kind": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "UploadResult": {
+      "kind": "object",
+      "properties": {
+        "filename": {
+          "schema": {
+            "kind": "string"
+          }
+        },
+        "contentType": {
+          "schema": {
+            "kind": "string"
+          }
+        },
+        "size": {
+          "schema": {
+            "kind": "number"
+          }
+        },
+        "caption": {
+          "schema": {
+            "kind": "string"
+          },
+          "optional": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "CreateUser": {
+      "kind": "object",
+      "properties": {
+        "username": {
+          "schema": {
+            "kind": "string",
+            "minLength": 3,
+            "maxLength": 32
+          }
+        },
+        "email": {
+          "schema": {
+            "kind": "string",
+            "format": "email"
+          }
+        },
+        "role": {
+          "schema": {
+            "kind": "enum",
+            "values": [
+              "admin",
+              "user"
+            ]
+          },
+          "optional": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "UpdateUser": {
+      "kind": "object",
+      "properties": {
+        "username": {
+          "schema": {
+            "kind": "string",
+            "minLength": 3,
+            "maxLength": 32
+          },
+          "optional": true
+        },
+        "email": {
+          "schema": {
+            "kind": "string",
+            "format": "email"
+          },
+          "optional": true
+        },
+        "role": {
+          "schema": {
+            "kind": "enum",
+            "values": [
+              "admin",
+              "user"
+            ]
+          },
+          "optional": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "Token": {
+      "kind": "object",
+      "properties": {
+        "token": {
+          "schema": {
+            "kind": "string"
+          }
+        },
+        "expiresIn": {
+          "schema": {
+            "kind": "number"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Login": {
+      "kind": "object",
+      "properties": {
+        "username": {
+          "schema": {
+            "kind": "string",
+            "minLength": 3
+          }
+        },
+        "password": {
+          "schema": {
+            "kind": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessageNotification": {
+      "kind": "object",
+      "properties": {
+        "type": {
+          "schema": {
+            "kind": "literal",
+            "values": [
+              "message"
+            ]
+          }
+        },
+        "from": {
+          "schema": {
+            "kind": "string"
+          }
+        },
+        "text": {
+          "schema": {
+            "kind": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PresenceNotification": {
+      "kind": "object",
+      "properties": {
+        "type": {
+          "schema": {
+            "kind": "literal",
+            "values": [
+              "presence"
+            ]
+          }
+        },
+        "userId": {
+          "schema": {
+            "kind": "string"
+          }
+        },
+        "online": {
+          "schema": {
+            "kind": "boolean"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Notification": {
+      "kind": "discriminatedUnion",
+      "discriminator": "type",
+      "variants": [
+        {
+          "kind": "ref",
+          "id": "MessageNotification"
+        },
+        {
+          "kind": "ref",
+          "id": "PresenceNotification"
+        }
+      ]
+    }
+  }
+}

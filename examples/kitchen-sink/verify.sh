@@ -214,29 +214,57 @@ else
 fi
 
 # ----------------------------------------------------------------------------
-# 2. Instance vs static swagger generators must produce identical output
+# 2. Generated artifacts: instance ≡ static, and both match the committed
+#    snapshots in __snapshots__/. Run `UPDATE_SNAPSHOTS=1 bash verify.sh` to
+#    regenerate the snapshots after an intentional change.
 # ----------------------------------------------------------------------------
-echo "==> Comparing instance vs static swagger output"
-npm --prefix "$APP_DIR" run --silent swagger -- "$TMP/instance.json" >/dev/null
-npm --prefix "$APP_DIR" run --silent swagger:static -- "$TMP/static.json" >/dev/null
+echo "==> Validating generated artifacts against snapshots"
+SNAP="$PWD/__snapshots__"
 
-if node -e '
-  const fs = require("fs");
-  const sort = (v) =>
-    Array.isArray(v) ? v.map(sort)
-    : v && typeof v === "object"
-      ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])]))
-      : v;
-  const load = (p) => JSON.stringify(sort(JSON.parse(fs.readFileSync(p, "utf8"))));
-  process.exit(load(process.argv[1]) === load(process.argv[2]) ? 0 : 1);
-' "$TMP/instance.json" "$TMP/static.json"; then
-  echo "    ✓ instance and static swagger match"
-else
-  echo "    ✗ instance and static swagger differ:"
-  diff <(node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1])),null,2))' "$TMP/instance.json") \
-       <(node -e 'console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1])),null,2))' "$TMP/static.json") | head -40
-  fail=1
-fi
+# Deep, key-order-insensitive JSON equality (exit 0 if equal).
+json_eq() {
+  node -e '
+    const fs = require("fs");
+    const sort = (v) =>
+      Array.isArray(v) ? v.map(sort)
+      : v && typeof v === "object"
+        ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sort(v[k])]))
+        : v;
+    const load = (p) => JSON.stringify(sort(JSON.parse(fs.readFileSync(p, "utf8"))));
+    process.exit(load(process.argv[1]) === load(process.argv[2]) ? 0 : 1);
+  ' "$1" "$2"
+}
+
+# artifact <name> <instance-script> <static-script>
+# Generates the instance + static outputs, then either updates the snapshot
+# (UPDATE_SNAPSHOTS=1) or checks instance≡static and instance≡snapshot.
+artifact() {
+  local name="$1" inst="$2" stat="$3" snap="$SNAP/$1.json"
+  npm --prefix "$APP_DIR" run --silent "$inst" -- "$TMP/$name-instance.json" >/dev/null
+  npm --prefix "$APP_DIR" run --silent "$stat" -- "$TMP/$name-static.json" >/dev/null
+
+  if [ "${UPDATE_SNAPSHOTS:-}" = "1" ]; then
+    cp "$TMP/$name-instance.json" "$snap"
+    echo "    ↻ updated snapshot $name.json"
+    return
+  fi
+
+  if json_eq "$TMP/$name-instance.json" "$TMP/$name-static.json"; then
+    echo "    ✓ $name: instance and static generators match"
+  else
+    echo "    ✗ $name: instance and static generators differ"
+    fail=1
+  fi
+  if [ -f "$snap" ] && json_eq "$TMP/$name-instance.json" "$snap"; then
+    echo "    ✓ $name: output matches __snapshots__/$name.json"
+  else
+    echo "    ✗ $name: output differs from __snapshots__/$name.json (run UPDATE_SNAPSHOTS=1 bash verify.sh)"
+    fail=1
+  fi
+}
+
+artifact swagger swagger swagger:static
+artifact contract contract contract:static
 
 echo
 if [ "$fail" -eq 0 ]; then

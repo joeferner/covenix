@@ -6,7 +6,9 @@
   "scripts": {
     "start": "tsx src/main.ts",
     "swagger": "tsx src/generate-swagger-instance.ts",
-    "swagger:static": "tsx src/generate-swagger-static.ts"
+    "swagger:static": "tsx src/generate-swagger-static.ts",
+    "contract": "tsx src/generate-contract-instance.ts",
+    "contract:static": "tsx src/generate-contract-static.ts"
   },
   "dependencies": {
     "@kitchen-sink/schemas": "*",

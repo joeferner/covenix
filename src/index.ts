@@ -79,3 +79,23 @@ export type {
   SpecVersion,
   StaticController,
 } from './swagger.js';
+export {
+  CONTRACT_VERSION,
+  ContractBodySchema,
+  ContractOperationSchema,
+  ContractResponseSchema,
+  SchemaNodeSchema,
+  ZodecContractSchema,
+  generateContract,
+  generateContractDocument,
+  parseContract,
+} from './contract.js';
+export type {
+  ContractBody,
+  ContractOperation,
+  ContractOptions,
+  ContractResponse,
+  PropertyNode,
+  SchemaNode,
+  ZodecContract,
+} from './contract.js';

@@ -7,5 +7,9 @@ docs/api/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
 
-# Generated swagger output from examples
+# Ad-hoc generated output from examples (default filenames written to the cwd)
 examples/**/swagger.json
+examples/**/contract.json
+# ...but keep the committed snapshots used by verify.sh
+!examples/**/__snapshots__/swagger.json
+!examples/**/__snapshots__/contract.json
