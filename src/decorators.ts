@@ -139,30 +139,43 @@ export function Body(schema: ZodType): MethodDecorator {
  * responds `500`), and the schema is emitted in the generated OpenAPI document.
  * Omit `schema` for a no-body response (e.g. `@Returns(204)`).
  *
+ * Usable on a method or on the **controller class**, where it declares a *shared*
+ * response merged into every route in the class (e.g. a common `401`/`422` error
+ * shape) — a route's own `@Returns` for the same status overrides the shared one.
+ *
  * @param status - HTTP status code, e.g. `200`.
  * @param schema - Zod schema for the response body; omit for no body.
  * @param options - Extra response metadata, e.g. `headers` or `description`.
  *
  * @example
  * ```ts
- * @Returns(200, UserListSchema, {
- *   description: 'A page of users',
- *   headers: { 'X-Total-Count': z.number().int() },
- * })
+ * @Route('users')
+ * @Returns(401, ErrorSchema)   // shared by every route in the controller
+ * @Returns(422, ErrorSchema)
+ * class UsersController {
+ *   @Get('{id}')
+ *   @Returns(200, UserSchema)
+ *   @Returns(404, NotFoundSchema) // route-specific, on top of the shared ones
+ *   get() {}
+ * }
  * ```
  */
 export function Returns(
   status: number,
   schema?: ZodType,
   options?: ReturnsOptions,
-): MethodDecorator {
-  return (target, propertyKey) => {
-    addReturnSchema(target, String(propertyKey), status, schema);
+): ClassDecorator & MethodDecorator {
+  return (target: object, propertyKey?: string | symbol): void => {
+    // Class-level (no propertyKey) writes to the controller's shared responses;
+    // the metadata setters branch on a `undefined` handler name.
+    const handlerName = propertyKey === undefined ? undefined : String(propertyKey);
+    const proto = propertyKey === undefined ? (target as { prototype: object }).prototype : target;
+    addReturnSchema(proto, handlerName, status, schema);
     if (options?.headers) {
-      addResponseHeaders(target, String(propertyKey), status, options.headers);
+      addResponseHeaders(proto, handlerName, status, options.headers);
     }
     if (options?.description !== undefined) {
-      addResponseDescription(target, String(propertyKey), status, options.description);
+      addResponseDescription(proto, handlerName, status, options.description);
     }
   };
 }

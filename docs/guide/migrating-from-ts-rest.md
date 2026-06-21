@@ -151,7 +151,7 @@ Three differences to internalize:
 | `summary` / `metadata`                                 | `@Summary` / `@Description` / `@OperationId`           | First-class decorators.                                        |
 | `strictStatusCodes`                                    | always validates the matched `@Returns`                | zodec validates the response you actually send.                |
 | `pathPrefix: '/v1'` (router option)                    | `api.group('/v1', …)` / `register(c, { prefix })`      | See [Grouping & Versioning](/guide/versioning).                |
-| `commonResponses` / `baseHeaders`                      | shared Zod schemas + `@Returns` (no built-in merge)    | Compose with plain schema reuse.                               |
+| `commonResponses` / `baseHeaders`                      | class-level `@Returns(status, Schema, { headers })`    | Shared responses merged into every route; route-level wins.    |
 | `initServer().router(contract, {...})`                 | `new C(deps)` + `api.register(c)`                      | Implementation lives on the class; explicit construction.      |
 | `createExpressEndpoints(contract, router, app)`        | `api.mount(app)`                                       | Wires routes + validation.                                     |
 | `globalMiddleware` / per-route middleware              | `@Use(...)` (class or method)                          | Express middleware.                                            |
@@ -216,9 +216,17 @@ createExpressEndpoints(contract, router, app, { responseValidation: true });
 async getUser(@Param('id') id: string) { return this.service.get(id); }
 ```
 
-If you relied on `commonResponses` for shared error shapes, just reuse a shared
-Zod schema across `@Returns(4xx, ErrorSchema)` declarations — there's no implicit
-merge, but the schema is a value you import like any other.
+`commonResponses` maps onto a **class-level `@Returns`**: declare the shared error
+shape once on the controller and it's merged into every route (a route's own
+`@Returns` for the same status overrides it). See
+[Shared responses](/guide/route-handlers#shared-responses).
+
+```typescript
+@Route('users')
+@Returns(401, ErrorSchema) // shared across every route, like commonResponses
+@Returns(422, ErrorSchema)
+class UsersController {}
+```
 
 ## Files, downloads, range, and SSE
 

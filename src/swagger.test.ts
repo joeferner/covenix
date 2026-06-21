@@ -615,3 +615,52 @@ describe('api.swagger()', () => {
     expect(fromClasses).toEqual(fromInstance);
   });
 });
+
+describe('shared (class-level) @Returns', () => {
+  const ApiError = z.object({ message: z.string() }).meta({ id: 'ApiError' });
+  const NotFound = z.object({ detail: z.string() }).meta({ id: 'NotFound' });
+
+  @Route('widgets')
+  @Returns(401, ApiError, { description: 'Unauthorized' })
+  @Returns(422, ApiError)
+  class WidgetController {
+    @Get()
+    @Returns(200, z.object({ ok: z.boolean() }))
+    public list(): null {
+      return null;
+    }
+
+    @Get('{id}')
+    @Returns(200, z.object({ ok: z.boolean() }))
+    @Returns(422, NotFound) // overrides the shared 422 for this route only
+    public get(): null {
+      return null;
+    }
+  }
+
+  function doc(): ReturnType<Zodec['swagger']> {
+    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    api.register(new WidgetController());
+    return api.swagger();
+  }
+
+  it('merges shared responses into every route in the controller', () => {
+    const responses = doc().paths?.['/widgets']?.get?.responses;
+    expect(Object.keys(responses ?? {}).sort()).toEqual(['200', '401', '422']);
+    expect(responses?.['401']).toMatchObject({
+      description: 'Unauthorized',
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+    });
+  });
+
+  it("lets a route's own @Returns override the shared one for the same status", () => {
+    const responses = doc().paths?.['/widgets/{id}']?.get?.responses;
+    // 401 still shared; 422 is the route-specific NotFound, not the shared ApiError.
+    expect(responses?.['401']).toMatchObject({
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+    });
+    expect(responses?.['422']).toMatchObject({
+      content: { 'application/json': { schema: { $ref: '#/components/schemas/NotFound' } } },
+    });
+  });
+});

@@ -45,8 +45,32 @@ Two rules underpin everything below:
 | `@Tags(...names)`          | OpenAPI tags for the class's operations; the first tag names the generated client group.                      |
 | `@Security(name, scopes?)` | Require a named security scheme for **all** routes in the class. See [Authentication](/guide/authentication). |
 | `@Use(...middleware)`      | Express middleware applied to every route in the class. See [middleware](#middleware-use).                    |
+| `@Returns(status, …)`      | A **shared response** merged into every route in the class (see [below](#shared-responses)).                  |
 
-`@Security` and `@Use` also work at the method level (below).
+`@Security`, `@Use`, and `@Returns` work at both the class and method level.
+
+### Shared responses {#shared-responses}
+
+Applying `@Returns` to the **controller class** declares a response shared by every
+route in it — handy for common error shapes you'd otherwise repeat on each method:
+
+```typescript
+@Route('users')
+@Returns(401, ErrorSchema) // every route documents 401…
+@Returns(422, ErrorSchema) // …and 422
+export class UsersController {
+  @Get('{id}')
+  @Returns(200, UserSchema)
+  @Returns(422, NotFoundSchema) // route-specific — overrides the shared 422 here
+  get(@Param('id') id: string) {}
+}
+```
+
+The shared responses are merged into each operation's OpenAPI `responses` (and the
+generated client's `.raw()` union); a route's own `@Returns` for the **same status**
+takes precedence. `headers` and `description` on a shared `@Returns` carry through
+too. (Shared responses are per-controller; declare them on each controller that
+needs them.)
 
 ## HTTP method decorators
 

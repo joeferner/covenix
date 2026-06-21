@@ -175,6 +175,8 @@ interface ControllerEntry {
   tags?: string[];
   security?: SecurityRequirement[];
   middleware?: RequestHandler[];
+  /** Shared responses (class-level `@Returns`) merged into every route in the class. */
+  commonResponses?: Record<number, ResponseMetadata>;
 }
 
 /** Reads a method's route entry without creating one. */
@@ -193,10 +195,27 @@ function routeEntry(target: object, handlerName: string): RouteEntry {
   return created;
 }
 
-/** Gets (creating + storing if needed) the per-status entry within a route. */
-function responseEntry(entry: RouteEntry, status: number): ResponseMetadata {
-  entry.responses ??= {};
-  return (entry.responses[status] ??= {});
+/** Gets (creating + storing if needed) the per-status entry within a responses map. */
+function responseEntry(
+  responses: Record<number, ResponseMetadata>,
+  status: number,
+): ResponseMetadata {
+  return (responses[status] ??= {});
+}
+
+/**
+ * The responses map a `@Returns` writes to: a method's own (`handlerName` set) or
+ * the controller's shared `commonResponses` (class-level, `handlerName` omitted).
+ */
+function responsesFor(
+  target: object,
+  handlerName: string | undefined,
+): Record<number, ResponseMetadata> {
+  if (handlerName === undefined) {
+    return (controllerEntry(target).commonResponses ??= {});
+  }
+  const entry = routeEntry(target, handlerName);
+  return (entry.responses ??= {});
 }
 
 /** Reads the controller entry without creating one. */
@@ -246,13 +265,13 @@ export function setHttpMethod(
  */
 export function addReturnSchema(
   target: object,
-  handlerName: string,
+  handlerName: string | undefined,
   status: number,
   schema?: ZodType,
 ): void {
-  const response = responseEntry(routeEntry(target, handlerName), status);
+  const response = responseEntry(responsesFor(target, handlerName), status);
   if (response.file || response.sse) {
-    throw STATUS_CONFLICT(handlerName, status);
+    throw STATUS_CONFLICT(handlerName ?? '<class>', status);
   }
   response.schema = schema;
 }
@@ -275,22 +294,22 @@ export function setBodySchema(target: object, handlerName: string, schema: ZodTy
 /** Records response headers for a status code. Called by `@Returns`. */
 export function addResponseHeaders(
   target: object,
-  handlerName: string,
+  handlerName: string | undefined,
   status: number,
   headers: Record<string, ZodType>,
 ): void {
-  const response = responseEntry(routeEntry(target, handlerName), status);
+  const response = responseEntry(responsesFor(target, handlerName), status);
   response.headers = { ...response.headers, ...headers };
 }
 
 /** Records a response description for a status code. Called by `@Returns`. */
 export function addResponseDescription(
   target: object,
-  handlerName: string,
+  handlerName: string | undefined,
   status: number,
   description: string,
 ): void {
-  responseEntry(routeEntry(target, handlerName), status).description = description;
+  responseEntry(responsesFor(target, handlerName), status).description = description;
 }
 
 /** Records a binary/file response for a status code. Called by `@ReturnsFile`. */
@@ -300,7 +319,7 @@ export function addFileResponse(
   status: number,
   decl: FileResponseDecl,
 ): void {
-  const response = responseEntry(routeEntry(target, handlerName), status);
+  const response = responseEntry(responsesFor(target, handlerName), status);
   if ('schema' in response || response.sse) {
     throw STATUS_CONFLICT(handlerName, status);
   }
@@ -314,7 +333,7 @@ export function addSseResponse(
   status: number,
   decl: SseResponseDecl,
 ): void {
-  const response = responseEntry(routeEntry(target, handlerName), status);
+  const response = responseEntry(responsesFor(target, handlerName), status);
   if ('schema' in response || response.file) {
     throw STATUS_CONFLICT(handlerName, status);
   }
@@ -455,6 +474,7 @@ export function getRoutes(target: object): RouteMetadata[] {
   const tags = controller.tags && controller.tags.length > 0 ? controller.tags : undefined;
   const classSecurity = controller.security;
   const classMiddleware = controller.middleware ?? [];
+  const commonResponses = controller.commonResponses ?? {};
   return names.map((handlerName) => {
     const entry = readRoute(target, handlerName) ?? {};
     // Class-level @Use runs before the route's own.
@@ -466,7 +486,8 @@ export function getRoutes(target: object): RouteMetadata[] {
       params: entry.params,
       query: entry.query,
       body: entry.body,
-      responses: entry.responses ?? {},
+      // Class-level shared responses, with the route's own taking precedence per status.
+      responses: { ...commonResponses, ...(entry.responses ?? {}) },
       tags,
       summary: entry.summary,
       description: entry.description,
