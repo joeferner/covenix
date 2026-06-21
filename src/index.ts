@@ -39,6 +39,7 @@ export type {
 } from './range-file-response.js';
 export {
   BodyParam,
+  createParamDecorator,
   File,
   Files,
   Header,
@@ -48,6 +49,7 @@ export {
   Req,
   Res,
 } from './parameters.js';
+export type { ParamContext, ParamResolver } from './metadata.js';
 export { bearer, basic, apiKey, oauth2 } from './security.js';
 export type {
   BearerOptions,

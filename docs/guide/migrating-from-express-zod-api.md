@@ -298,7 +298,11 @@ you'd rather wire Express by hand, `api.mount(app)` is still there.
   abstraction; zodec leaves logging and config to you.
 - **The `EndpointsFactory` middleware-composition model.** zodec uses plain Express
   middleware via `@Use` and first-class `@Security` instead of factory-composed,
-  option-contributing middleware.
+  option-contributing middleware. For the common case — middleware that contributes
+  a typed value the handler consumes (a tenant, a request-scoped lookup) — use
+  [`createParamDecorator`](/guide/route-handlers#custom-injectors-createparamdecorator):
+  its resolver runs per request (sync or async) and injects the value as a handler
+  argument.
 
 If you hit an express-zod-api feature without an obvious zodec equivalent, please
 [open an issue](https://github.com/joeferner/zodec/issues).

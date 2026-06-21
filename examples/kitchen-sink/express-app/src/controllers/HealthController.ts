@@ -1,6 +1,18 @@
 import type { Request, RequestHandler, Response } from 'express';
 import { z } from 'zod';
-import { Route, Tags, Get, Returns, Summary, Sse, Use, Req, Res, Header } from 'zodec';
+import {
+  Route,
+  Tags,
+  Get,
+  Returns,
+  Summary,
+  Sse,
+  Use,
+  Req,
+  Res,
+  createParamDecorator,
+  HttpResponse,
+} from 'zodec';
 
 const HealthSchema = z
   .object({
@@ -16,6 +28,12 @@ const stampSource: RequestHandler = (_req, res, next) => {
   next();
 };
 
+// A custom parameter decorator built with createParamDecorator. The resolver runs
+// per request with `{ req, res }` (and any `data` you pass) and may be sync or
+// async; its value is injected as a handler argument. @Principal() is built the
+// same way.
+const ClientIp = createParamDecorator(({ req }) => req.ip ?? 'unknown');
+
 @Route('health')
 @Tags('Health')
 @Use(stampSource)
@@ -25,9 +43,13 @@ export class HealthController {
   @Get()
   @Summary('Liveness probe')
   @Returns(200, HealthSchema)
-  public check(@Header('user-agent') userAgent: string | undefined): z.infer<typeof HealthSchema> {
-    void userAgent;
-    return { status: 'ok', uptimeMs: Date.now() - this.startedAt };
+  public check(@ClientIp() ip: string): HttpResponse<z.infer<typeof HealthSchema>> {
+    // The body is still validated/serialized by HealthSchema; X-Client-IP is an
+    // undeclared header (not in @Returns), so it's allowed but stays out of the spec.
+    return new HttpResponse(
+      { status: 'ok', uptimeMs: Date.now() - this.startedAt },
+      { headers: { 'X-Client-IP': ip } },
+    );
   }
 
   // Server-Sent Events: the handler returns an async generator and zodec frames

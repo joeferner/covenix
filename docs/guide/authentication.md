@@ -3,7 +3,7 @@
 Protect a route with [`@Security`](/api/functions/Security). It names a scheme
 you register on the `Zodec` instance; before the handler runs, zodec invokes that
 scheme's handler, and the principal it returns is injected with
-[`@Principal()`](/api/functions/Principal). The same registration drives the
+[`@Principal()`](/api/variables/Principal). The same registration drives the
 OpenAPI `securitySchemes` + per-operation `security`, so the spec always matches
 what's enforced.
 

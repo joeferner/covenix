@@ -9,6 +9,7 @@ import {
   type SecurityRequirement,
   type SseResponseDecl,
 } from './metadata.js';
+import { ZODEC_PRINCIPAL } from './parameters.js';
 import { Readable } from 'node:stream';
 import { Blob, File } from 'node:buffer';
 import { openAsBlob } from 'node:fs';
@@ -213,9 +214,6 @@ interface RawMultipartFile {
 /** Where the adapted `File`s are stashed on the request, keyed by field name. */
 const ZODEC_FILES = Symbol('zodec:files');
 
-/** Where the resolved `@Security` principal is stashed on the request. */
-const ZODEC_PRINCIPAL = Symbol('zodec:principal');
-
 /** Adapts a multer file into a web-standard `File` the handler can consume. */
 async function toWebFile(file: RawMultipartFile): Promise<File> {
   if (file.buffer) {
@@ -290,7 +288,9 @@ function resolveParam(
   values: RequestValues,
   req: Request,
   res: Response,
-): unknown {
+  // The Promise arm documents that custom resolvers may be async (buildArgs awaits).
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+): unknown | Promise<unknown> {
   switch (param.source) {
     case 'param':
       return param.name ? values.params[param.name] : values.params;
@@ -306,8 +306,9 @@ function resolveParam(
       return req;
     case 'res':
       return res;
-    case 'principal':
-      return (req as unknown as Record<symbol, unknown>)[ZODEC_PRINCIPAL];
+    case 'custom':
+      // A createParamDecorator resolver; may be sync or async (awaited by buildArgs).
+      return param.resolve?.({ req, res });
   }
 }
 
@@ -654,18 +655,22 @@ async function streamSse(
 
 /**
  * Builds the handler argument array, placing each injected value at its own
- * parameter index. Indexes without a decorator stay `undefined`.
+ * parameter index. Indexes without a decorator stay `undefined`. Custom
+ * (`createParamDecorator`) resolvers may be async, so values are awaited — all
+ * concurrently, since injected parameters are independent.
  */
-function buildArgs(
+async function buildArgs(
   params: ParamMetadata[],
   values: RequestValues,
   req: Request,
   res: Response,
-): unknown[] {
+): Promise<unknown[]> {
   const args: unknown[] = [];
-  for (const param of params) {
-    args[param.index] = resolveParam(param, values, req, res);
-  }
+  await Promise.all(
+    params.map(async (param) => {
+      args[param.index] = await resolveParam(param, values, req, res);
+    }),
+  );
   return args;
 }
 
@@ -947,10 +952,16 @@ export class Zodec {
     }
     const params = getParams(proto, route.handlerName);
     return (req, res, next) => {
+      let values: RequestValues;
       try {
-        const values = validate(route, req);
-        const args = buildArgs(params, values, req, res);
-        Promise.resolve(fn.apply(instance, args)).then((value: unknown) => {
+        values = validate(route, req);
+      } catch (err) {
+        next(err);
+        return;
+      }
+      buildArgs(params, values, req, res)
+        .then((args) => fn.apply(instance, args))
+        .then((value: unknown) => {
           // A handler using @Res() writes the response itself — don't double-send.
           if (res.headersSent) {
             return;
@@ -995,10 +1006,8 @@ export class Zodec {
             output = result.data;
           }
           res.status(status).json(output);
-        }, next);
-      } catch (err) {
-        next(err);
-      }
+        })
+        .catch(next);
     };
   }
 }

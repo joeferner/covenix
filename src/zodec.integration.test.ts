@@ -26,6 +26,7 @@ import {
 } from './decorators.js';
 import {
   BodyParam,
+  createParamDecorator,
   File,
   Files,
   Header,
@@ -310,6 +311,76 @@ describe('zodecErrorHandler', () => {
     expect(res.headers['content-type']).toContain('application/json');
     expect(res.headers['content-type']).not.toContain('problem');
     expect(body).toEqual({ ok: false, count: 1 });
+  });
+});
+
+describe('createParamDecorator', () => {
+  const Echoed = z.object({ value: z.string() });
+
+  // Sync resolver reading from req.
+  const ClientIp = createParamDecorator(({ req }) => req.ip ?? 'unknown');
+  // Resolver with a `data` argument.
+  const HeaderVal = createParamDecorator(({ req }, name: string) => req.headers[name]);
+  // Async resolver — the value is awaited before injection.
+  const AsyncVal = createParamDecorator(async () => {
+    await Promise.resolve();
+    return 'async-value';
+  });
+  // Throwing resolver — routed through the error pipeline.
+  const Boom = createParamDecorator(() => {
+    throw new SecurityError(403, 'denied by resolver');
+  });
+
+  @Route('cpd')
+  class CpdController {
+    @Get('ip')
+    @Returns(200, Echoed)
+    public ip(@ClientIp() ip: string): z.infer<typeof Echoed> {
+      return { value: ip };
+    }
+
+    @Get('header')
+    @Returns(200, Echoed)
+    public header(@HeaderVal('x-thing') thing: string): z.infer<typeof Echoed> {
+      return { value: thing };
+    }
+
+    @Get('async')
+    @Returns(200, Echoed)
+    public asyncVal(@AsyncVal() v: string): z.infer<typeof Echoed> {
+      return { value: v };
+    }
+
+    @Get('boom')
+    @Returns(200, Echoed)
+    public boom(@Boom() _v: unknown): z.infer<typeof Echoed> {
+      return { value: 'never' };
+    }
+  }
+
+  it('injects a sync resolver value', async () => {
+    const res = await request(makeApp(new CpdController())).get('/cpd/ip');
+    expect(res.status).toBe(200);
+    expect(typeof (res.body as { value: unknown }).value).toBe('string');
+  });
+
+  it('passes the decorator data argument to the resolver', async () => {
+    const res = await request(makeApp(new CpdController()))
+      .get('/cpd/header')
+      .set('x-thing', 'hello');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ value: 'hello' });
+  });
+
+  it('awaits an async resolver', async () => {
+    const res = await request(makeApp(new CpdController())).get('/cpd/async');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ value: 'async-value' });
+  });
+
+  it('routes a throwing resolver through the error pipeline', async () => {
+    const res = await request(makeAppWithErrorHandler(new CpdController())).get('/cpd/boom');
+    expect(res.status).toBe(403);
   });
 });
 

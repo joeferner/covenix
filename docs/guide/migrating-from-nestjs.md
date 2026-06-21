@@ -127,6 +127,7 @@ Three things collapse into one:
 | `@Body() body: CreateUserDto`                               | `@Body(Schema)` + `@BodyParam() body`                         | Same split.                                                 |
 | `@Headers('x-id') id`                                       | `@Header('x-id') id`                                          | Injection; validate in a schema if needed.                  |
 | `@Req() req` / `@Res() res`                                 | `@Req() req` / `@Res() res`                                   | Escape hatch.                                               |
+| `createParamDecorator((data, ctx) => …)`                    | `createParamDecorator(({ req, res }, data) => …)`             | Custom injectors; sync or async resolver.                   |
 | class-validator (`@IsString`, `@Length`, …)                 | Zod (`z.string().min().max()`)                                | Runtime types move to schemas.                              |
 | `class XDto` + `class-transformer`                          | `z.object({…}).meta({ id: 'X' })` + `z.infer`                 | `.meta({ id })` names the component.                        |
 | `@ApiProperty({ … })`                                       | **removed** — read from the Zod schema                        | The no-drift win; no CLI plugin needed.                     |
@@ -495,10 +496,6 @@ yourself about which you depend on before migrating:
   Use Express middleware via `@Use`; response serialization is built in.
 - **Lifecycle hooks.** No `OnModuleInit`/`OnApplicationBootstrap`/`OnModuleDestroy`.
   Do setup/teardown in your own bootstrap code.
-- **Custom parameter decorators.** Nest's `createParamDecorator` lets you mint new
-  injection decorators; zodec's parameter decorator set is fixed (`@Param`,
-  `@QueryParam`, `@BodyParam`, `@Header`, `@File(s)`, `@Principal`, `@Req`, `@Res`).
-  Reach for `@Req()` for anything custom.
 - **The ecosystem.** `@nestjs/config`, `@nestjs/typeorm`, `@nestjs/schedule`,
   `@nestjs/testing`, CLI scaffolding, etc. — none of it applies. zodec is a single
   library; you wire config/ORM/scheduling yourself.

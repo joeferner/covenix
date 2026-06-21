@@ -1,4 +1,51 @@
-import { addParam } from './metadata.js';
+import { addParam, type ParamContext } from './metadata.js';
+
+/**
+ * Where the resolved `@Security` principal is stashed on the request (set by
+ * zodec's security middleware, read by {@link Principal}). Exported for internal
+ * use across modules.
+ *
+ * @internal
+ */
+export const ZODEC_PRINCIPAL = Symbol('zodec:principal');
+
+/**
+ * Builds a custom parameter decorator from a resolver. The resolver runs at
+ * request time with the {@link ParamContext} (`{ req, res }`) plus any `data`
+ * passed where the decorator is applied, and may be **sync or async** — its
+ * resolved value is injected as the handler argument. This is the extension point
+ * for injecting values the built-in decorators don't cover (a cookie, `req.ip`, a
+ * tenant resolved from a header, an awaited per-request value). A resolver that
+ * throws is routed through the normal error pipeline (so `throw createError.X()`
+ * picks the status).
+ *
+ * Type safety note: TypeScript's legacy parameter decorators can't constrain the
+ * annotated parameter type, so (as with `@Principal()`) the handler's parameter
+ * type is developer-asserted — keep it in sync with the resolver's return type.
+ *
+ * @param resolve - Computes the value from `{ req, res }` and the decorator `data`.
+ * @returns A decorator factory; call it (optionally with `data`) on a parameter.
+ *
+ * @example
+ * ```ts
+ * const ClientIp = createParamDecorator(({ req }) => req.ip);
+ * const Cookie = createParamDecorator(({ req }, name: string) => req.cookies?.[name]);
+ *
+ * @Get()
+ * handler(@ClientIp() ip: string | undefined, @Cookie('sid') sid: string | undefined) {}
+ * ```
+ */
+export function createParamDecorator<T, D = undefined>(
+  resolve: (ctx: ParamContext, data: D) => T | Promise<T>,
+): (data?: D) => ParameterDecorator {
+  return (data?: D) => (target, propertyKey, index) => {
+    addParam(target, String(propertyKey), {
+      index,
+      source: 'custom',
+      resolve: (ctx) => resolve(ctx, data as D),
+    });
+  };
+}
 
 /**
  * Injects `req.params[name]` as a handler argument. Resolves to the value parsed
@@ -85,13 +132,12 @@ export function Header(name: string): ParameterDecorator {
 /**
  * Injects the principal returned by the route's `@Security` handler (e.g. the
  * authenticated user). Only meaningful on a route guarded by `@Security`; on an
- * unguarded route it resolves to `undefined`.
+ * unguarded route it resolves to `undefined`. Built on {@link createParamDecorator}
+ * — it's the canonical example of a custom injected value.
  */
-export function Principal(): ParameterDecorator {
-  return (target, propertyKey, index) => {
-    addParam(target, String(propertyKey), { index, source: 'principal' });
-  };
-}
+export const Principal = createParamDecorator(
+  ({ req }) => (req as unknown as Record<symbol, unknown>)[ZODEC_PRINCIPAL],
+);
 
 /**
  * Escape hatch: injects the raw Express `Request` object as a handler argument.

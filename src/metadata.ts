@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import type { ZodType } from 'zod';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 
 /** HTTP methods zodec routes can be mapped to. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
@@ -103,7 +103,28 @@ export interface ExampleMetadata {
 }
 
 /** Where an injected handler parameter is sourced from. */
-export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res' | 'principal';
+export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res' | 'custom';
+
+/**
+ * The per-request context passed to a {@link ParamResolver} (the function behind
+ * a `createParamDecorator`). A single object so new fields can be added later
+ * without breaking existing resolvers.
+ */
+export interface ParamContext {
+  /** The raw Express request. */
+  req: Request;
+  /** The raw Express response. */
+  res: Response;
+}
+
+/**
+ * Resolves the value for a `custom` parameter (built with `createParamDecorator`).
+ * Runs at request time with the {@link ParamContext}; may be sync or async.
+ */
+// `unknown | Promise<unknown>` collapses to `unknown`, but the explicit Promise arm
+// documents that resolvers may be async (the value is awaited before injection).
+// eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
+export type ParamResolver = (ctx: ParamContext) => unknown | Promise<unknown>;
 
 /** Metadata for one injected handler parameter, as returned by {@link getParams}. */
 export interface ParamMetadata {
@@ -113,6 +134,8 @@ export interface ParamMetadata {
   source: ParamSource;
   /** Key name for `param`/`query`/`header` sources; absent otherwise. */
   name?: string | undefined;
+  /** Resolver for a `custom` source (from `createParamDecorator`); absent otherwise. */
+  resolve?: ParamResolver | undefined;
 }
 
 /**

@@ -99,6 +99,32 @@ For status, headers, and cookies, return an [`HttpResponse`](#httpresponse-heade
 instead — you keep validation and a documented contract.
 :::
 
+### Custom injectors (`createParamDecorator`)
+
+The built-ins don't cover everything — a cookie, `req.ip`, a value derived from a
+header, or an awaited per-request lookup. `createParamDecorator` builds your own
+from a resolver that receives `{ req, res }` (plus any `data` you pass) and returns
+the value — **sync or async**:
+
+```typescript
+import { createParamDecorator } from 'zodec';
+
+const ClientIp = createParamDecorator(({ req }) => req.ip);
+const Cookie = createParamDecorator(({ req }, name: string) => req.cookies?.[name]);
+
+@Get()
+handler(@ClientIp() ip: string | undefined, @Cookie('sid') sid: string | undefined) {}
+```
+
+A resolver may return a promise — it's awaited before the handler runs — and a
+throw is routed through the [error pipeline](/guide/validation#errors-flow-through-express),
+so `throw createError.Forbidden()` yields a `403`. `@Principal()` is itself built on
+`createParamDecorator`.
+
+Type note: TypeScript's legacy parameter decorators can't constrain the parameter's
+type, so the annotation (`ip: string | undefined`) is developer-asserted — keep it
+in sync with the resolver's return type (exactly like `@Principal() user: User`).
+
 ## Response decorators
 
 | Decorator                          | Declares                                                                                                                           |

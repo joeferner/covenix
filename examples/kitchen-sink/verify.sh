@@ -78,6 +78,15 @@ else
   echo "    ✗ @Use middleware did not set X-Health-Source"
   fail=1
 fi
+
+# createParamDecorator (ClientIp) injects req.ip; the handler echoes it back as an
+# undeclared header via HttpResponse.
+if curl -s -D - -o /dev/null "$BASE/v1/health" | grep -qi '^x-client-ip:'; then
+  echo "    ✓ createParamDecorator injects the client IP (X-Client-IP header)"
+else
+  echo "    ✗ createParamDecorator value did not reach X-Client-IP"
+  fail=1
+fi
 expect 201 "POST /v1/users (valid)" -X POST "$BASE/v1/users" \
   -H 'content-type: application/json' \
   -d '{"username":"ada","email":"ada@example.com"}'
