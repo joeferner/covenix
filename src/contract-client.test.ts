@@ -85,9 +85,9 @@ describe('generateTypeScriptClient — output', () => {
     expect(client).toContain(
       '(args: { params: { id: string }; headers?: Record<string, string> }): Promise<User>;',
     );
-    // …and .raw returns the per-status union.
+    // …and .raw returns the per-status union, each arm exposing response headers.
     expect(client).toContain(
-      'Promise<{ status: 200; body: User } | { status: 404; body: ApiError }>',
+      'Promise<{ status: 200; body: User; headers: Headers } | { status: 404; body: ApiError; headers: Headers }>',
     );
   });
 
@@ -199,7 +199,9 @@ interface TestClient {
   users: {
     get: {
       (args: { params: { id: string } }): Promise<{ id: string; name: string }>;
-      raw(args: { params: { id: string } }): Promise<{ status: number; body: unknown }>;
+      raw(args: {
+        params: { id: string };
+      }): Promise<{ status: number; body: unknown; headers: Headers }>;
     };
     create(args: { body: { name: string } }): Promise<{ id: string; name: string }>;
     upload(args: { params: { id: string }; body: { avatar: Blob } }): Promise<{ ok: boolean }>;
@@ -334,9 +336,12 @@ describe('generated client — runtime behavior', () => {
     expect(ticks).toEqual([{ tick: 1 }, { tick: 2 }]); // comment frame skipped
   });
 
-  it('.raw returns the { status, body } envelope instead of throwing', async () => {
+  it('.raw returns the { status, body, headers } envelope instead of throwing', async () => {
     const { api } = await loadClient(() => ({ status: 404, body: { message: 'nope' } }));
     const res = await api.users.get.raw({ params: { id: 'missing' } });
     expect(res).toMatchObject({ status: 404, body: { message: 'nope' } });
+    // `.raw()` surfaces response headers as a standard Headers object.
+    expect(res.headers).toBeInstanceOf(Headers);
+    expect(res.headers.get('content-type')).toContain('json');
   });
 });

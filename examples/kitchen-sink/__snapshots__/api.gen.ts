@@ -275,19 +275,19 @@ async function requestRaw(
 export interface Client {
   health: {
     /** Liveness probe */
-    check: { (args?: { headers?: Record<string, string> }): Promise<Health>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: Health }> };
+    check: { (args?: { headers?: Record<string, string> }): Promise<Health>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: Health; headers: Headers }> };
     /** Stream a few health pings (Server-Sent Events) */
-    events: { (args?: { headers?: Record<string, string> }): Promise<AsyncIterable<Health>>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: AsyncIterable<Health> }> };
+    events: { (args?: { headers?: Record<string, string> }): Promise<AsyncIterable<Health>>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: AsyncIterable<Health>; headers: Headers }> };
     /** Plain-text ping, written straight to the Express response */
-    rawPing: { (args?: { headers?: Record<string, string> }): Promise<void>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: number; body: unknown }> };
+    rawPing: { (args?: { headers?: Record<string, string> }): Promise<void>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: number; body: unknown; headers: Headers }> };
   };
   users: {
     /** List users (paginated) */
-    list: { (args?: { query?: PaginationQuery; headers?: Record<string, string> }): Promise<UserList>; raw(args?: { query?: PaginationQuery; headers?: Record<string, string> }): Promise<{ status: 200; body: UserList }> };
+    list: { (args?: { query?: PaginationQuery; headers?: Record<string, string> }): Promise<UserList>; raw(args?: { query?: PaginationQuery; headers?: Record<string, string> }): Promise<{ status: 200; body: UserList; headers: Headers }> };
     /** Fetch a single user by id */
-    get: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: User } | { status: 404; body: Error }> };
+    get: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** List users related to a given user (paginated) */
-    related: { (args: { params: { id: string }; query?: PaginationQuery; headers?: Record<string, string> }): Promise<UserList>; raw(args: { params: { id: string }; query?: PaginationQuery; headers?: Record<string, string> }): Promise<{ status: 200; body: UserList } | { status: 404; body: Error }> };
+    related: { (args: { params: { id: string }; query?: PaginationQuery; headers?: Record<string, string> }): Promise<UserList>; raw(args: { params: { id: string }; query?: PaginationQuery; headers?: Record<string, string> }): Promise<{ status: 200; body: UserList; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /**
      * Avatar URL for a user (no method-level schema on this route)
      *
@@ -295,29 +295,29 @@ export interface Client {
      *
      * @deprecated
      */
-    getUserAvatarUrl: { (args?: { headers?: Record<string, string> }): Promise<{ url: string }>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: { url: string } }> };
+    getUserAvatarUrl: { (args?: { headers?: Record<string, string> }): Promise<{ url: string }>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: { url: string }; headers: Headers }> };
     /** Download a user as a CSV file */
-    export: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<Blob>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: Blob } | { status: 404; body: Error }> };
+    export: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<Blob>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: Blob; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Upload an avatar image for a user */
-    uploadAvatar: { (args: { params: { id: string }; body: { avatar: File | Blob; caption?: string }; headers?: Record<string, string> }): Promise<UploadResult>; raw(args: { params: { id: string }; body: { avatar: File | Blob; caption?: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: UploadResult } | { status: 404; body: Error }> };
+    uploadAvatar: { (args: { params: { id: string }; body: { avatar: File | Blob; caption?: string }; headers?: Record<string, string> }): Promise<UploadResult>; raw(args: { params: { id: string }; body: { avatar: File | Blob; caption?: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: UploadResult; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Upload multiple photos for a user */
-    uploadPhotos: { (args: { params: { id: string }; body: { photos: Array<File | Blob> }; headers?: Record<string, string> }): Promise<{ uploaded: number }>; raw(args: { params: { id: string }; body: { photos: Array<File | Blob> }; headers?: Record<string, string> }): Promise<{ status: 200; body: { uploaded: number } } | { status: 404; body: Error }> };
+    uploadPhotos: { (args: { params: { id: string }; body: { photos: Array<File | Blob> }; headers?: Record<string, string> }): Promise<{ uploaded: number }>; raw(args: { params: { id: string }; body: { photos: Array<File | Blob> }; headers?: Record<string, string> }): Promise<{ status: 200; body: { uploaded: number }; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Download a user avatar (supports HTTP Range) */
-    getAvatar: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<Blob>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: Blob } | { status: 404; body: Error }> };
+    getAvatar: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<Blob>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 200; body: Blob; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Create a user */
-    create: { (args: { body: CreateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { body: CreateUser; headers?: Record<string, string> }): Promise<{ status: 201; body: User } | { status: 422; body: Error }> };
+    create: { (args: { body: CreateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { body: CreateUser; headers?: Record<string, string> }): Promise<{ status: 201; body: User; headers: Headers } | { status: 422; body: Error; headers: Headers }> };
     /** Replace a user */
-    replace: { (args: { params: { id: string }; body: CreateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; body: CreateUser; headers?: Record<string, string> }): Promise<{ status: 200; body: User } | { status: 404; body: Error }> };
+    replace: { (args: { params: { id: string }; body: CreateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; body: CreateUser; headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Partially update a user */
-    update: { (args: { params: { id: string }; body: UpdateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; body: UpdateUser; headers?: Record<string, string> }): Promise<{ status: 200; body: User } | { status: 404; body: Error }> };
+    update: { (args: { params: { id: string }; body: UpdateUser; headers?: Record<string, string> }): Promise<User>; raw(args: { params: { id: string }; body: UpdateUser; headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
     /** Delete a user (admin only) */
-    remove: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<void>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 204; body: void } | { status: 401; body: Error } | { status: 403; body: Error } | { status: 404; body: Error }> };
+    remove: { (args: { params: { id: string }; headers?: Record<string, string> }): Promise<void>; raw(args: { params: { id: string }; headers?: Record<string, string> }): Promise<{ status: 204; body: void; headers: Headers } | { status: 401; body: Error; headers: Headers } | { status: 403; body: Error; headers: Headers } | { status: 404; body: Error; headers: Headers }> };
   };
   auth: {
     /** Exchange credentials for a bearer token */
-    login: { (args: { body: Login; headers?: Record<string, string> }): Promise<Token>; raw(args: { body: Login; headers?: Record<string, string> }): Promise<{ status: 200; body: Token } | { status: 401; body: Error }> };
+    login: { (args: { body: Login; headers?: Record<string, string> }): Promise<Token>; raw(args: { body: Login; headers?: Record<string, string> }): Promise<{ status: 200; body: Token; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
     /** Return the currently authenticated user */
-    me: { (args?: { headers?: Record<string, string> }): Promise<User>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: User } | { status: 401; body: Error }> };
+    me: { (args?: { headers?: Record<string, string> }): Promise<User>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
   };
 }
 

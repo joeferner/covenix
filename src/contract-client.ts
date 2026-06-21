@@ -9,7 +9,8 @@ import type { ContractOperation, ContractResponse, SchemaNode, ZodecContract } f
  * Operations are grouped by their first tag (`api.users.get(...)`); untagged
  * operations sit at the client root. Each method returns the success body and
  * throws a `ZodecClientError` on a non-2xx response; `method.raw(...)` returns a
- * status-discriminated `{ status, body }` union for exhaustive handling.
+ * status-discriminated `{ status, body, headers }` union (the `headers` is a
+ * standard `Headers` object) for exhaustive handling and response-header access.
  *
  * Descriptions (`.describe()` / `.meta({ description })`) and operation
  * summaries become JSDoc on interfaces, fields, and methods. v1 emits types only
@@ -275,12 +276,17 @@ function successType(op: ContractOperation): string {
   return ok ? responseBodyType(ok[1]) : 'void';
 }
 
-/** The discriminated `{ status, body }` union for `.raw()` — declared statuses only. */
+/**
+ * The discriminated `{ status, body, headers }` union for `.raw()` — declared
+ * statuses only. `headers` is a standard `Headers` object (read with
+ * `headers.get('x-total-count')`); response header values aren't individually typed.
+ */
 function rawType(op: ContractOperation): string {
   const arms = Object.entries(op.responses).map(
-    ([status, response]) => `{ status: ${status}; body: ${responseBodyType(response)} }`,
+    ([status, response]) =>
+      `{ status: ${status}; body: ${responseBodyType(response)}; headers: Headers }`,
   );
-  return arms.length ? arms.join(' | ') : '{ status: number; body: unknown }';
+  return arms.length ? arms.join(' | ') : '{ status: number; body: unknown; headers: Headers }';
 }
 
 /** A method type: a call signature returning the success body plus a `.raw` form. */

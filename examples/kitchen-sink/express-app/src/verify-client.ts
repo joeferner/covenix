@@ -40,6 +40,12 @@ async function main(): Promise<void> {
   assert.ok(Array.isArray(list.items) && typeof list.total === 'number');
   ok('users.list({ query }) → UserList (query serialized)');
 
+  // .raw() exposes response headers as a standard Headers object.
+  const listRaw = await api.users.list.raw({ query: { page: 1, limit: 5 } });
+  assert.equal(listRaw.status, 200);
+  assert.equal(listRaw.headers.get('x-total-count'), String(list.total));
+  ok('users.list.raw() → reads the X-Total-Count response header');
+
   const missing = '00000000-0000-0000-0000-000000000000';
   await assert.rejects(
     api.users.get({ params: { id: missing } }),

@@ -101,8 +101,8 @@ try {
 ```
 
 When you want to handle every status without `try/catch`, call `.raw()` — it
-returns a **status-discriminated union** of `{ status, body }` and never throws on
-a declared status:
+returns a **status-discriminated union** of `{ status, body, headers }` and never
+throws on a declared status:
 
 ```typescript
 const res = await api.users.get.raw({ params: { id } });
@@ -110,6 +110,19 @@ if (res.status === 200)
   res.body; // ^? User
 else if (res.status === 404) res.body; // ^? Error
 ```
+
+Each arm also carries the response `headers` as a standard
+[`Headers`](https://developer.mozilla.org/docs/Web/API/Headers) object — so you can
+read rate-limit, pagination, or other metadata without dropping to raw `fetch`:
+
+```typescript
+const res = await api.users.list.raw({ query: { page: 1 } });
+const total = res.headers.get('x-total-count'); // string | null
+```
+
+Header _values_ aren't individually typed (a plain `Headers`, always correct);
+the default call form stays body-only — headers are an opt-in via `.raw()`.
+`ZodecClientError` likewise carries `.headers` for the thrown path.
 
 ## Response shapes
 
