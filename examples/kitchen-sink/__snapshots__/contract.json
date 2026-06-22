@@ -383,6 +383,13 @@
             },
             "optional": true,
             "description": "Client-supplied correlation id."
+          },
+          "x-legacy-id": {
+            "schema": {
+              "kind": "string"
+            },
+            "optional": true,
+            "description": "Deprecated: use x-request-id."
           }
         },
         "additionalProperties": false

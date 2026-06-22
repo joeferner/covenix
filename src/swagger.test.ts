@@ -98,6 +98,36 @@ describe('api.swagger()', () => {
     );
   });
 
+  it('hoists a property-level deprecated flag onto the parameter object', () => {
+    @Route('reports')
+    class ReportsController {
+      @Get()
+      @Query(
+        z.object({
+          sort: z.string().optional(),
+          legacy: z.string().optional().meta({ deprecated: true }),
+        }),
+      )
+      @Returns(200, z.object({ ok: z.boolean() }))
+      public list(): unknown {
+        return null;
+      }
+    }
+    const api = new Zodec({ info: { title: 'T', version: '1.0.0' } });
+    api.register(new ReportsController());
+    const params = api.swagger().paths?.['/reports']?.get?.parameters ?? [];
+
+    const legacy = params.find((p) => 'name' in p && p.name === 'legacy');
+    expect(legacy).toMatchObject({ name: 'legacy', in: 'query', deprecated: true });
+    // The redundant nested copy is dropped from the parameter's schema.
+    expect((legacy as { schema?: Record<string, unknown> }).schema).not.toHaveProperty(
+      'deprecated',
+    );
+
+    const sort = params.find((p) => 'name' in p && p.name === 'sort');
+    expect(sort).not.toHaveProperty('deprecated');
+  });
+
   it('refs named schemas into components for responses and bodies', () => {
     const doc = buildDoc();
 

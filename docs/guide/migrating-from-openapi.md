@@ -64,6 +64,7 @@ the schema's optionality.
 | `in: cookie`                      | `@Cookies(z.object({ sid: z.string() }))` + `@CookieParam('sid')` (needs a cookie parser ahead of the route)        |
 | parameter `description`/`example` | `.describe(...)` / `.meta({ examples })` on the property schema                                                     |
 | `required`                        | Path → always; query/header/cookie → non-`.optional()` property                                                     |
+| parameter `deprecated`            | `.meta({ deprecated: true })` on the property → `deprecated` on the parameter                                       |
 | `style` / `explode`               | Post-process (zodec emits the default `schema` form)                                                                |
 
 ## Request bodies

@@ -353,8 +353,10 @@ class DocumentBuilder {
   /**
    * Decomposes a `@Params`/`@Query`/`@Headers`/`@Cookies` object schema into
    * individual OpenAPI parameters — one per property. Path parameters are always
-   * required. Reserved headers (`authorization`/`accept`/`content-type`) are
-   * dropped from the `header` location: OpenAPI handles those elsewhere and
+   * required. A property marked `.meta({ deprecated: true })` sets `deprecated`
+   * on the parameter object itself (the canonical OpenAPI location, vs. the
+   * nested schema). Reserved headers (`authorization`/`accept`/`content-type`)
+   * are dropped from the `header` location: OpenAPI handles those elsewhere and
    * ignores them as parameters.
    */
   private parameters(
@@ -367,12 +369,21 @@ class DocumentBuilder {
     const required = new Set((json['required'] as string[] | undefined) ?? []);
     return Object.entries(properties)
       .filter(([name]) => !(location === 'header' && RESERVED_HEADERS.has(name.toLowerCase())))
-      .map(([name, propSchema]) => ({
-        name,
-        in: location,
-        required: location === 'path' ? true : required.has(name),
-        schema: asParameterSchema(propSchema),
-      }));
+      .map(([name, propSchema]) => {
+        const parameter: OpenAPIV3_1.ParameterObject = {
+          name,
+          in: location,
+          required: location === 'path' ? true : required.has(name),
+          schema: asParameterSchema(propSchema),
+        };
+        // Hoist a property-level `deprecated` onto the parameter, dropping the
+        // redundant nested copy so the output matches a hand-written spec.
+        if (typeof propSchema === 'object' && propSchema['deprecated'] === true) {
+          parameter.deprecated = true;
+          delete propSchema['deprecated'];
+        }
+        return parameter;
+      });
   }
 
   /** Moves nested `$defs` into components, strips `$schema`, and rewrites refs. */

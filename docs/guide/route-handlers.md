@@ -101,9 +101,10 @@ always receive clean data. See [Validation & Errors](/guide/validation).
 | `@Body(schema)`    | `req.body`    | `422`          |
 
 `@Params`/`@Query`/`@Headers`/`@Cookies` also **document** each property as an
-OpenAPI parameter (`in: path` / `query` / `header` / `cookie`). A `@Body` schema
-containing a `z.file()` field auto-detects the route as `multipart/form-data`.
-See [File uploads](/guide/file-uploads).
+OpenAPI parameter (`in: path` / `query` / `header` / `cookie`); a property marked
+`.meta({ deprecated: true })` sets `deprecated` on that parameter. A `@Body`
+schema containing a `z.file()` field auto-detects the route as
+`multipart/form-data`. See [File uploads](/guide/file-uploads).
 
 ::: tip Headers & cookies
 Header names are case-insensitive — Node lower-cases them, so `@Headers` schema

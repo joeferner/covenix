@@ -232,9 +232,15 @@ export class UsersController {
   // @Headers documents `x-request-id` as an `in: header` parameter (and validates
   // it); @HeaderParam injects the parsed value. Header schema keys are lower-case
   // (Node normalizes header names).
+  // `x-legacy-id` carries `.meta({ deprecated: true })` → the OpenAPI parameter is
+  // marked `deprecated` (tools strike it through), while still validated/injected.
   @Headers(
     z.object({
       'x-request-id': z.uuid().optional().describe('Client-supplied correlation id.'),
+      'x-legacy-id': z
+        .string()
+        .optional()
+        .meta({ deprecated: true, description: 'Deprecated: use x-request-id.' }),
     }),
   )
   public async create(
