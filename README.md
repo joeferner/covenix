@@ -2,8 +2,6 @@
   <img src="https://raw.githubusercontent.com/joeferner/covenix/main/docs/public/logo.png" alt="covenix" width="180" />
 </p>
 
-<h1 align="center">covenix</h1>
-
 **Zod-powered decorators for Express APIs — typed routes, runtime validation, and accurate OpenAPI from a single source of truth.**
 
 **[Documentation](https://joeferner.github.io/covenix/guide/getting-started)** · [API Reference](https://joeferner.github.io/covenix/api/)
