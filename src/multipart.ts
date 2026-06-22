@@ -96,3 +96,22 @@ export function getMultipartFields(schema: ZodType | undefined): MultipartFileFi
 export function isMultipart(schema: ZodType | undefined): boolean {
   return getMultipartFields(schema).length > 0;
 }
+
+/**
+ * The property names of an object `@Body` schema, or `undefined` when the body
+ * isn't a plain object (e.g. an array, union, or primitive — where field-level
+ * `@BodyParam('name')` references can't be checked). Used by registration-time
+ * validation to catch a `@BodyParam` that names a field the schema doesn't have.
+ *
+ * @param schema - The route's `@Body` schema, if any.
+ */
+export function getObjectFields(schema: ZodType | undefined): Set<string> | undefined {
+  if (!schema) {
+    return undefined;
+  }
+  const def = (schema as unknown as ZodInternal)._zod?.def;
+  if (def?.type !== 'object' || !def.shape) {
+    return undefined;
+  }
+  return new Set(Object.keys(def.shape));
+}

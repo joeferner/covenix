@@ -56,7 +56,7 @@ const IdParams = z.object({ id: z.string().uuid() });
 @Tags('Users')
 export class UsersController {
   // Dependency injected explicitly by the caller in main.ts — no container.
-  constructor(private readonly users: UserService) {}
+  constructor(private readonly users: UserService) { }
 
   @Get()
   @Summary('List users (paginated)')
@@ -213,7 +213,6 @@ export class UsersController {
 
   @Post()
   @Summary('Create a user')
-  @Body(CreateUserSchema)
   // Request-body example (no status) and a 201 response example. Both surface on
   // their media types in the generated OpenAPI / Swagger UI.
   @Example({ username: 'ada', email: 'ada@example.com' })
@@ -230,7 +229,7 @@ export class UsersController {
   )
   @Returns(422, ErrorSchema)
   public async create(
-    @BodyParam() body: CreateUser,
+    @BodyParam(CreateUserSchema) body: CreateUser,
     @Header('x-request-id') requestId: string | undefined,
   ): Promise<User> {
     void requestId; // demonstrates header injection; a real app might log it

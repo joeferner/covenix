@@ -134,6 +134,13 @@ export interface ParamMetadata {
   source: ParamSource;
   /** Key name for `param`/`query`/`header` sources; absent otherwise. */
   name?: string | undefined;
+  /**
+   * For `body`-sourced file injectors: `'single'` (from `@File`, expects a
+   * `z.file()` field) or `'multiple'` (from `@Files`, expects a
+   * `z.array(z.file())` field). Absent for `@BodyParam`. Lets registration-time
+   * validation check the injector against the `@Body` schema's shape.
+   */
+  file?: 'single' | 'multiple' | undefined;
   /** Resolver for a `custom` source (from `createParamDecorator`); absent otherwise. */
   resolve?: ParamResolver | undefined;
 }
@@ -286,9 +293,20 @@ export function setQuerySchema(target: object, handlerName: string, schema: ZodT
   routeEntry(target, handlerName).query = schema;
 }
 
-/** Stores the `req.body` schema for a handler. Called by `@Body`. */
+/**
+ * Stores the `req.body` schema for a handler. Called by `@Body` and by the
+ * schema form of `@BodyParam(schema)`. Declaring the body twice (e.g. both a
+ * method-level `@Body` and a `@BodyParam(schema)`) with different schemas is an
+ * error — there's only one request body.
+ */
 export function setBodySchema(target: object, handlerName: string, schema: ZodType): void {
-  routeEntry(target, handlerName).body = schema;
+  const entry = routeEntry(target, handlerName);
+  if (entry.body && entry.body !== schema) {
+    throw new Error(
+      `zodec: "${handlerName}" declares its request body more than once — use either @Body(schema) or @BodyParam(schema), not both`,
+    );
+  }
+  entry.body = schema;
 }
 
 /** Records response headers for a status code. Called by `@Returns`. */

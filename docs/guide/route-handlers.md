@@ -106,22 +106,62 @@ A `@Body` schema containing a `z.file()` field auto-detects the route as
 Placed on handler parameters to inject a value. A name-less injector (e.g.
 `@BodyParam()`) injects the whole parsed object.
 
-| Decorator           | Injects                                                                             |
-| ------------------- | ----------------------------------------------------------------------------------- |
-| `@Param('id')`      | One parsed path param (or all, with no name).                                       |
-| `@QueryParam('q')`  | One parsed query field (or the whole query object).                                 |
-| `@BodyParam('x')`   | One body field (or the whole parsed body, with no name).                            |
-| `@Header('x-id')`   | One request header.                                                                 |
-| `@File('avatar')`   | An uploaded file as a web-standard `File`. See [File uploads](/guide/file-uploads). |
-| `@Files('photos')`  | Multiple uploaded files (`File[]`).                                                 |
-| `@Principal()`      | The authenticated principal. See [Authentication](/guide/authentication).           |
-| `@Req()` / `@Res()` | The raw Express `Request` / `Response` — the escape hatch.                          |
+| Decorator           | Injects                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `@Param('id')`      | One parsed path param (or all, with no name).                                                                 |
+| `@QueryParam('q')`  | One parsed query field (or the whole query object).                                                           |
+| `@BodyParam('x')`   | One body field; `@BodyParam()` the whole body; `@BodyParam(schema)` the whole body + declares `@Body` inline. |
+| `@Header('x-id')`   | One request header.                                                                                           |
+| `@File('avatar')`   | An uploaded file as a web-standard `File`. See [File uploads](/guide/file-uploads).                           |
+| `@Files('photos')`  | Multiple uploaded files (`File[]`).                                                                           |
+| `@Principal()`      | The authenticated principal. See [Authentication](/guide/authentication).                                     |
+| `@Req()` / `@Res()` | The raw Express `Request` / `Response` — the escape hatch.                                                    |
 
 ::: tip Prefer return values over `@Res()`
 Reaching for `@Res()` opts a handler out of response validation and serialization.
 For status, headers, and cookies, return an [`HttpResponse`](#httpresponse-headers-status-cookies)
 instead — you keep validation and a documented contract.
 :::
+
+### Schemas, parameter types, and mismatches
+
+A method-level schema (`@Body(UserSchema)`) and the **type annotation** on the
+parameter that receives it (`@BodyParam() user: User`) are declared separately,
+and TypeScript's legacy parameter decorators **can't** tie them together — a
+decorator never sees the parameter's type. So this compiles without complaint:
+
+```typescript
+@Body(UserSchema)
+create(@BodyParam() user: Item) {} // ⚠️ runtime hands you a User; the compiler believes Item
+```
+
+At runtime `user` is the parsed `User` (validated against `UserSchema`); the
+`: Item` annotation is erased and never checked. Nothing flags the lie — it just
+poisons the handler body. Two things keep you honest:
+
+1. **Derive the type from the schema.** Annotate with `z.infer<typeof Schema>`
+   instead of an independently-written type, so the schema is the single source
+   of truth and the two can't drift:
+
+   ```typescript
+   @Body(CreateUserSchema)
+   create(@BodyParam() user: z.infer<typeof CreateUserSchema>) {}
+   ```
+
+   `@BodyParam(CreateUserSchema)` goes one step further — the schema sits right on
+   the parameter (no separate `@Body`), so there's only one thing to keep in sync:
+
+   ```typescript
+   create(@BodyParam(CreateUserSchema) user: z.infer<typeof CreateUserSchema>) {}
+   ```
+
+2. **zodec checks what it can at registration.** Types are erased, but names and
+   schema shape aren't — so when you `mount` (or `toExpress`/`serve`) zodec throws
+   on the **structural** mismatches it can see:
+   - `@BodyParam('field')` naming a field absent from the `@Body` schema;
+   - any body/file injector when the handler declares no `@Body` schema;
+   - `@File('x')` whose field isn't a single `z.file()`, or `@Files('x')` whose
+     field isn't a `z.array(z.file())`.
 
 ### Custom injectors (`createParamDecorator`)
 

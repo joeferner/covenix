@@ -23,6 +23,7 @@ import { HttpResponse } from './http-response.js';
 import type { HeaderValue, ResponseCookie } from './response.js';
 import { SseEvent } from './sse.js';
 import { getMultipartFields, type MultipartFileField } from './multipart.js';
+import { assertValidBodyParams } from './route-validation.js';
 import { mountDocs, type ServeDocsOptions } from './serve-docs.js';
 import type { SecurityConfig } from './security.js';
 import type { OpenAPIV3_1 } from 'openapi-types';
@@ -837,6 +838,9 @@ export class Zodec {
       // Registration base path (e.g. `/v1`) in front of the controller's @Route.
       const prefix = joinPrefix(basePrefix, getPrefix(proto));
       for (const route of getRoutes(proto)) {
+        // Fail fast on a structural annotation/schema mismatch (e.g. a
+        // @BodyParam naming a field the @Body schema doesn't have).
+        assertValidBodyParams(route.handlerName, route.body, getParams(proto, route.handlerName));
         const path = toExpressPath(prefix, route.path);
         const middlewares: RequestHandler[] = [];
         // Chain order: security → @Use → multipart → handler.

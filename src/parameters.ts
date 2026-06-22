@@ -1,4 +1,5 @@
-import { addParam, type ParamContext } from './metadata.js';
+import type { ZodType } from 'zod';
+import { addParam, setBodySchema, type ParamContext } from './metadata.js';
 
 /**
  * Where the resolved `@Security` principal is stashed on the request (set by
@@ -72,15 +73,36 @@ export function QueryParam(name: string): ParameterDecorator {
 }
 
 /**
- * Injects the request body (the value parsed by `@Body` when present, otherwise
- * the raw `req.body`). With a `name`, injects that single field of the parsed
- * body; with no `name`, the whole body.
+ * Injects the request body. Three forms:
  *
- * @param name - Optional body field to inject; omit for the whole body.
+ * - `@BodyParam()` — the whole body (the value parsed by `@Body` when present,
+ *   otherwise the raw `req.body`).
+ * - `@BodyParam('field')` — a single field of the parsed body.
+ * - `@BodyParam(schema)` — the whole body, **declaring its `@Body` schema inline**.
+ *   Sugar for a method-level `@Body(schema)` plus a name-less `@BodyParam()`,
+ *   keeping the schema next to the parameter it feeds. Don't combine it with a
+ *   separate `@Body` on the same handler (declaring the body twice throws).
+ *
+ * @param arg - A field name (`string`), a `@Body` schema (`ZodType`), or omitted
+ *   for the whole body.
+ *
+ * @example
+ * ```ts
+ * @Post()
+ * @Returns(201, UserSchema)
+ * create(@BodyParam(CreateUserSchema) user: z.infer<typeof CreateUserSchema>) {}
+ * ```
  */
-export function BodyParam(name?: string): ParameterDecorator {
+export function BodyParam(arg?: string | ZodType): ParameterDecorator {
   return (target, propertyKey, index) => {
-    addParam(target, String(propertyKey), { index, source: 'body', name });
+    const handlerName = String(propertyKey);
+    if (arg !== undefined && typeof arg !== 'string') {
+      // Schema form: register the body schema and inject the whole parsed body.
+      setBodySchema(target, handlerName, arg);
+      addParam(target, handlerName, { index, source: 'body' });
+      return;
+    }
+    addParam(target, handlerName, { index, source: 'body', name: arg });
   };
 }
 
@@ -100,7 +122,7 @@ export function BodyParam(name?: string): ParameterDecorator {
  */
 export function File(name: string): ParameterDecorator {
   return (target, propertyKey, index) => {
-    addParam(target, String(propertyKey), { index, source: 'body', name });
+    addParam(target, String(propertyKey), { index, source: 'body', name, file: 'single' });
   };
 }
 
@@ -113,7 +135,7 @@ export function File(name: string): ParameterDecorator {
  */
 export function Files(name: string): ParameterDecorator {
   return (target, propertyKey, index) => {
-    addParam(target, String(propertyKey), { index, source: 'body', name });
+    addParam(target, String(propertyKey), { index, source: 'body', name, file: 'multiple' });
   };
 }
 
