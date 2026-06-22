@@ -373,6 +373,20 @@
         "Users"
       ],
       "summary": "Create a user",
+      "headers": {
+        "kind": "object",
+        "properties": {
+          "x-request-id": {
+            "schema": {
+              "kind": "string",
+              "format": "uuid"
+            },
+            "optional": true,
+            "description": "Client-supplied correlation id."
+          }
+        },
+        "additionalProperties": false
+      },
       "body": {
         "mediaType": "application/json",
         "schema": {
@@ -587,6 +601,36 @@
           "scopes": []
         }
       ]
+    },
+    {
+      "operationId": "session",
+      "method": "get",
+      "path": "/v1/auth/session",
+      "tags": [
+        "Auth"
+      ],
+      "summary": "Report whether a session cookie is present",
+      "cookies": {
+        "kind": "object",
+        "properties": {
+          "sid": {
+            "schema": {
+              "kind": "string"
+            },
+            "optional": true,
+            "description": "Session id cookie."
+          }
+        },
+        "additionalProperties": false
+      },
+      "responses": {
+        "200": {
+          "schema": {
+            "kind": "ref",
+            "id": "SessionResult"
+          }
+        }
+      }
     }
   ],
   "schemas": {
@@ -879,6 +923,18 @@
         }
       },
       "additionalProperties": false
+    },
+    "SessionResult": {
+      "kind": "object",
+      "properties": {
+        "authenticated": {
+          "schema": {
+            "kind": "boolean"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "Whether a session cookie was presented."
     },
     "MessageNotification": {
       "kind": "object",

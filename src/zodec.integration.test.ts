@@ -29,7 +29,7 @@ import {
   createParamDecorator,
   File,
   Files,
-  Header,
+  HeaderParam,
   Param,
   Principal,
   QueryParam,
@@ -95,7 +95,7 @@ describe('handler argument assembly', () => {
       @Param('id') id: string,
       @QueryParam('q') q: string,
       @BodyParam() body: unknown,
-      @Header('x-token') token: string,
+      @HeaderParam('x-token') token: string,
     ): Record<string, unknown> {
       return { id, q, body, token };
     }

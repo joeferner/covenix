@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import createError from 'http-errors';
 import {
   Route,
@@ -10,6 +11,8 @@ import {
   Example,
   Security,
   BodyParam,
+  Cookies,
+  CookieParam,
   Principal,
 } from 'zodec';
 import {
@@ -22,6 +25,10 @@ import {
   type User,
 } from '@kitchen-sink/schemas';
 import type { AuthService } from '../services/AuthService.js';
+
+const SessionResultSchema = z
+  .object({ authenticated: z.boolean() })
+  .meta({ id: 'SessionResult', description: 'Whether a session cookie was presented.' });
 
 @Route('auth')
 @Tags('Auth')
@@ -51,5 +58,16 @@ export class AuthController {
   @Returns(401, ErrorSchema)
   public me(@Principal() user: User): User {
     return user;
+  }
+
+  // @Cookies documents `sid` as an `in: cookie` parameter (and validates it);
+  // @CookieParam injects the parsed value. zodec reads `req.cookies`, so a cookie
+  // parser must run ahead of the route — see main.ts (`configure: cookieParser()`).
+  @Get('session')
+  @Summary('Report whether a session cookie is present')
+  @Cookies(z.object({ sid: z.string().optional().describe('Session id cookie.') }))
+  @Returns(200, SessionResultSchema)
+  public session(@CookieParam('sid') sid: string | undefined): z.infer<typeof SessionResultSchema> {
+    return { authenticated: sid !== undefined };
   }
 }

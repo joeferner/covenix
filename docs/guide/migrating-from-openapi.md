@@ -56,15 +56,15 @@ zodec decomposes a `@Params`/`@Query` **object schema** into one OpenAPI
 parameter per property — path params are always `required`, query params follow
 the schema's optionality.
 
-| Hand-written parameter            | zodec                                                                                                                 |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `in: path`                        | `@Params(z.object({ id: z.string() }))` + `@Param('id')`                                                              |
-| `in: query`                       | `@Query(z.object({ page: z.coerce.number() }))` + `@QueryParam('page')`                                               |
-| `in: header`                      | `@Header('x-id')` injects it at runtime, but it is **not** emitted as a parameter today — post-process to document it |
-| `in: cookie`                      | Not emitted — post-process                                                                                            |
-| parameter `description`/`example` | `.describe(...)` / `.meta({ examples })` on the property schema                                                       |
-| `required`                        | Path → always; query → non-`.optional()` property                                                                     |
-| `style` / `explode`               | Post-process (zodec emits the default `schema` form)                                                                  |
+| Hand-written parameter            | zodec                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `in: path`                        | `@Params(z.object({ id: z.string() }))` + `@Param('id')`                                                            |
+| `in: query`                       | `@Query(z.object({ page: z.coerce.number() }))` + `@QueryParam('page')`                                             |
+| `in: header`                      | `@Headers(z.object({ 'x-id': z.string() }))` + `@HeaderParam('x-id')` (reserved headers are validated, not emitted) |
+| `in: cookie`                      | `@Cookies(z.object({ sid: z.string() }))` + `@CookieParam('sid')` (needs a cookie parser ahead of the route)        |
+| parameter `description`/`example` | `.describe(...)` / `.meta({ examples })` on the property schema                                                     |
+| `required`                        | Path → always; query/header/cookie → non-`.optional()` property                                                     |
+| `style` / `explode`               | Post-process (zodec emits the default `schema` form)                                                                |
 
 ## Request bodies
 

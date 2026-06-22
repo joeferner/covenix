@@ -22,7 +22,8 @@ import {
   Param,
   QueryParam,
   BodyParam,
-  Header,
+  Headers,
+  HeaderParam,
   File,
   Files,
   Principal,
@@ -228,9 +229,17 @@ export class UsersController {
     201,
   )
   @Returns(422, ErrorSchema)
+  // @Headers documents `x-request-id` as an `in: header` parameter (and validates
+  // it); @HeaderParam injects the parsed value. Header schema keys are lower-case
+  // (Node normalizes header names).
+  @Headers(
+    z.object({
+      'x-request-id': z.uuid().optional().describe('Client-supplied correlation id.'),
+    }),
+  )
   public async create(
     @BodyParam(CreateUserSchema) body: CreateUser,
-    @Header('x-request-id') requestId: string | undefined,
+    @HeaderParam('x-request-id') requestId: string | undefined,
   ): Promise<User> {
     void requestId; // demonstrates header injection; a real app might log it
     return this.users.create(body);

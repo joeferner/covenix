@@ -45,6 +45,10 @@ export interface RouteMetadata {
   params?: ZodType | undefined;
   /** `@Query` schema, if any. */
   query?: ZodType | undefined;
+  /** `@Headers` schema (validates `req.headers`), if any. */
+  headers?: ZodType | undefined;
+  /** `@Cookies` schema (validates `req.cookies`), if any. */
+  cookies?: ZodType | undefined;
   /** `@Body` schema, if any. */
   body?: ZodType | undefined;
   /** Declared responses, keyed by status code. One entry per declared status. */
@@ -103,7 +107,15 @@ export interface ExampleMetadata {
 }
 
 /** Where an injected handler parameter is sourced from. */
-export type ParamSource = 'param' | 'query' | 'body' | 'header' | 'req' | 'res' | 'custom';
+export type ParamSource =
+  | 'param'
+  | 'query'
+  | 'body'
+  | 'header'
+  | 'cookie'
+  | 'req'
+  | 'res'
+  | 'custom';
 
 /**
  * The per-request context passed to a {@link ParamResolver} (the function behind
@@ -164,6 +176,8 @@ interface RouteEntry {
   path?: string;
   params?: ZodType;
   query?: ZodType;
+  headers?: ZodType;
+  cookies?: ZodType;
   body?: ZodType;
   responses?: Record<number, ResponseMetadata>;
   summary?: string;
@@ -291,6 +305,16 @@ export function setParamsSchema(target: object, handlerName: string, schema: Zod
 /** Stores the `req.query` schema for a handler. Called by `@Query`. */
 export function setQuerySchema(target: object, handlerName: string, schema: ZodType): void {
   routeEntry(target, handlerName).query = schema;
+}
+
+/** Stores the `req.headers` schema for a handler. Called by `@Headers`. */
+export function setHeadersSchema(target: object, handlerName: string, schema: ZodType): void {
+  routeEntry(target, handlerName).headers = schema;
+}
+
+/** Stores the `req.cookies` schema for a handler. Called by `@Cookies`. */
+export function setCookiesSchema(target: object, handlerName: string, schema: ZodType): void {
+  routeEntry(target, handlerName).cookies = schema;
 }
 
 /**
@@ -503,6 +527,8 @@ export function getRoutes(target: object): RouteMetadata[] {
       handlerName,
       params: entry.params,
       query: entry.query,
+      headers: entry.headers,
+      cookies: entry.cookies,
       body: entry.body,
       // Class-level shared responses, with the route's own taking precedence per status.
       responses: { ...commonResponses, ...(entry.responses ?? {}) },

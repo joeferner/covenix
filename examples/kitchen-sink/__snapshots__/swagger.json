@@ -149,6 +149,19 @@
         ],
         "summary": "Create a user",
         "operationId": "create",
+        "parameters": [
+          {
+            "name": "x-request-id",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "description": "Client-supplied correlation id.",
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -803,6 +816,38 @@
           }
         ]
       }
+    },
+    "/v1/auth/session": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResult"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Auth"
+        ],
+        "summary": "Report whether a session cookie is present",
+        "operationId": "session",
+        "parameters": [
+          {
+            "name": "sid",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "description": "Session id cookie.",
+              "type": "string"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1065,6 +1110,19 @@
           "password"
         ],
         "additionalProperties": false
+      },
+      "SessionResult": {
+        "type": "object",
+        "properties": {
+          "authenticated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "authenticated"
+        ],
+        "additionalProperties": false,
+        "description": "Whether a session cookie was presented."
       },
       "MessageNotification": {
         "type": "object",

@@ -200,6 +200,8 @@ export const ContractOperationSchema = z.object({
   deprecated: z.boolean().optional(),
   params: SchemaNodeSchema.optional(),
   query: SchemaNodeSchema.optional(),
+  headers: SchemaNodeSchema.optional(),
+  cookies: SchemaNodeSchema.optional(),
   body: ContractBodySchema.optional(),
   responses: z.record(z.string(), ContractResponseSchema),
   security: z.array(SecurityRequirementSchema).optional(),
@@ -306,6 +308,8 @@ export function generateContractDocument(
         ...(route.deprecated ? { deprecated: true } : {}),
         ...(route.params ? { params: convert.toNode(route.params) } : {}),
         ...(route.query ? { query: convert.toNode(route.query) } : {}),
+        ...(route.headers ? { headers: convert.toNode(route.headers) } : {}),
+        ...(route.cookies ? { cookies: convert.toNode(route.cookies) } : {}),
         ...(route.body
           ? {
               body: {

@@ -28,9 +28,21 @@ async function main(): Promise<void> {
 
   const created = await api.users.create({
     body: { username: 'clientuser', email: 'clientuser@example.com' },
+    // x-request-id is a documented @Headers param (validated as a UUID server-side).
+    headers: { 'x-request-id': crypto.randomUUID() },
   });
   assert.ok(created.id);
-  ok(`users.create({ body }) → User (${created.id})`);
+  ok(`users.create({ body, x-request-id }) → User (${created.id})`);
+
+  // A malformed documented header is rejected with 400 before the body is touched.
+  await assert.rejects(
+    api.users.create({
+      body: { username: 'hdr', email: 'hdr@example.com' },
+      headers: { 'x-request-id': 'not-a-uuid' },
+    }),
+    (err: unknown) => err instanceof ZodecClientError && err.status === 400,
+  );
+  ok('users.create({ x-request-id: invalid }) → ZodecClientError(400) (@Headers validation)');
 
   const fetched = await api.users.get({ params: { id: created.id } });
   assert.equal(fetched.username, 'clientuser');
@@ -93,6 +105,14 @@ async function main(): Promise<void> {
   const me = await authed.auth.me();
   assert.equal(me.username, 'clientuser');
   ok('auth.me() with default bearer header → User (security route)');
+
+  // @Cookies/@CookieParam: send a `sid` cookie via the generic headers escape hatch
+  // (cookie-parser populates req.cookies server-side; see main.ts).
+  const withCookie = await api.auth.session({ headers: { cookie: 'sid=abc123' } });
+  assert.equal(withCookie.authenticated, true);
+  const noCookie = await api.auth.session();
+  assert.equal(noCookie.authenticated, false);
+  ok('auth.session() reads the `sid` cookie via @Cookies/@CookieParam');
 
   console.log('client exercised the live server successfully');
 }

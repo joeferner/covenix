@@ -26,7 +26,7 @@ the routing and parameter decorators are nearly identical.
 | `@Query() q: string`                              | `@Query(Schema)` + `@QueryParam('q') q`         | Same split.                                                       |
 | `@Body() body: T`                                 | `@Body(Schema)` + `@BodyParam() body`           | Same split.                                                       |
 | `@BodyProp() x`                                   | `@Body(Schema)` + `@BodyParam('x') x`           | Inject one field.                                                 |
-| `@Header('x-id') id`                              | `@Header('x-id') id`                            | Identical.                                                        |
+| `@Header('x-id') id`                              | `@Headers(Schema)` + `@HeaderParam('x-id') id`  | Same split as path/query; documents an `in: header` parameter.    |
 | `@Request() req`                                  | `@Req() req` / `@Res() res`                     | Escape hatch.                                                     |
 | `@SuccessResponse('201')` + `this.setStatus()`    | `@Returns(201, Schema)`                         | The first declared 2xx is the success status — no manual call.    |
 | `@Response<E>(422, '…')`                          | `@Returns(422, ErrorSchema)`                    | Stackable, one per status.                                        |

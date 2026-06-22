@@ -143,6 +143,13 @@ function asParameterSchema(schema: JsonSchema): NonNullable<OpenAPIV3_1.Paramete
 }
 
 /**
+ * Header names that must not be expressed as `in: header` parameters — OpenAPI
+ * defines these elsewhere (content negotiation / security) and ignores them as
+ * parameters. Compared case-insensitively.
+ */
+const RESERVED_HEADERS = new Set(['authorization', 'accept', 'content-type']);
+
+/**
  * Walks controller metadata (read off each prototype) and hand-assembles an
  * OpenAPI 3.1 document. Named schemas accumulate in `components.schemas`.
  */
@@ -203,6 +210,8 @@ class DocumentBuilder {
     const parameters: OpenAPIV3_1.ParameterObject[] = [
       ...(route.params ? this.parameters(route.params, 'path') : []),
       ...(route.query ? this.parameters(route.query, 'query') : []),
+      ...(route.headers ? this.parameters(route.headers, 'header') : []),
+      ...(route.cookies ? this.parameters(route.cookies, 'cookie') : []),
     ];
     const responses: Record<string, OpenAPIV3_1.ResponseObject> = {};
     for (const [status, decl] of Object.entries(route.responses)) {
@@ -342,20 +351,28 @@ class DocumentBuilder {
   }
 
   /**
-   * Decomposes a `@Params`/`@Query` object schema into individual OpenAPI
-   * parameters — one per property. Path parameters are always required.
+   * Decomposes a `@Params`/`@Query`/`@Headers`/`@Cookies` object schema into
+   * individual OpenAPI parameters — one per property. Path parameters are always
+   * required. Reserved headers (`authorization`/`accept`/`content-type`) are
+   * dropped from the `header` location: OpenAPI handles those elsewhere and
+   * ignores them as parameters.
    */
-  private parameters(schema: ZodType, location: 'path' | 'query'): OpenAPIV3_1.ParameterObject[] {
+  private parameters(
+    schema: ZodType,
+    location: 'path' | 'query' | 'header' | 'cookie',
+  ): OpenAPIV3_1.ParameterObject[] {
     const json = toJsonSchema(schema) as unknown as JsonObject;
     this.hoist(json);
     const properties = (json['properties'] ?? {}) as Record<string, JsonSchema>;
     const required = new Set((json['required'] as string[] | undefined) ?? []);
-    return Object.entries(properties).map(([name, propSchema]) => ({
-      name,
-      in: location,
-      required: location === 'path' ? true : required.has(name),
-      schema: asParameterSchema(propSchema),
-    }));
+    return Object.entries(properties)
+      .filter(([name]) => !(location === 'header' && RESERVED_HEADERS.has(name.toLowerCase())))
+      .map(([name, propSchema]) => ({
+        name,
+        in: location,
+        required: location === 'path' ? true : required.has(name),
+        schema: asParameterSchema(propSchema),
+      }));
   }
 
   /** Moves nested `$defs` into components, strips `$schema`, and rewrites refs. */

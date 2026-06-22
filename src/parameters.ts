@@ -140,14 +140,29 @@ export function Files(name: string): ParameterDecorator {
 }
 
 /**
- * Injects a request header value (`req.headers[name]`, case-insensitive) as a
- * handler argument.
+ * Injects a request header value (case-insensitive) as a handler argument.
+ * Resolves to the value parsed by `@Headers` when present, otherwise the raw
+ * header from Express.
  *
  * @param name - Header name, e.g. `'authorization'`.
  */
-export function Header(name: string): ParameterDecorator {
+export function HeaderParam(name: string): ParameterDecorator {
   return (target, propertyKey, index) => {
     addParam(target, String(propertyKey), { index, source: 'header', name });
+  };
+}
+
+/**
+ * Injects a request cookie value as a handler argument. Resolves to the value
+ * parsed by `@Cookies` when present, otherwise the raw cookie. zodec reads
+ * `req.cookies`, so a cookie parser (e.g. `cookie-parser`) must run as middleware
+ * ahead of the route.
+ *
+ * @param name - Cookie name, e.g. `'sid'`.
+ */
+export function CookieParam(name: string): ParameterDecorator {
+  return (target, propertyKey, index) => {
+    addParam(target, String(propertyKey), { index, source: 'cookie', name });
   };
 }
 

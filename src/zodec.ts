@@ -44,6 +44,8 @@ import { generateContractDocument, type ContractOptions, type ZodecContract } fr
 interface RequestValues {
   params: Record<string, unknown>;
   query: Record<string, unknown>;
+  headers: Record<string, unknown>;
+  cookies: Record<string, unknown>;
   body: unknown;
 }
 
@@ -167,9 +169,14 @@ function successStatus(responses: Record<number, unknown>): number {
  * the first failure — 400 for params/query, 422 for body.
  */
 function validate(route: RouteMetadata, req: Request): RequestValues {
+  // `req.cookies` (typed `any` by Express) is populated by a cookie parser
+  // (e.g. cookie-parser) ahead of the route; absent one it's undefined → {}.
+  const cookies = (req.cookies as Record<string, unknown> | undefined) ?? {};
   const values: RequestValues = {
     params: req.params,
     query: req.query,
+    headers: req.headers,
+    cookies,
     body: req.body as unknown,
   };
   if (route.params) {
@@ -185,6 +192,20 @@ function validate(route: RouteMetadata, req: Request): RequestValues {
       throw new ValidationError(400, result.error.issues);
     }
     values.query = result.data as Record<string, unknown>;
+  }
+  if (route.headers) {
+    const result = route.headers.safeParse(req.headers);
+    if (!result.success) {
+      throw new ValidationError(400, result.error.issues);
+    }
+    values.headers = result.data as Record<string, unknown>;
+  }
+  if (route.cookies) {
+    const result = route.cookies.safeParse(cookies);
+    if (!result.success) {
+      throw new ValidationError(400, result.error.issues);
+    }
+    values.cookies = result.data as Record<string, unknown>;
   }
   if (route.body) {
     const fileFields = getMultipartFields(route.body);
@@ -302,7 +323,9 @@ function resolveParam(
         ? (values.body as Record<string, unknown> | undefined)?.[param.name]
         : values.body;
     case 'header':
-      return param.name ? req.headers[param.name.toLowerCase()] : req.headers;
+      return param.name ? values.headers[param.name.toLowerCase()] : values.headers;
+    case 'cookie':
+      return param.name ? values.cookies[param.name] : values.cookies;
     case 'req':
       return req;
     case 'res':

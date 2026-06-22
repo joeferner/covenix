@@ -133,7 +133,7 @@ Three differences to internalize:
 | `request: { params: Schema }`                                        | `@Params(Schema)` + `@Param('id')`                            | Schema on the method; injection on the parameter.           |
 | `request: { query: Schema }`                                         | `@Query(Schema)` + `@QueryParam('q')`                         | Same split.                                                 |
 | `request: { body: { content: { 'application/json': { schema } } } }` | `@Body(Schema)` + `@BodyParam()`                              | Far less nesting.                                           |
-| `request: { headers: Schema }`                                       | `@Header('x-id')` (+ schema to validate)                      | Hono validates header schema; zodec injects.                |
+| `request: { headers: Schema }`                                       | `@Headers(Schema)` + `@HeaderParam('x-id')`                   | Both validate the header schema; zodec also documents it.   |
 | `responses: { 200: { content: {...}, description } }`                | `@Returns(200, Schema)`                                       | Stackable, one per status.                                  |
 | `c.req.valid('param' \| 'query' \| 'json' \| 'form')`                | `@Param` / `@QueryParam` / `@BodyParam` / `@File`             | Injection by parameter decorator.                           |
 | `app.openapi(route, handler)`                                        | implementation is the decorated method                        | Definition and handler are one unit.                        |

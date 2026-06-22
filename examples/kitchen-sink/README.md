@@ -24,8 +24,8 @@ kitchen-sink/
       services/            #   UserService, AuthService — fake in-memory, constructor-injected
       controllers/         #   files named after the class they export
         UsersController.ts    # full CRUD — all method/param decorators, multiple @Returns
-        HealthController.ts   # @Req/@Res escape hatch, @Header
-        AuthController.ts     # login + me, @Header
+        HealthController.ts   # @Req/@Res escape hatch, createParamDecorator
+        AuthController.ts     # login + me + session, @Cookies/@CookieParam
 ```
 
 ## The cross-module point
@@ -42,7 +42,8 @@ schema is just a value and works across module boundaries with no special wiring
 | `@Route`, `@Tags`                                                 | every controller                                             |
 | `@Get`/`@Post`/`@Put`/`@Patch`/`@Delete`                          | `UsersController.ts`                                         |
 | `@Params`, `@Query`, `@Body`, stackable `@Returns`, `@Summary`    | `UsersController.ts`                                         |
-| `@Param`, `@QueryParam`, `@BodyParam`, `@Header`                  | `UsersController.ts`, `AuthController.ts`                    |
+| `@Param`, `@QueryParam`, `@BodyParam`, `@HeaderParam`             | `UsersController.ts`, `AuthController.ts`                    |
+| `@Headers`/`@Cookies` (+ `@CookieParam`) request params           | `UsersController.ts`, `AuthController.ts`                    |
 | Multipart upload — `z.file()` in `@Body`, `@File`/`@Files`        | `UsersController.ts`                                         |
 | `@ReturnsFile` + `FileResponse`; `RangeFileResponse` (HTTP Range) | `UsersController.ts`                                         |
 | `@Security` + `@Principal`, scopes, `bearer()` handler            | `AuthController.ts`, `UsersController.ts`, `api-security.ts` |

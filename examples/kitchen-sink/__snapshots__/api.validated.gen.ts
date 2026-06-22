@@ -71,6 +71,11 @@ export interface Login {
   password: string;
 }
 
+/** Whether a session cookie was presented. */
+export interface SessionResult {
+  authenticated: boolean;
+}
+
 export interface MessageNotification {
   type: "message";
   from: string;
@@ -95,6 +100,7 @@ const CreateUser$schema: z.ZodType<CreateUser> = z.object({ username: z.string()
 const UpdateUser$schema: z.ZodType<UpdateUser> = z.object({ username: z.string().min(3).max(32).optional(), email: z.string().email().optional(), role: z.enum(["admin","user"]).optional(), lastSeenAt: z.coerce.date().optional() });
 const Token$schema: z.ZodType<Token> = z.object({ token: z.string(), expiresIn: z.number() });
 const Login$schema: z.ZodType<Login> = z.object({ username: z.string().min(3), password: z.string().min(8) });
+const SessionResult$schema: z.ZodType<SessionResult> = z.object({ authenticated: z.boolean() });
 const MessageNotification$schema: z.ZodType<MessageNotification> = z.object({ type: z.literal("message"), from: z.string(), text: z.string() });
 const PresenceNotification$schema: z.ZodType<PresenceNotification> = z.object({ type: z.literal("presence"), userId: z.string(), online: z.boolean() });
 const Notification$schema: z.ZodType<Notification> = z.union([z.lazy(() => MessageNotification$schema), z.lazy(() => PresenceNotification$schema)]);
@@ -370,6 +376,8 @@ export interface Client {
     login: { (args: { body: Login; headers?: Record<string, string> }): Promise<Token>; raw(args: { body: Login; headers?: Record<string, string> }): Promise<{ status: 200; body: Token; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
     /** Return the currently authenticated user */
     me: { (args?: { headers?: Record<string, string> }): Promise<User>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
+    /** Report whether a session cookie is present */
+    session: { (args?: { headers?: Record<string, string> }): Promise<SessionResult>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: SessionResult; headers: Headers }> };
   };
 }
 
@@ -401,6 +409,7 @@ export function createClient(options: ClientOptions): Client {
     auth: {
       login: method({ method: "post", path: "/v1/auth/login", body: z.lazy(() => Login$schema), responses: { 200: z.lazy(() => Token$schema), 401: z.lazy(() => Error$schema) } }),
       me: method({ method: "get", path: "/v1/auth/me", responses: { 200: z.lazy(() => User$schema), 401: z.lazy(() => Error$schema) } }),
+      session: method({ method: "get", path: "/v1/auth/session", responses: { 200: z.lazy(() => SessionResult$schema) } }),
     },
   } as unknown as Client;
 }

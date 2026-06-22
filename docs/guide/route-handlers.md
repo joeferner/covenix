@@ -92,30 +92,44 @@ Each validates one request source against a Zod schema. The parsed (coerced,
 defaulted) result is what the matching parameter decorators inject — so handlers
 always receive clean data. See [Validation & Errors](/guide/validation).
 
-| Decorator         | Validates    | Failure status |
-| ----------------- | ------------ | -------------- |
-| `@Params(schema)` | `req.params` | `400`          |
-| `@Query(schema)`  | `req.query`  | `400`          |
-| `@Body(schema)`   | `req.body`   | `422`          |
+| Decorator          | Validates     | Failure status |
+| ------------------ | ------------- | -------------- |
+| `@Params(schema)`  | `req.params`  | `400`          |
+| `@Query(schema)`   | `req.query`   | `400`          |
+| `@Headers(schema)` | `req.headers` | `400`          |
+| `@Cookies(schema)` | `req.cookies` | `400`          |
+| `@Body(schema)`    | `req.body`    | `422`          |
 
-A `@Body` schema containing a `z.file()` field auto-detects the route as
-`multipart/form-data`. See [File uploads](/guide/file-uploads).
+`@Params`/`@Query`/`@Headers`/`@Cookies` also **document** each property as an
+OpenAPI parameter (`in: path` / `query` / `header` / `cookie`). A `@Body` schema
+containing a `z.file()` field auto-detects the route as `multipart/form-data`.
+See [File uploads](/guide/file-uploads).
+
+::: tip Headers & cookies
+Header names are case-insensitive — Node lower-cases them, so `@Headers` schema
+keys must be lower-case (`'x-request-id'`). The reserved `authorization`,
+`accept`, and `content-type` headers are still validated but omitted from the
+generated OpenAPI parameters. `@Cookies` reads `req.cookies`, so a cookie parser
+(e.g. [`cookie-parser`](https://github.com/expressjs/cookie-parser)) must run as
+middleware ahead of the route.
+:::
 
 ## Parameter injection decorators
 
 Placed on handler parameters to inject a value. A name-less injector (e.g.
 `@BodyParam()`) injects the whole parsed object.
 
-| Decorator           | Injects                                                                                                       |
-| ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `@Param('id')`      | One parsed path param (or all, with no name).                                                                 |
-| `@QueryParam('q')`  | One parsed query field (or the whole query object).                                                           |
-| `@BodyParam('x')`   | One body field; `@BodyParam()` the whole body; `@BodyParam(schema)` the whole body + declares `@Body` inline. |
-| `@Header('x-id')`   | One request header.                                                                                           |
-| `@File('avatar')`   | An uploaded file as a web-standard `File`. See [File uploads](/guide/file-uploads).                           |
-| `@Files('photos')`  | Multiple uploaded files (`File[]`).                                                                           |
-| `@Principal()`      | The authenticated principal. See [Authentication](/guide/authentication).                                     |
-| `@Req()` / `@Res()` | The raw Express `Request` / `Response` — the escape hatch.                                                    |
+| Decorator              | Injects                                                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `@Param('id')`         | One parsed path param (or all, with no name).                                                                 |
+| `@QueryParam('q')`     | One parsed query field (or the whole query object).                                                           |
+| `@BodyParam('x')`      | One body field; `@BodyParam()` the whole body; `@BodyParam(schema)` the whole body + declares `@Body` inline. |
+| `@HeaderParam('x-id')` | One request header (parsed by `@Headers` when present, else the raw value).                                   |
+| `@CookieParam('sid')`  | One request cookie (parsed by `@Cookies` when present, else the raw value).                                   |
+| `@File('avatar')`      | An uploaded file as a web-standard `File`. See [File uploads](/guide/file-uploads).                           |
+| `@Files('photos')`     | Multiple uploaded files (`File[]`).                                                                           |
+| `@Principal()`         | The authenticated principal. See [Authentication](/guide/authentication).                                     |
+| `@Req()` / `@Res()`    | The raw Express `Request` / `Response` — the escape hatch.                                                    |
 
 ::: tip Prefer return values over `@Res()`
 Reaching for `@Res()` opts a handler out of response validation and serialization.
@@ -165,19 +179,19 @@ poisons the handler body. Two things keep you honest:
 
 ### Custom injectors (`createParamDecorator`)
 
-The built-ins don't cover everything — a cookie, `req.ip`, a value derived from a
-header, or an awaited per-request lookup. `createParamDecorator` builds your own
-from a resolver that receives `{ req, res }` (plus any `data` you pass) and returns
-the value — **sync or async**:
+The built-ins don't cover everything — `req.ip`, a value derived from a header, a
+tenant resolved from the host, or an awaited per-request lookup. `createParamDecorator`
+builds your own from a resolver that receives `{ req, res }` (plus any `data` you
+pass) and returns the value — **sync or async**:
 
 ```typescript
 import { createParamDecorator } from 'zodec';
 
 const ClientIp = createParamDecorator(({ req }) => req.ip);
-const Cookie = createParamDecorator(({ req }, name: string) => req.cookies?.[name]);
+const Tenant = createParamDecorator(({ req }) => req.hostname.split('.')[0]);
 
 @Get()
-handler(@ClientIp() ip: string | undefined, @Cookie('sid') sid: string | undefined) {}
+handler(@ClientIp() ip: string | undefined, @Tenant() tenant: string) {}
 ```
 
 A resolver may return a promise — it's awaited before the handler runs — and a

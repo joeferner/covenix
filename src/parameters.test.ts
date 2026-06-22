@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Get } from './decorators.js';
-import { BodyParam, Header, Param, QueryParam, Req, Res } from './parameters.js';
+import { BodyParam, HeaderParam, Param, QueryParam, Req, Res } from './parameters.js';
 import { getParams, type ParamMetadata } from './metadata.js';
 
 function byIndex(params: ParamMetadata[]): ParamMetadata[] {
@@ -15,7 +15,7 @@ describe('parameter metadata', () => {
         @Param('id') _id: string,
         @QueryParam('page') _page: number,
         @BodyParam() _body: unknown,
-        @Header('authorization') _auth: string,
+        @HeaderParam('authorization') _auth: string,
         @Req() _req: unknown,
         @Res() _res: unknown,
       ): void {}

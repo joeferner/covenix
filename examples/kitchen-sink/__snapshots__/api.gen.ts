@@ -70,6 +70,11 @@ export interface Login {
   password: string;
 }
 
+/** Whether a session cookie was presented. */
+export interface SessionResult {
+  authenticated: boolean;
+}
+
 export interface MessageNotification {
   type: "message";
   from: string;
@@ -323,6 +328,8 @@ export interface Client {
     login: { (args: { body: Login; headers?: Record<string, string> }): Promise<Token>; raw(args: { body: Login; headers?: Record<string, string> }): Promise<{ status: 200; body: Token; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
     /** Return the currently authenticated user */
     me: { (args?: { headers?: Record<string, string> }): Promise<User>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: User; headers: Headers } | { status: 401; body: Error; headers: Headers }> };
+    /** Report whether a session cookie is present */
+    session: { (args?: { headers?: Record<string, string> }): Promise<SessionResult>; raw(args?: { headers?: Record<string, string> }): Promise<{ status: 200; body: SessionResult; headers: Headers }> };
   };
 }
 
@@ -354,6 +361,7 @@ export function createClient(options: ClientOptions): Client {
     auth: {
       login: method({ method: "post", path: "/v1/auth/login" }),
       me: method({ method: "get", path: "/v1/auth/me" }),
+      session: method({ method: "get", path: "/v1/auth/session" }),
     },
   } as unknown as Client;
 }

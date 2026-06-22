@@ -10,8 +10,10 @@ import {
   addSecurity,
   addSseResponse,
   setBodySchema,
+  setCookiesSchema,
   setDeprecated,
   setDescription,
+  setHeadersSchema,
   setHttpMethod,
   setOperationId,
   setParamsSchema,
@@ -118,6 +120,41 @@ export function Params(schema: ZodObject): MethodDecorator {
 export function Query(schema: ZodObject): MethodDecorator {
   return (target, propertyKey) => {
     setQuerySchema(target, String(propertyKey), schema);
+  };
+}
+
+/**
+ * Validates `req.headers` against the given Zod object before the handler runs,
+ * and documents each property as an `in: header` OpenAPI parameter. The parsed
+ * (coerced) values are what `@HeaderParam` injects. A failure responds `400`.
+ *
+ * Header names are case-insensitive and Node lower-cases them, so the schema's
+ * keys must be lower-case (e.g. `'x-request-id'`). The reserved `authorization`,
+ * `accept`, and `content-type` headers are still validated but omitted from the
+ * generated OpenAPI parameters (the spec handles those elsewhere).
+ *
+ * @param schema - Zod object schema describing the request headers.
+ */
+export function Headers(schema: ZodObject): MethodDecorator {
+  return (target, propertyKey) => {
+    setHeadersSchema(target, String(propertyKey), schema);
+  };
+}
+
+/**
+ * Validates `req.cookies` against the given Zod object before the handler runs,
+ * and documents each property as an `in: cookie` OpenAPI parameter. The parsed
+ * (coerced) values are what `@CookieParam` injects. A failure responds `400`.
+ *
+ * zodec reads `req.cookies`, so a cookie parser (e.g. `cookie-parser`) must be
+ * installed as middleware ahead of the route; without it `req.cookies` is empty
+ * and validation sees no cookies.
+ *
+ * @param schema - Zod object schema describing the request cookies.
+ */
+export function Cookies(schema: ZodObject): MethodDecorator {
+  return (target, propertyKey) => {
+    setCookiesSchema(target, String(propertyKey), schema);
   };
 }
 

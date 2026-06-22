@@ -8,6 +8,8 @@ export {
   Delete,
   Params,
   Query,
+  Headers,
+  Cookies,
   Body,
   Returns,
   ReturnsFile,
@@ -39,10 +41,11 @@ export type {
 } from './range-file-response.js';
 export {
   BodyParam,
+  CookieParam,
   createParamDecorator,
   File,
   Files,
-  Header,
+  HeaderParam,
   Param,
   Principal,
   QueryParam,
