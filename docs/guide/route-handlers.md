@@ -159,6 +159,43 @@ in sync with the resolver's return type (exactly like `@Principal() user: User`)
 
 The **first declared 2xx** is the success status; there's no `setStatus` call.
 
+## Dates
+
+A JavaScript `Date` has no JSON form — it travels as an **ISO string** over the
+wire. zodec keeps the schema honest about which side holds a real `Date`:
+
+- **Responses → `z.date()`.** Your handler returns a `Date`; zodec validates it
+  and serializes it to an ISO string. Documented in OpenAPI as
+  `{ type: 'string', format: 'date-time' }`.
+- **Requests → `z.coerce.date()`.** The incoming JSON value is a string, so
+  `z.coerce.date()` parses it into a `Date` before your handler runs. (Plain
+  `z.date()` on a request body would reject the string.)
+
+```typescript
+const CreateEvent = z.object({
+  title: z.string(),
+  startsAt: z.coerce.date(), // request: ISO string → Date
+});
+const Event = z.object({
+  id: z.uuid(),
+  startsAt: z.date(), // response: Date → ISO string on the wire
+});
+
+@Post()
+@Body(CreateEvent)
+@Returns(201, Event)
+create(@BodyParam() body: z.infer<typeof CreateEvent>): z.infer<typeof Event> {
+  return this.events.create(body); // body.startsAt is a Date; the returned Date is serialized
+}
+```
+
+On the client side, dates depend on whether you generate a validating client:
+
+- The **default (types-only) [client](/guide/typed-client)** types a date field as
+  `string` — the honest wire type, since it does no parsing.
+- A **validating client** (`generateTypeScriptClient(contract, { validate: 'zod' })`)
+  types it as `Date` and **revives** the ISO string into a real `Date` on receipt.
+
 ## Documentation decorators
 
 These enrich the OpenAPI operation and the generated client's JSDoc.

@@ -7,6 +7,10 @@ export const UserSchema = z
     email: z.string().email().describe('Primary contact email; also the login identifier.'),
     role: z.enum(['admin', 'user']).default('user').describe('Authorization role for the user.'),
     createdAt: z.string().datetime(),
+    // A real `z.date()` in a response: the handler returns a `Date`, zodec
+    // serializes it to an ISO string on the wire, and the *validating* generated
+    // client revives it back into a `Date`. (Documented as date-time in OpenAPI.)
+    lastSeenAt: z.date().optional().describe('When the user was last seen.'),
   })
   // Descriptions (.describe() / .meta({ description })) flow into both the OpenAPI
   // document and the generated client's JSDoc.
@@ -17,6 +21,10 @@ export const CreateUserSchema = z
     username: z.string().min(3).max(32),
     email: z.string().email(),
     role: z.enum(['admin', 'user']).optional(),
+    // A `z.date()` in a request body: the incoming JSON value is an ISO string, so
+    // `z.coerce.date()` parses it into a `Date` server-side. The validating client
+    // accepts a `Date` and serializes it to a string on the way out.
+    lastSeenAt: z.coerce.date().optional().describe('When the user was last seen.'),
   })
   .meta({ id: 'CreateUser' });
 

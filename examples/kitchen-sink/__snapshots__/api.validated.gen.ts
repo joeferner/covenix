@@ -18,6 +18,8 @@ export interface User {
   /** Authorization role for the user. */
   role: "admin" | "user";
   createdAt: string;
+  /** When the user was last seen. */
+  lastSeenAt?: Date;
 }
 
 export interface UserList {
@@ -48,12 +50,15 @@ export interface CreateUser {
   username: string;
   email: string;
   role?: "admin" | "user";
+  /** When the user was last seen. */
+  lastSeenAt?: Date;
 }
 
 export interface UpdateUser {
   username?: string;
   email?: string;
   role?: "admin" | "user";
+  lastSeenAt?: Date;
 }
 
 export interface Token {
@@ -81,13 +86,13 @@ export interface PresenceNotification {
 export type Notification = (MessageNotification | PresenceNotification);
 
 const Health$schema: z.ZodType<Health> = z.object({ status: z.literal("ok"), uptimeMs: z.number() });
-const User$schema: z.ZodType<User> = z.object({ id: z.string().uuid(), username: z.string().min(3).max(32), email: z.string().email(), role: z.enum(["admin","user"]).default("user"), createdAt: z.string() });
+const User$schema: z.ZodType<User> = z.object({ id: z.string().uuid(), username: z.string().min(3).max(32), email: z.string().email(), role: z.enum(["admin","user"]).default("user"), createdAt: z.string(), lastSeenAt: z.coerce.date().optional() });
 const UserList$schema: z.ZodType<UserList> = z.object({ items: z.array(z.lazy(() => User$schema)), page: z.number(), limit: z.number(), total: z.number() });
 const PaginationQuery$schema: z.ZodType<PaginationQuery> = z.object({ page: z.number().min(1).default(1), limit: z.number().min(1).max(100).default(20) });
 const Error$schema: z.ZodType<Error> = z.object({ status: z.number(), errors: z.array(z.object({ path: z.array(z.string()), message: z.string() })) });
 const UploadResult$schema: z.ZodType<UploadResult> = z.object({ filename: z.string(), contentType: z.string(), size: z.number(), caption: z.string().optional() });
-const CreateUser$schema: z.ZodType<CreateUser> = z.object({ username: z.string().min(3).max(32), email: z.string().email(), role: z.enum(["admin","user"]).optional() });
-const UpdateUser$schema: z.ZodType<UpdateUser> = z.object({ username: z.string().min(3).max(32).optional(), email: z.string().email().optional(), role: z.enum(["admin","user"]).optional() });
+const CreateUser$schema: z.ZodType<CreateUser> = z.object({ username: z.string().min(3).max(32), email: z.string().email(), role: z.enum(["admin","user"]).optional(), lastSeenAt: z.coerce.date().optional() });
+const UpdateUser$schema: z.ZodType<UpdateUser> = z.object({ username: z.string().min(3).max(32).optional(), email: z.string().email().optional(), role: z.enum(["admin","user"]).optional(), lastSeenAt: z.coerce.date().optional() });
 const Token$schema: z.ZodType<Token> = z.object({ token: z.string(), expiresIn: z.number() });
 const Login$schema: z.ZodType<Login> = z.object({ username: z.string().min(3), password: z.string().min(8) });
 const MessageNotification$schema: z.ZodType<MessageNotification> = z.object({ type: z.literal("message"), from: z.string(), text: z.string() });

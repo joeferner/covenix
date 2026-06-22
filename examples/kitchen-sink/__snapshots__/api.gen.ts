@@ -17,6 +17,8 @@ export interface User {
   /** Authorization role for the user. */
   role: "admin" | "user";
   createdAt: string;
+  /** When the user was last seen. */
+  lastSeenAt?: string;
 }
 
 export interface UserList {
@@ -47,12 +49,15 @@ export interface CreateUser {
   username: string;
   email: string;
   role?: "admin" | "user";
+  /** When the user was last seen. */
+  lastSeenAt?: string;
 }
 
 export interface UpdateUser {
   username?: string;
   email?: string;
   role?: "admin" | "user";
+  lastSeenAt?: string;
 }
 
 export interface Token {

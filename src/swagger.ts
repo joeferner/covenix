@@ -74,7 +74,19 @@ export type OpenApiDocument = OpenAPIV3_1.Document;
  * @returns The schema as JSON Schema (draft 2020-12).
  */
 export function toJsonSchema(schema: ZodType): JsonSchema {
-  return z.toJSONSchema(schema);
+  return z.toJSONSchema(schema, {
+    // `z.date()` (and other types JSON Schema can't represent) would otherwise
+    // throw; emit them as `any` and then give dates the conventional OpenAPI
+    // representation. A JS `Date` travels as an ISO string over JSON.
+    unrepresentable: 'any',
+    override: (ctx) => {
+      const def = (ctx.zodSchema as { _zod?: { def?: { type?: string } } })._zod?.def;
+      if (def?.type === 'date') {
+        ctx.jsonSchema.type = 'string';
+        ctx.jsonSchema.format = 'date-time';
+      }
+    },
+  });
 }
 
 /**
@@ -264,7 +276,7 @@ class DocumentBuilder {
 
   /** Converts a Zod schema to a JSON Schema fragment, hoisting named `$defs`. */
   private toJson(schema: ZodType): JsonSchema {
-    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    const json = toJsonSchema(schema) as unknown as JsonObject;
     this.hoist(json);
     return json;
   }
@@ -283,7 +295,7 @@ class DocumentBuilder {
    * that is itself named becomes a component and is returned as a `$ref`.
    */
   private schema(schema: ZodType): OpenAPIV3_1.SchemaObject {
-    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    const json = toJsonSchema(schema) as unknown as JsonObject;
     this.hoist(json);
     // Record any named discriminated unions reachable from here (incl. nested),
     // so `discriminator` can be attached once every component is registered.
@@ -334,7 +346,7 @@ class DocumentBuilder {
    * parameters — one per property. Path parameters are always required.
    */
   private parameters(schema: ZodType, location: 'path' | 'query'): OpenAPIV3_1.ParameterObject[] {
-    const json = z.toJSONSchema(schema) as unknown as JsonObject;
+    const json = toJsonSchema(schema) as unknown as JsonObject;
     this.hoist(json);
     const properties = (json['properties'] ?? {}) as Record<string, JsonSchema>;
     const required = new Set((json['required'] as string[] | undefined) ?? []);

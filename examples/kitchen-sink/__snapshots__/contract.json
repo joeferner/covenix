@@ -648,6 +648,13 @@
             "kind": "string",
             "format": "datetime"
           }
+        },
+        "lastSeenAt": {
+          "schema": {
+            "kind": "date"
+          },
+          "optional": true,
+          "description": "When the user was last seen."
         }
       },
       "additionalProperties": false,
@@ -791,6 +798,13 @@
             ]
           },
           "optional": true
+        },
+        "lastSeenAt": {
+          "schema": {
+            "kind": "date"
+          },
+          "optional": true,
+          "description": "When the user was last seen."
         }
       },
       "additionalProperties": false
@@ -820,6 +834,12 @@
               "admin",
               "user"
             ]
+          },
+          "optional": true
+        },
+        "lastSeenAt": {
+          "schema": {
+            "kind": "date"
           },
           "optional": true
         }

@@ -15,11 +15,17 @@ async function main(): Promise<void> {
   // Each call parses the server's response through the regenerated Zod schema; a
   // drift would throw ZodecClientValidationError. Reaching the assertions proves
   // the responses conform.
+  // Send a real Date in the request body; it round-trips back as a real Date.
+  const lastSeenAt = new Date('2020-06-15T10:00:00.000Z');
   const created = await api.users.create({
-    body: { username: 'valclient', email: 'valclient@example.com' },
+    body: { username: 'valclient', email: 'valclient@example.com', lastSeenAt },
   });
   assert.equal(typeof created.id, 'string');
-  ok('users.create() → response validated against the contract');
+  assert.ok(
+    created.lastSeenAt instanceof Date &&
+      created.lastSeenAt.toISOString() === lastSeenAt.toISOString(),
+  );
+  ok('users.create({ lastSeenAt: Date }) → response revives z.date() to a Date');
 
   const fetched = await api.users.get({ params: { id: created.id } });
   assert.equal(fetched.id, created.id);

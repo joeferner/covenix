@@ -36,6 +36,9 @@ export class UserService {
       email: input.email,
       role: input.role ?? 'user',
       createdAt: new Date().toISOString(),
+      // input.lastSeenAt is a real Date (coerced from the request's ISO string);
+      // it serializes back to an ISO string in the response.
+      lastSeenAt: input.lastSeenAt,
     };
     this.users.set(user.id, user);
     return user;
