@@ -73,13 +73,13 @@ export type {
   RouteMetadata,
   SecurityRequirement,
 } from './metadata.js';
-export { Zodec, ControllerGroup } from './zodec.js';
-export type { ZodecInfo, ZodecOptions, RegisterOptions } from './zodec.js';
+export { Avero, ControllerGroup } from './avero.js';
+export type { AveroInfo, AveroOptions, RegisterOptions } from './avero.js';
 export { toExpress, serve } from './express.js';
 export type { ToExpressOptions, ServeOptions } from './express.js';
 export type { DocsUi, ServeDocsOptions } from './serve-docs.js';
-export { SecurityError, ValidationError, ZodecError, zodecErrorHandler } from './errors.js';
-export type { ProblemDetails, ZodecErrorHandlerOptions } from './errors.js';
+export { SecurityError, ValidationError, AveroError, averoErrorHandler } from './errors.js';
+export type { ProblemDetails, AveroErrorHandlerOptions } from './errors.js';
 export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
 export type {
   ControllerSource,
@@ -96,7 +96,7 @@ export {
   ContractOperationSchema,
   ContractResponseSchema,
   SchemaNodeSchema,
-  ZodecContractSchema,
+  AveroContractSchema,
   generateContract,
   generateContractDocument,
   parseContract,
@@ -108,7 +108,7 @@ export type {
   ContractResponse,
   PropertyNode,
   SchemaNode,
-  ZodecContract,
+  AveroContract,
 } from './contract.js';
 export { generateTypeScriptClient } from './generator/contract-client.js';
 export type { GenerateClientOptions, ClientValidation } from './generator/contract-client.js';

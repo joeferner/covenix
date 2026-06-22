@@ -1,16 +1,16 @@
 # Authentication
 
 Protect a route with [`@Security`](/api/functions/Security). It names a scheme
-you register on the `Zodec` instance; before the handler runs, zodec invokes that
+you register on the `Avero` instance; before the handler runs, avero invokes that
 scheme's handler, and the principal it returns is injected with
 [`@Principal()`](/api/variables/Principal). The same registration drives the
 OpenAPI `securitySchemes` + per-operation `security`, so the spec always matches
 what's enforced.
 
 ```typescript
-import { Zodec, Route, Get, Security, Principal, Returns, bearer, SecurityError } from 'zodec';
+import { Avero, Route, Get, Security, Principal, Returns, bearer, SecurityError } from 'avero';
 
-const api = new Zodec({
+const api = new Avero({
   info: { title: 'My API', version: '1.0.0' },
   security: {
     bearerAuth: bearer((req, scopes) => {
@@ -43,12 +43,12 @@ A security handler is `(req, scopes) => principal`:
 
 - **Returns a principal** (any value) — authentication succeeded; the value is
   injected via `@Principal()`.
-- **Returns `null`/`undefined`** — zodec rejects with **`401`**.
+- **Returns `null`/`undefined`** — avero rejects with **`401`**.
 - **Throws** — the thrown error propagates (e.g. `new SecurityError(403)` for
-  authenticated-but-not-authorized). It can be `async`; zodec awaits it.
+  authenticated-but-not-authorized). It can be `async`; avero awaits it.
 
 `scopes` is the array passed to `@Security(scheme, scopes)` for this route. **The
-handler owns the scope check** — zodec doesn't prescribe a principal shape, so
+handler owns the scope check** — avero doesn't prescribe a principal shape, so
 whether a "scope" is an OAuth scope, a role, or a permission is up to you.
 
 Authentication runs **before** request validation, so an unauthenticated request
@@ -60,7 +60,7 @@ The `security` map pairs an OpenAPI scheme definition with a handler. Builders
 produce both at once:
 
 ```typescript
-import { bearer, basic, apiKey, oauth2 } from 'zodec';
+import { bearer, basic, apiKey, oauth2 } from 'avero';
 
 security: {
   bearerAuth: bearer(handler, { bearerFormat: 'JWT' }), // { type: 'http', scheme: 'bearer' }
@@ -86,7 +86,7 @@ me(@Principal() user: User): User {
 }
 ```
 
-On an unguarded route `@Principal()` resolves to `undefined`. (zodec doesn't carry
+On an unguarded route `@Principal()` resolves to `undefined`. (avero doesn't carry
 runtime type info, so the annotation is yours to get right — same as `@Param`/
 `@Body` injections.)
 
@@ -103,7 +103,7 @@ passes if one succeeds (left to right). This is OpenAPI's array-of-requirements
 getData(@Principal() who: Principal) { ... }
 ```
 
-zodec runs each in order and injects the first success. If none succeed, the
+avero runs each in order and injects the first success. If none succeed, the
 first failure is reported (a `null` return → `401`; a thrown `403` is preserved).
 
 ## Class-wide and per-route
@@ -126,9 +126,9 @@ class AdminController {
 
 ## Errors
 
-zodec throws [`SecurityError`](/api/classes/SecurityError) (`401`, or `403` when
+avero throws [`SecurityError`](/api/classes/SecurityError) (`401`, or `403` when
 a handler throws it) through the normal error pipeline. The optional
-[`zodecErrorHandler()`](/guide/validation) renders it as an RFC 9457
+[`averoErrorHandler()`](/guide/validation) renders it as an RFC 9457
 `application/problem+json` body (`{ type, title, status }`); handlers that throw
 `http-errors` (or any error with a `status`) compose with your own Express error
 middleware.
@@ -161,5 +161,5 @@ generateSwagger([UsersController], info, {
 });
 ```
 
-Sharing one `securitySchemes` constant between `new Zodec({ security })` and
+Sharing one `securitySchemes` constant between `new Avero({ security })` and
 `generateSwagger(...)` keeps the running server and the static spec identical.

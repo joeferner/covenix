@@ -1,13 +1,13 @@
 # Migrating from tsoa
 
-[tsoa](https://github.com/lukeautry/tsoa) and zodec solve the same problem —
+[tsoa](https://github.com/lukeautry/tsoa) and avero solve the same problem —
 typed Express routes with an OpenAPI document — but from opposite directions:
 
 - **tsoa is build-time.** It reads your TypeScript **types** (plus JSDoc tags)
   and runs a code generator (`tsoa routes`, `tsoa spec`) that emits a routes file
   and a `swagger.json`. Your types are the source of truth, and a compile step
   turns them into validation + spec.
-- **zodec is runtime.** You describe each endpoint with **Zod schemas**. There is
+- **avero is runtime.** You describe each endpoint with **Zod schemas**. There is
   no code generation and no `tsoa.json`: `api.mount(app)` wires the routes and
   `api.swagger()` produces the document, both at startup, from the same schemas.
 
@@ -17,7 +17,7 @@ the routing and parameter decorators are nearly identical.
 
 ## At a glance
 
-| tsoa                                              | zodec                                           | Notes                                                             |
+| tsoa                                              | avero                                           | Notes                                                             |
 | ------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | `class C extends Controller`                      | `class C` (plain)                               | No base class.                                                    |
 | `@Route('users')` / `@Tags('Users')`              | `@Route('users')` / `@Tags('Users')`            | Identical.                                                        |
@@ -40,13 +40,13 @@ the routing and parameter decorators are nearly identical.
 | Manual `req.range` / `206` / `416`                | return a `RangeFileResponse`                    | Range negotiation is automatic.                                   |
 | Validation from TS types + `@isInt`/`@minLength`  | Zod schema (`z.number().int()`, `.min()`)       | Runtime, explicit.                                                |
 | Models are interfaces/classes                     | `z.object({…}).meta({ id: 'User' })`            | `.meta({ id })` names the component.                              |
-| `ValidateError` (422), handle it yourself         | `ValidationError` + `zodecErrorHandler()`       | Optional ready-made handler.                                      |
+| `ValidateError` (422), handle it yourself         | `ValidationError` + `averoErrorHandler()`       | Optional ready-made handler.                                      |
 | `tsoa routes && tsoa spec`, `RegisterRoutes(app)` | `api.mount(app)`, `api.swagger()`               | No generated files.                                               |
 | IoC container (`iocModule`)                       | `api.register(new C(deps))`                     | Explicit construction.                                            |
 | `@Security('jwt', scopes)`                        | `@Security('jwt', scopes)` + `bearer()` handler | Schemes registered on the instance; principal via `@Principal()`. |
 | `@OperationId('x')`                               | `@OperationId('x')`                             | Both default the id to the method name.                           |
 | `@Middlewares(...)`                               | `@Use(...)`                                     | Express middleware, class or method.                              |
-| JSDoc summary / description on the method         | `@Summary('…')` / `@Description('…')`           | zodec uses decorators, not doc comments.                          |
+| JSDoc summary / description on the method         | `@Summary('…')` / `@Description('…')`           | avero uses decorators, not doc comments.                          |
 | JSDoc `@deprecated` tag                           | `@Deprecated()`                                 | Marks the operation deprecated in the spec.                       |
 
 ## A controller, side by side
@@ -74,7 +74,7 @@ export class UsersController extends Controller {
 }
 ```
 
-**zodec** — Zod schemas carry the contract. The method-level `@Params`/`@Query`/
+**avero** — Zod schemas carry the contract. The method-level `@Params`/`@Query`/
 `@Body` decorators validate; the parameter-level `@Param`/`@QueryParam`/
 `@BodyParam` inject:
 
@@ -92,7 +92,7 @@ import {
   Param,
   QueryParam,
   BodyParam,
-} from 'zodec';
+} from 'avero';
 
 @Route('users')
 @Tags('Users')
@@ -120,7 +120,7 @@ export class UsersController {
 Two things to internalize:
 
 1. **The schema lives on the method, the injection on the parameter.** tsoa packs
-   both into one decorator because it reads your types. zodec keeps them separate:
+   both into one decorator because it reads your types. avero keeps them separate:
    `@Query(schema)` validates the whole query object once; `@QueryParam('verbose')`
    pulls one parsed field out.
 2. **No `extends Controller`, no `this.setStatus()`.** The success status is just
@@ -155,7 +155,7 @@ The same contract as a Zod schema — and this object both validates requests an
 becomes the `CreateUser` component in your OpenAPI document:
 
 ```typescript
-// zodec
+// avero
 export const CreateUserSchema = z
   .object({
     username: z
@@ -205,12 +205,12 @@ public async list(): Promise<User[]> {
 }
 ```
 
-zodec declares each response with a stackable `@Returns`, declares headers as part
+avero declares each response with a stackable `@Returns`, declares headers as part
 of the success response, and sets the header value by returning an `HttpResponse`
 (no `@Res`, and the declared header schema coerces the value — `number` → string):
 
 ```typescript
-// zodec
+// avero
 @Get()
 @Returns(200, UserListSchema, { headers: { 'X-Total-Count': z.number().int() } })
 @Returns(404, ErrorSchema)
@@ -226,7 +226,7 @@ bare return. The `@Res` escape hatch remains for anything lower-level.
 ## Errors
 
 tsoa throws `ValidateError` (422) and leaves you to write the error middleware.
-zodec throws `ValidationError` (400 for params/query, 422 for body, 500 for a
+avero throws `ValidationError` (400 for params/query, 422 for body, 500 for a
 response that violates its `@Returns` schema) and ships an optional handler:
 
 ```typescript
@@ -239,9 +239,9 @@ app.use((err, req, res, next) => {
   next(err);
 });
 
-// zodec — ready-made (or handle ValidationError yourself)
-import { zodecErrorHandler } from 'zodec';
-app.use(zodecErrorHandler());
+// avero — ready-made (or handle ValidationError yourself)
+import { averoErrorHandler } from 'avero';
+app.use(averoErrorHandler());
 ```
 
 See [Validation & Errors](/guide/validation) for the error shape and how to
@@ -260,12 +260,12 @@ public async upload(
 ): Promise<void> {}
 ```
 
-zodec models the whole form as a `@Body` schema. A `z.file()` field auto-detects
+avero models the whole form as a `@Body` schema. A `z.file()` field auto-detects
 the route as `multipart/form-data`; the file is injected as a **web-standard
 `File`**, and constraints live in the schema:
 
 ```typescript
-// zodec
+// avero
 const AvatarUpload = z.object({
   avatar: z.file().max(2_000_000).mime(['image/png', 'image/jpeg']),
   caption: z.string().max(140).optional(),
@@ -283,7 +283,7 @@ public async upload(
 }
 ```
 
-zodec also uses multer under the hood — configure it via `new Zodec({ multipart })`.
+avero also uses multer under the hood — configure it via `new Avero({ multipart })`.
 See [File uploads](/guide/file-uploads).
 
 ## File downloads
@@ -301,11 +301,11 @@ public async export(): Promise<Readable> {
 }
 ```
 
-zodec returns a `FileResponse` and declares the binary body with `@ReturnsFile`;
+avero returns a `FileResponse` and declares the binary body with `@ReturnsFile`;
 the `Content-Disposition` (including RFC 5987 UTF-8 filenames) is handled for you:
 
 ```typescript
-// zodec
+// avero
 @Get('export')
 @ReturnsFile(200, { contentType: 'text/csv' })
 public async export(): Promise<FileResponse> {
@@ -333,7 +333,7 @@ return new FileResponse(bytes, {
 ### Range / partial downloads
 
 tsoa has no built-in Range support — you read `req.range(size)` and set `206`/
-`416`, `Content-Range`, and `Accept-Ranges` by hand. zodec packages that into
+`416`, `Content-Range`, and `Accept-Ranges` by hand. avero packages that into
 `RangeFileResponse`: return one and the `206`/`416`/full-`200` negotiation is
 automatic.
 
@@ -350,7 +350,7 @@ if (ranges === -1) {
   return file.getStream({ start, end });
 }
 
-// zodec — return a RangeFileResponse; zodec negotiates the range
+// avero — return a RangeFileResponse; avero negotiates the range
 return new RangeFileResponse(
   { size: file.size, stream: (range) => file.getStream(range) },
   { contentType: file.contentType, filename: file.filename, disposition: 'inline' },
@@ -373,18 +373,18 @@ RegisterRoutes(app);
 // swagger.json is the generated file, served statically
 ```
 
-zodec wires routes and produces the document at runtime — no `tsoa.json`, no
+avero wires routes and produces the document at runtime — no `tsoa.json`, no
 generated files, nothing to keep in sync:
 
 ```typescript
 import 'reflect-metadata';
 import express from 'express';
-import { Zodec } from 'zodec';
+import { Avero } from 'avero';
 
 const app = express();
 app.use(express.json());
 
-const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service)); // you own construction (DI)
 api.mount(app);
 
@@ -398,7 +398,7 @@ instance-free [`generateSwagger([UsersController])`](/guide/swagger).
 ## Dependency injection
 
 tsoa constructs controllers with a no-arg constructor by default, or via an IoC
-container configured in `tsoa.json` (inversify/tsyringe/typedi). zodec has no
+container configured in `tsoa.json` (inversify/tsyringe/typedi). avero has no
 container: you construct each controller and `register` the instance, injecting
 dependencies through its constructor.
 
@@ -432,13 +432,13 @@ public async me(@Request() req: ExRequest): Promise<User> {
 }
 ```
 
-zodec registers each scheme on the instance (definition **and** handler together,
+avero registers each scheme on the instance (definition **and** handler together,
 via a builder) and injects the principal with `@Principal()`:
 
 ```typescript
-import { Zodec, Security, Principal, bearer } from 'zodec';
+import { Avero, Security, Principal, bearer } from 'avero';
 
-const api = new Zodec({
+const api = new Avero({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -464,7 +464,7 @@ Mapping notes:
 - **Per-scheme handlers, not one global switch.** Each named scheme carries its
   own handler, so there's no `securityName` dispatch.
 - **`req.user` → `@Principal()`.** The handler's return value is injected directly.
-- **Scopes are handler-decided** (same as tsoa) — zodec passes them in.
+- **Scopes are handler-decided** (same as tsoa) — avero passes them in.
 - **Reject semantics:** return `null`/`undefined` for `401`; throw (e.g.
   `new SecurityError(403)`) for `403`.
 - **OR** of schemes: stack `@Security` decorators (the request passes if any one
@@ -472,5 +472,5 @@ Mapping notes:
 
 See [Authentication](/guide/authentication) for the full picture.
 
-If you hit a tsoa feature without an obvious zodec equivalent, please
-[open an issue](https://github.com/joeferner/zodec/issues).
+If you hit a tsoa feature without an obvious avero equivalent, please
+[open an issue](https://github.com/joeferner/avero/issues).

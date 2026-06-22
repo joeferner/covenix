@@ -1,13 +1,13 @@
 import type { OpenAPIV3_1 } from 'openapi-types';
 
 /**
- * Converts an assembled OpenAPI **3.1** document (as zodec builds it from Zod 4's
+ * Converts an assembled OpenAPI **3.1** document (as avero builds it from Zod 4's
  * `z.toJSONSchema()`, which is JSON Schema draft 2020-12) down to **3.0**, in
- * place. zodec emits 3.1 by default; this is applied only when `specVersion: '3.0'`
+ * place. avero emits 3.1 by default; this is applied only when `specVersion: '3.0'`
  * is requested — typically so older tooling (e.g. `openapi-generator`'s
  * `typescript-fetch`, which has only partial 3.1 support) can consume the spec.
  *
- * It handles the differences that actually arise from zodec's output:
+ * It handles the differences that actually arise from avero's output:
  *
  * - **nullable**: 3.1 `anyOf: [..., { type: 'null' }]` → 3.0 `nullable: true`
  *   (a lone `$ref` becomes `allOf: [$ref]` + `nullable`, since 3.0 forbids `$ref`

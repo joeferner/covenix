@@ -1,12 +1,12 @@
 import cookieParser from 'cookie-parser';
-import { serve } from 'zodec';
+import { serve } from 'avero';
 import { api } from './api.js';
 import { additionalSchemas } from './api-schemas.js';
 
 const port = Number(process.env.PORT ?? 3000);
 
 // One-call bootstrap: `serve` builds the Express app (json body parser, mounted
-// routes, Scalar docs at /docs, and the zodec error handler) and starts listening.
+// routes, Scalar docs at /docs, and the avero error handler) and starts listening.
 // The docs `schemas` option adds route-less named types (see api-schemas.ts) to the
 // served spec, so /docs/openapi.json is complete — no separate /swagger.json needed.
 await serve(api, {

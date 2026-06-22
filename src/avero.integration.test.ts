@@ -36,9 +36,9 @@ import {
   Req,
   Res,
 } from './parameters.js';
-import { Zodec } from './zodec.js';
+import { Avero } from './avero.js';
 import { bearer, apiKey } from './security.js';
-import { SecurityError, ValidationError, zodecErrorHandler } from './errors.js';
+import { SecurityError, ValidationError, averoErrorHandler } from './errors.js';
 import { FileResponse } from './file-response.js';
 import { RangeFileResponse } from './range-file-response.js';
 import { HttpResponse } from './http-response.js';
@@ -59,7 +59,7 @@ class HelloController {
 function makeApp(...controllers: object[]): express.Express {
   const app = express();
   app.use(express.json());
-  const api = new Zodec({ info: { title: 'Test API', version: '1.0.0' } });
+  const api = new Avero({ info: { title: 'Test API', version: '1.0.0' } });
   for (const controller of controllers) {
     api.register(controller);
   }
@@ -69,11 +69,11 @@ function makeApp(...controllers: object[]): express.Express {
 
 function makeAppWithErrorHandler(...controllers: object[]): express.Express {
   const app = makeApp(...controllers);
-  app.use(zodecErrorHandler());
+  app.use(averoErrorHandler());
   return app;
 }
 
-describe('Zodec register + mount', () => {
+describe('Avero register + mount', () => {
   it('serves a registered controller route end to end', async () => {
     const res = await request(makeApp(new HelloController())).get('/hello');
 
@@ -89,7 +89,7 @@ describe('handler argument assembly', () => {
     // plain undecorated trailing arg to prove gaps stay undefined.
     @Post('{id}')
     // `.loose()` keeps the echoed payload — this test is about arg injection,
-    // not response shaping (zodec otherwise strips undeclared fields).
+    // not response shaping (avero otherwise strips undeclared fields).
     @Returns(200, z.object({}).loose())
     public echo(
       @Param('id') id: string,
@@ -245,7 +245,7 @@ describe('response validation', () => {
   });
 });
 
-describe('zodecErrorHandler', () => {
+describe('averoErrorHandler', () => {
   const CreateBody = z.object({ name: z.string().min(3) });
 
   @Route('things')
@@ -289,14 +289,14 @@ describe('zodecErrorHandler', () => {
     const res = await request(makeAppWithErrorHandler(new ThingController())).get('/things/boom');
 
     expect(res.status).toBe(500);
-    // Not rendered in zodec's validation shape.
+    // Not rendered in avero's validation shape.
     expect(res.body).not.toHaveProperty('errors');
   });
 
   it('honors a custom formatError (and falls back to application/json)', async () => {
     const app = makeApp(new ThingController());
     app.use(
-      zodecErrorHandler({
+      averoErrorHandler({
         formatError: (error) => ({
           ok: false,
           count: error instanceof ValidationError ? error.issues.length : 0,
@@ -602,7 +602,7 @@ describe('range file responses', () => {
       return new RangeFileResponse(new Uint8Array(data), { contentType: 'text/plain' });
     }
 
-    // Stream source: zodec asks for the requested slice.
+    // Stream source: avero asks for the requested slice.
     @Get('stream')
     @ReturnsFile(200, { contentType: 'text/plain' })
     public stream(): RangeFileResponse {
@@ -661,7 +661,7 @@ describe('range file responses', () => {
   });
 
   describe('fromPath (Express sendFile)', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'zodec-range-'));
+    const dir = mkdtempSync(join(tmpdir(), 'avero-range-'));
     const file = join(dir, 'data.txt');
     writeFileSync(file, 'helloworld');
 
@@ -817,7 +817,7 @@ describe('multipart storage engines', () => {
 
   function appWith(multipart: Options | undefined): express.Express {
     const app = express();
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'T', version: '1.0.0' },
       ...(multipart ? { multipart } : {}),
     });
@@ -831,7 +831,7 @@ describe('multipart storage engines', () => {
   // the file on disk via openAsBlob.
   it.each<[string, Options | undefined]>([
     ['memory (default)', undefined],
-    ['disk via dest', { dest: mkdtempSync(join(tmpdir(), 'zodec-dest-')) }],
+    ['disk via dest', { dest: mkdtempSync(join(tmpdir(), 'avero-dest-')) }],
     ['disk via diskStorage', { storage: multer.diskStorage({}) }],
   ])('adapts an upload to a File with %s storage', async (_label, multipart) => {
     const res = await request(appWith(multipart))
@@ -882,7 +882,7 @@ describe('@Security', () => {
   // For ['admin'] scope, a non-admin principal throws 403.
   function secureApp(): express.Express {
     const app = express();
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'T', version: '1.0.0' },
       security: {
         bearer: bearer((req, scopes) => {
@@ -903,7 +903,7 @@ describe('@Security', () => {
     });
     api.register(new SecureController());
     api.mount(app);
-    app.use(zodecErrorHandler());
+    app.use(averoErrorHandler());
     return app;
   }
 
@@ -957,7 +957,7 @@ describe('@Security', () => {
     }
     const app = express();
     app.use(express.json());
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'T', version: '1.0.0' },
       security: { bearer: bearer(() => null) }, // always 401
     });
@@ -1037,7 +1037,7 @@ describe('@Use middleware', () => {
     }
 
     const app = express();
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'T', version: '1.0.0' },
       security: {
         bearer: bearer((_req) => {
@@ -1056,9 +1056,9 @@ describe('@Use middleware', () => {
 });
 
 describe('serveDocs', () => {
-  function docsApp(path: string, options?: Parameters<Zodec['serveDocs']>[2]): express.Express {
+  function docsApp(path: string, options?: Parameters<Avero['serveDocs']>[2]): express.Express {
     const app = express();
-    const api = new Zodec({ info: { title: 'Docs API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'Docs API', version: '1.0.0' } });
     api.register(new HelloController());
     api.serveDocs(app, path, options);
     return app;

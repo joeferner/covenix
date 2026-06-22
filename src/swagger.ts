@@ -7,10 +7,10 @@ import { collectDiscriminators, type DiscriminatorInfo } from './discriminator.j
 import type { SecuritySchemes } from './security.js';
 
 /**
- * OpenAPI specification version to emit. zodec produces **`'3.1'`** by default
+ * OpenAPI specification version to emit. avero produces **`'3.1'`** by default
  * (its native form — Zod 4's `z.toJSONSchema()` is JSON Schema draft 2020-12,
  * which 3.1 uses verbatim). Choose `'3.0'` when a consumer has only partial 3.1
- * support (e.g. `openapi-generator`'s `typescript-fetch`); zodec down-converts
+ * support (e.g. `openapi-generator`'s `typescript-fetch`); avero down-converts
  * the schemas (nullable, exclusive bounds, `const`, binary, …) accordingly.
  */
 export type SpecVersion = '3.0' | '3.1';
@@ -19,7 +19,7 @@ export type SpecVersion = '3.0' | '3.1';
 export interface OpenApiOptions {
   /**
    * Security scheme definitions to emit under `components.securitySchemes`. The
-   * `Zodec` instance derives these from its `security` config; pass them
+   * `Avero` instance derives these from its `security` config; pass them
    * explicitly to {@link generateSwagger} for instance-free generation.
    */
   securitySchemes?: SecuritySchemes | undefined;
@@ -119,7 +119,7 @@ function rewriteRefs(node: unknown): void {
 
 /**
  * Joins controller prefix + route path for OpenAPI, keeping `{id}` placeholders
- * (OpenAPI uses the same curly-brace syntax zodec routes are written in).
+ * (OpenAPI uses the same curly-brace syntax avero routes are written in).
  */
 function toOpenApiPath(prefix: string, path: string): string {
   const joined = `/${prefix}/${path}`.replace(/\/+/g, '/').replace(/\/$/, '');
@@ -344,7 +344,7 @@ class DocumentBuilder {
    */
   private registerStandaloneSchema(schema: ZodType): void {
     if (typeof schema.meta()?.id !== 'string') {
-      throw new Error('zodec: schemas passed to registerSchemas must be named via .meta({ id })');
+      throw new Error('avero: schemas passed to registerSchemas must be named via .meta({ id })');
     }
     // `schema()` converts, hoists nested named schemas, and registers this one.
     this.schema(schema);
@@ -413,7 +413,7 @@ export function generateOpenApiDocument(
   options: OpenApiOptions = {},
 ): OpenApiDocument {
   const document = new DocumentBuilder().build(sources, info, options);
-  // The builder always emits 3.1 (zodec's native form); down-convert if asked.
+  // The builder always emits 3.1 (avero's native form); down-convert if asked.
   return options.specVersion === '3.0' ? downConvertToV30(document) : document;
 }
 

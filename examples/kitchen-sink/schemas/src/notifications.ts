@@ -6,7 +6,7 @@ import { z } from 'zod';
  * under `components.schemas` so client generators still emit a type for it. A
  * discriminated union is the typical message-envelope shape.
  *
- * Naming each variant via `.meta({ id })` lets zodec emit a full OpenAPI
+ * Naming each variant via `.meta({ id })` lets avero emit a full OpenAPI
  * `discriminator` (with a `propertyName` → `$ref` mapping), so generators like
  * `openapi-generator-cli`'s `typescript-fetch` produce a proper discriminated
  * TypeScript union instead of a flattened interface.

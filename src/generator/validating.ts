@@ -201,14 +201,14 @@ export interface ClientOptions {
 }
 
 /** Thrown by the default call form on a non-2xx response; carries the parsed body. */
-export class ZodecClientError extends Error {
+export class AveroClientError extends Error {
   constructor(
     public readonly status: number,
     public readonly body: unknown,
     public readonly headers: Headers,
   ) {
-    super('zodec client: request failed with status ' + status);
-    this.name = 'ZodecClientError';
+    super('avero client: request failed with status ' + status);
+    this.name = 'AveroClientError';
   }
 }
 
@@ -216,12 +216,12 @@ export class ZodecClientError extends Error {
  * Thrown when a request input or response body fails its schema. The underlying
  * ZodError is on '.cause'.
  */
-export class ZodecClientValidationError extends Error {
+export class AveroClientValidationError extends Error {
   public readonly phase: 'request' | 'response';
   constructor(phase: 'request' | 'response', options?: { cause?: unknown }) {
-    super('zodec client: ' + phase + ' validation failed', options);
+    super('avero client: ' + phase + ' validation failed', options);
     this.phase = phase;
-    this.name = 'ZodecClientValidationError';
+    this.name = 'AveroClientValidationError';
   }
 }
 
@@ -254,7 +254,7 @@ interface RawResponse {
 function runValidate<T>(schema: z.ZodType | undefined, value: T, phase: 'request' | 'response'): T {
   if (!schema) return value;
   const result = schema.safeParse(value);
-  if (!result.success) throw new ZodecClientValidationError(phase, { cause: result.error });
+  if (!result.success) throw new AveroClientValidationError(phase, { cause: result.error });
   return result.data as T;
 }
 
@@ -395,7 +395,7 @@ async function request(
 ): Promise<unknown> {
   const res = await fetchRaw(options, spec, args);
   if (!isOk(res.status)) {
-    throw new ZodecClientError(res.status, await parseBody(res), res.headers);
+    throw new AveroClientError(res.status, await parseBody(res), res.headers);
   }
   if (spec.stream) return sseStream(res);
   if (spec.binary) return res.blob();

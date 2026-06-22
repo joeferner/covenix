@@ -18,7 +18,7 @@ environment.
 
 ### The response schema also serializes the response
 
-zodec sends the **parsed** result, not the raw return value, so the `@Returns`
+avero sends the **parsed** result, not the raw return value, so the `@Returns`
 schema doubles as a response serializer:
 
 - **Undeclared fields are stripped.** Return `{ id, passwordHash }` from a handler
@@ -32,17 +32,17 @@ A route with no `@Returns` schema sends the value untouched.
 
 ## Errors flow through Express
 
-zodec never sends an error response itself. A failed validation calls
+avero never sends an error response itself. A failed validation calls
 `next(err)` with a `ValidationError` carrying the Zod issues and a status, so it
 travels the **same** Express error pipeline as anything your handlers throw.
-`ValidationError` and `SecurityError` both extend [`ZodecError`](/api/classes/ZodecError)
+`ValidationError` and `SecurityError` both extend [`AveroError`](/api/classes/AveroError)
 (which carries `.status`), so you can match on that in your own middleware:
 
 ```typescript
-import { ZodecError } from 'zodec';
+import { AveroError } from 'avero';
 
 app.use((err, req, res, next) => {
-  if (err instanceof ZodecError) {
+  if (err instanceof AveroError) {
     return res.status(err.status).json({ status: err.status, message: err.message });
   }
   next(err);
@@ -51,15 +51,15 @@ app.use((err, req, res, next) => {
 
 ## Convenience handler
 
-If you don't want to write that, zodec ships an optional
-[`zodecErrorHandler`](/api/functions/zodecErrorHandler) that renders errors as
+If you don't want to write that, avero ships an optional
+[`averoErrorHandler`](/api/functions/averoErrorHandler) that renders errors as
 [RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457) **Problem Details**
 (`application/problem+json`) — the standard, interoperable error shape:
 
 ```typescript
-import { zodecErrorHandler } from 'zodec';
+import { averoErrorHandler } from 'avero';
 
-app.use(zodecErrorHandler());
+app.use(averoErrorHandler());
 // 422 → application/problem+json
 // {
 //   "type": "about:blank",          // a doc URI when you have one
@@ -77,7 +77,7 @@ Override the body with `formatError` — which switches the response back to
 `application/json`, since your shape isn't Problem Details:
 
 ```typescript
-app.use(zodecErrorHandler({ formatError: (err) => ({ ok: false, message: err.message }) }));
+app.use(averoErrorHandler({ formatError: (err) => ({ ok: false, message: err.message }) }));
 ```
 
 Handlers themselves should throw standard

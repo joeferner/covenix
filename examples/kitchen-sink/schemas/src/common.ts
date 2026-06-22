@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Shape zodec's ValidationError serializes to via `zodecErrorHandler()`.
+ * Shape avero's ValidationError serializes to via `averoErrorHandler()`.
  * Named so it shows up as `#/components/schemas/Error` in swagger.
  */
 export const ErrorSchema = z
@@ -19,7 +19,7 @@ export const ErrorSchema = z
 /**
  * Reusable pagination query. `z.coerce` turns the raw string query params into
  * numbers, and `.default(...)` fills them in — exactly the coercion/defaulting
- * zodec applies before the handler runs.
+ * avero applies before the handler runs.
  */
 export const PaginationQuerySchema = z
   .object({

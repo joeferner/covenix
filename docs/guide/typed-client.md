@@ -1,13 +1,13 @@
 # Typed Client
 
-zodec can generate a **standalone, fully-typed TypeScript client** for your API.
+avero can generate a **standalone, fully-typed TypeScript client** for your API.
 It's the modern replacement for a `tsoa → swagger → openapi-generator-cli`
 pipeline: one accurate hop instead of two lossy ones, no Java, and a generated
 file with **no runtime dependency** — a front end imports it and calls your API
 with full types.
 
 ```typescript
-import { createClient } from './api.gen'; // the generated file — no zodec import
+import { createClient } from './api.gen'; // the generated file — no avero import
 
 const api = createClient({
   baseUrl: 'https://api.example.com',
@@ -28,7 +28,7 @@ representation that keeps the semantic detail JSON Schema flattens (real
 `date`/`file` kinds, first-class discriminated unions, per-property optionality).
 
 ```typescript
-import { generateContract, generateTypeScriptClient } from 'zodec';
+import { generateContract, generateTypeScriptClient } from 'avero';
 
 // 1. controllers → contract (validated on write; serialize to contract.json if you like)
 const contract = generateContract([UsersController, AuthController]);
@@ -85,16 +85,16 @@ switches the request to `multipart/form-data` automatically.
 ## Responses: throw by default, `.raw()` for exhaustive handling
 
 The default call form returns the **success body** and **throws** a
-`ZodecClientError` (carrying the status and parsed error body) on any non-2xx —
-mirroring zodec's server model, where non-2xx are thrown errors:
+`AveroClientError` (carrying the status and parsed error body) on any non-2xx —
+mirroring avero's server model, where non-2xx are thrown errors:
 
 ```typescript
-import { ZodecClientError } from './api.gen';
+import { AveroClientError } from './api.gen';
 
 try {
   const user = await api.users.get({ params: { id } }); // user: User
 } catch (err) {
-  if (err instanceof ZodecClientError && err.status === 404) {
+  if (err instanceof AveroClientError && err.status === 404) {
     err.body; // ^? the 404 schema from the contract
   }
 }
@@ -122,11 +122,11 @@ const total = res.headers.get('x-total-count'); // string | null
 
 Header _values_ aren't individually typed (a plain `Headers`, always correct);
 the default call form stays body-only — headers are an opt-in via `.raw()`.
-`ZodecClientError` likewise carries `.headers` for the thrown path.
+`AveroClientError` likewise carries `.headers` for the thrown path.
 
 ## Response shapes
 
-The client handles every response kind zodec can declare:
+The client handles every response kind avero can declare:
 
 | Server declares                      | Client method returns                           |
 | ------------------------------------ | ----------------------------------------------- |
@@ -161,9 +161,9 @@ The validating client:
 - **`import`s `zod`** (a peer dependency) — install `zod` wherever the client runs.
 - **Validates response bodies** against the matched status's schema and **request
   inputs** (`params` / `query` / `body`) before sending. A mismatch throws a
-  `ZodecClientValidationError` — the underlying `ZodError` is on `.cause`, and
+  `AveroClientValidationError` — the underlying `ZodError` is on `.cause`, and
   `.phase` is `'request'` or `'response'`. It's the client-side analogue of
-  zodec's always-on **server** response validation, so you catch drift instead of
+  avero's always-on **server** response validation, so you catch drift instead of
   getting bad data typed as valid.
 - **Revives `z.date()` responses into real `Date`s** (typed `Date`, parsed via
   `z.coerce.date()`) and applies defaults on the way through.
@@ -176,7 +176,7 @@ validating build pulls in `zod`.
 Being honest about the edges:
 
 - **It's codegen, not zero-codegen inference.** Unlike ts-rest (whose contract is
-  a value the client infers from directly), zodec's contract comes from decorators,
+  a value the client infers from directly), avero's contract comes from decorators,
   so the client is a generated file you regenerate on change. In return it's
   standalone (no runtime dependency) and works for any contract consumer.
 - **Types-only by default; validation is opt-in.** The default client trusts the
@@ -186,7 +186,7 @@ Being honest about the edges:
   ISO strings over JSON, so the types-only client types them `string` (the honest
   wire type); the validating client revives them to real `Date`s.
 - **No React Query / framework hooks** — but the contract is open for a generator
-  that emits them ([#28](https://github.com/joeferner/zodec/issues/28)).
+  that emits them ([#28](https://github.com/joeferner/avero/issues/28)).
 
 For non-TS or external consumers, keep emitting the
 [OpenAPI document](/guide/swagger) and point any standard generator at it; the

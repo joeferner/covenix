@@ -5,10 +5,10 @@ import { Body, Post, Route } from './decorators.js';
 import { BodyParam, File, Files } from './parameters.js';
 import { getParams } from './metadata.js';
 import { assertValidBodyParams } from './route-validation.js';
-import { Zodec } from './zodec.js';
+import { Avero } from './avero.js';
 
 function mount(...controllers: object[]): void {
-  const api = new Zodec({ info: { title: 'T', version: '1.0.0' } });
+  const api = new Avero({ info: { title: 'T', version: '1.0.0' } });
   for (const c of controllers) {
     api.register(c);
   }

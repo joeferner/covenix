@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 import type { Request } from 'express';
-import type { SecuritySchemes } from 'zodec';
+import type { SecuritySchemes } from 'avero';
 import type { AuthService } from './services/AuthService.js';
 
 /**
@@ -16,7 +16,7 @@ export const securitySchemes = {
 
 /**
  * Binds a runtime handler to each named scheme, reusing the {@link securitySchemes}
- * definitions above. Passed to `new Zodec({ security })`.
+ * definitions above. Passed to `new Avero({ security })`.
  *
  * The handler resolves the request to a principal (any value) or `null` for a
  * 401. Scopes are passed in and the handler decides what they mean — here a scope

@@ -1,6 +1,6 @@
 # Migrating from NestJS
 
-[NestJS](https://nestjs.com) and zodec overlap on the part you see every day —
+[NestJS](https://nestjs.com) and avero overlap on the part you see every day —
 decorated controllers that turn into Express routes with an OpenAPI document —
 but they are very different sizes of thing:
 
@@ -10,7 +10,7 @@ but they are very different sizes of thing:
   microservices, GraphQL). The HTTP/OpenAPI layer (`@nestjs/swagger`) is one
   feature among many, and the spec is described by a **second set of decorators**
   (`@ApiProperty`, `@ApiResponse`, …) layered on top of your class-validator DTOs.
-- **zodec is a focused Express + OpenAPI layer.** It does routing, runtime
+- **avero is a focused Express + OpenAPI layer.** It does routing, runtime
   validation, and an accurate spec — and deliberately nothing else. There is no
   container and no transport abstraction; you bring your own Express app and
   construct your controllers yourself. The spec is **derived from the same Zod
@@ -20,35 +20,35 @@ but they are very different sizes of thing:
 The routing/parameter decorators map almost 1:1. The two real shifts are
 **class-validator DTOs → Zod schemas** (the source of truth moves) and **dropping
 the DI container** (you construct controllers directly). Read the honesty section
-first — zodec does **less** than Nest on purpose.
+first — avero does **less** than Nest on purpose.
 
 ## Should you migrate? (the honest version)
 
-zodec is **not** a NestJS replacement. Nest is an application framework; zodec is
+avero is **not** a NestJS replacement. Nest is an application framework; avero is
 a library you mount onto an Express app. If you use Nest for more than HTTP
-controllers + Swagger, migrating means giving up framework features zodec has no
-intention of providing (see [Gaps](#gaps-what-zodec-doesn-t-do) below).
+controllers + Swagger, migrating means giving up framework features avero has no
+intention of providing (see [Gaps](#gaps-what-avero-doesn-t-do) below).
 
 **Stay on NestJS if** you rely on any of: the DI container and module system,
 WebSocket/microservice/GraphQL transports, guards/interceptors/pipes as a
 cross-cutting middleware system, the Fastify adapter, or the broader ecosystem
-(`@nestjs/config`, `@nestjs/typeorm`, testing utilities, etc.). zodec replaces
+(`@nestjs/config`, `@nestjs/typeorm`, testing utilities, etc.). avero replaces
 exactly one slice of Nest — the HTTP controller + OpenAPI slice — and nothing
 around it.
 
-**zodec is the better fit if** that one slice is most of what you use Nest for,
+**avero is the better fit if** that one slice is most of what you use Nest for,
 and these resonate:
 
 - **You're tired of the `@ApiProperty` ↔ DTO drift.** In Nest the runtime
   contract (class-validator decorators) and the documented contract
   (`@ApiProperty`) are two separate declarations that can — and do — diverge,
   unless you run the [`@nestjs/swagger` CLI plugin](https://docs.nestjs.com/openapi/cli-plugin)
-  to reverse-engineer them from TypeScript types. zodec has **one** declaration:
+  to reverse-engineer them from TypeScript types. avero has **one** declaration:
   the Zod schema validates the request, serializes the response, **and** becomes
   the OpenAPI component. There is nothing to keep in sync.
 - **You want response validation on by default.** Nest's `ClassSerializerInterceptor`
   is opt-in and shapes output via `@Exclude`/`@Expose`; nothing validates that a
-  handler's return value matches what the spec promises. zodec parses **every**
+  handler's return value matches what the spec promises. avero parses **every**
   response through its `@Returns` schema (extra fields stripped, a mismatch throws
   a `500`), so a handler can't silently over-share.
 - **You want a smaller, explicit surface.** No container, no module graph, no
@@ -91,7 +91,7 @@ The same contract as a single Zod schema — this one object validates the reque
 serializes the response, **and** becomes the `CreateUser` component in the spec:
 
 ```typescript
-// zodec
+// avero
 import { z } from 'zod';
 
 export const CreateUserSchema = z
@@ -118,7 +118,7 @@ Three things collapse into one:
 
 ## At a glance
 
-| NestJS                                                      | zodec                                                         | Notes                                                       |
+| NestJS                                                      | avero                                                         | Notes                                                       |
 | ----------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
 | `@Controller('users')` / `@ApiTags('Users')`                | `@Route('users')` / `@Tags('Users')`                          | Nearly identical.                                           |
 | `@Get(':id')`, `@Post()`, …                                 | `@Get('{id}')`, `@Post()`, …                                  | Path params switch from `:id` to `{id}`.                    |
@@ -138,7 +138,7 @@ Three things collapse into one:
 | `@UseGuards(JwtGuard)` + `@ApiBearerAuth()`                 | `@Security('jwt', scopes)` + `bearer()` handler               | Scheme + spec from one place; principal via `@Principal()`. |
 | Pipe (`ParseIntPipe`, custom transform)                     | `z.coerce.number()` / Zod transform in the schema             | Coercion lives in the schema.                               |
 | Interceptor (logging, wrap, timing)                         | `@Use(middleware)` (class or method)                          | Express middleware; no rxjs.                                |
-| Exception filter (`@Catch`, `HttpException`)                | `throw createError.NotFound()` + `zodecErrorHandler()`        | Express error pipeline.                                     |
+| Exception filter (`@Catch`, `HttpException`)                | `throw createError.NotFound()` + `averoErrorHandler()`        | Express error pipeline.                                     |
 | `@UploadedFile()` (multer interceptor)                      | `z.file()` in `@Body` + `@File('f') f: File`                  | Auto-detected multipart; web-standard `File`.               |
 | `StreamableFile` + `res.set(...)`                           | `@ReturnsFile(...)` + `FileResponse` / `RangeFileResponse`    | Disposition + range negotiation handled.                    |
 | `@Sse()` (`Observable<MessageEvent>`)                       | [`@Sse(schema?)`](/guide/server-sent-events) (async iterable) | Validated + documented as `text/event-stream`; no rxjs.     |
@@ -148,7 +148,7 @@ Three things collapse into one:
 | `SwaggerModule.createDocument(app, config)`                 | `api.swagger()` / `generateSwagger([...])`                    | Native, derived from Zod.                                   |
 | `SwaggerModule.setup('docs', app, doc)`                     | `api.serveDocs(app)`                                          | Browsable UI in one line.                                   |
 | `Test.createTestingModule({...})`                           | `new C(fakeDeps)`                                             | Construct it; that's the test fixture.                      |
-| Fastify adapter / WebSockets / microservices / GraphQL      | **not supported** (by design)                                 | Express HTTP only. See [Gaps](#gaps-what-zodec-doesn-t-do). |
+| Fastify adapter / WebSockets / microservices / GraphQL      | **not supported** (by design)                                 | Express HTTP only. See [Gaps](#gaps-what-avero-doesn-t-do). |
 
 ## A controller, side by side
 
@@ -181,12 +181,12 @@ export class UsersController {
 }
 ```
 
-**zodec** — Zod schemas carry the contract; `@Returns` describes the spec _and_
+**avero** — Zod schemas carry the contract; `@Returns` describes the spec _and_
 validates the response; you construct the controller yourself:
 
 ```typescript
 import { z } from 'zod';
-import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'zodec';
+import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'avero';
 import createError from 'http-errors';
 
 @Route('users')
@@ -216,7 +216,7 @@ export class UsersController {
 Differences to internalize:
 
 1. **`@Param('id')` validation moves to `@Params(schema)`.** Nest packs name +
-   pipe into the param decorator; zodec validates the whole params object once
+   pipe into the param decorator; avero validates the whole params object once
    with `@Params`, then `@Param('id')` injects one parsed field.
 2. **`@ApiResponse({ type })` → `@Returns(status, schema)`** — and it's not just
    documentation. The return value is parsed through that schema.
@@ -259,7 +259,7 @@ export class OrderDto {
   items: LineItemDto[];
 }
 
-// zodec
+// avero
 const OrderSchema = z.object({ items: z.array(LineItemSchema) }).meta({ id: 'Order' });
 ```
 
@@ -267,10 +267,10 @@ const OrderSchema = z.object({ items: z.array(LineItemSchema) }).meta({ id: 'Ord
 
 `@nestjs/swagger` needs `@ApiProperty` (or the CLI plugin's type inference)
 because class-validator decorators don't describe everything the spec needs —
-descriptions, examples, enums, formats. In zodec all of that is already on the
+descriptions, examples, enums, formats. In avero all of that is already on the
 Zod schema:
 
-| `@ApiProperty` option            | zodec / Zod                                         |
+| `@ApiProperty` option            | avero / Zod                                         |
 | -------------------------------- | --------------------------------------------------- |
 | `description: '…'`               | `.describe('…')` or `.meta({ description })`        |
 | `example: …`                     | `.meta({ example })` / `@Example(value)`            |
@@ -291,22 +291,22 @@ not a loss.
 
 Nest's cross-cutting constructs map onto plainer Express/Zod equivalents:
 
-- **Guards (`@UseGuards`)** — auth guards become zodec [security schemes](/guide/authentication):
+- **Guards (`@UseGuards`)** — auth guards become avero [security schemes](/guide/authentication):
   `@Security('jwt', scopes)` plus a `bearer()`/`apiKey()` handler registered on
   the instance. The handler returns the principal (injected via `@Principal()`)
   or `null` for a `401`; throw `new SecurityError(403)` for forbidden. Non-auth
   guards become ordinary `@Use(middleware)`.
 - **Pipes (`ParseIntPipe`, `ValidationPipe`, custom transform pipes)** — fold into
   the Zod schema. `ParseIntPipe` → `z.coerce.number().int()`; a transform pipe →
-  `.transform(...)` on the field; `ValidationPipe` is just how zodec always works.
+  `.transform(...)` on the field; `ValidationPipe` is just how avero always works.
 - **Interceptors** — there's no rxjs pipeline. Request/response side effects
   (logging, timing, wrapping) become `@Use(middleware)` at the class or method
   level. The one interceptor with a direct upgrade is `ClassSerializerInterceptor`:
-  zodec serializes responses through the `@Returns` schema **by default**, so you
+  avero serializes responses through the `@Returns` schema **by default**, so you
   don't need it.
 - **Exception filters (`@Catch`, `HttpException`)** — become the Express error
   pipeline. `throw new NotFoundException()` → `throw new createError.NotFound()`
-  (or any error); `zodecErrorHandler()` maps `ValidationError`/`SecurityError` and
+  (or any error); `averoErrorHandler()` maps `ValidationError`/`SecurityError` and
   `http-errors` to responses. For a custom shape, write your own Express error
   middleware (the analog of a global filter). See [Validation & Errors](/guide/validation).
 
@@ -316,7 +316,7 @@ Nest's cross-cutting constructs map onto plainer Express/Zod equivalents:
 @Get(':id')
 getUser(@Param('id', ParseIntPipe) id: number) { /* throws HttpException, caught by a filter */ }
 
-// zodec — security scheme + coercion in the schema + thrown http-error
+// avero — security scheme + coercion in the schema + thrown http-error
 @Get('{id}')
 @Security('jwt')
 @Params(z.object({ id: z.coerce.number().int() }))
@@ -339,11 +339,11 @@ and `@Injectable()`:
 export class UsersModule {}
 ```
 
-zodec has **no container**. You construct each controller, passing its
+avero has **no container**. You construct each controller, passing its
 dependencies through the constructor, and register the instance:
 
 ```typescript
-// zodec
+// avero
 const db = makeDb();
 const service = new UserService(db);
 api.register(new UsersController(service));
@@ -356,7 +356,7 @@ The tradeoff, stated plainly:
   resolution, and `@Inject(TOKEN)` injection. If your app leans on these, that
   wiring becomes your responsibility (a composition-root file, or a small DI
   library like [tsyringe](https://github.com/microsoft/tsyringe)/`awilix` if you
-  want one — zodec doesn't care how a controller was constructed).
+  want one — avero doesn't care how a controller was constructed).
 - **You gain** explicitness: construction is plain TypeScript, fully type-checked,
   with no metadata reflection or token-resolution errors at boot. It's also all
   the "testing module" you need — `new UsersController(fakeService)` replaces
@@ -368,14 +368,14 @@ large graphs, centralize construction in one composition root.
 ## Modules → grouping & versioning
 
 Nest organizes routes with feature modules and `RouterModule` path prefixes.
-zodec has no module system, but [grouping](/guide/versioning) covers the routing
+avero has no module system, but [grouping](/guide/versioning) covers the routing
 side — prefixes and versioned mounts:
 
 ```typescript
 // NestJS
 RouterModule.register([{ path: 'v1', module: V1Module }]);
 
-// zodec
+// avero
 api.group('/v1', (v1) => {
   v1.register(new UsersController(service));
   v1.register(new OrdersController(orders));
@@ -384,18 +384,18 @@ api.group('/v1', (v1) => {
 ```
 
 For code organization beyond routing (the "feature module" concept), use ordinary
-files/folders — zodec doesn't impose a structure.
+files/folders — avero doesn't impose a structure.
 
 ## Authentication
 
 Nest splits auth across a guard (runtime) and `@ApiBearerAuth()` + `DocumentBuilder.addBearerAuth()`
-(spec). zodec registers a scheme once — definition **and** handler together — and
+(spec). avero registers a scheme once — definition **and** handler together — and
 both the runtime check and the spec come from it:
 
 ```typescript
-import { Zodec, Security, Principal, bearer, SecurityError } from 'zodec';
+import { Avero, Security, Principal, bearer, SecurityError } from 'avero';
 
-const api = new Zodec({
+const api = new Avero({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -421,7 +421,7 @@ calls. See [Authentication](/guide/authentication).
 ## OpenAPI & the typed client
 
 `@nestjs/swagger` builds the document at boot from `DocumentBuilder` + the
-`@Api*` decorators (and optionally the CLI plugin). zodec derives it from the Zod
+`@Api*` decorators (and optionally the CLI plugin). avero derives it from the Zod
 schemas with no parallel decorators and no plugin:
 
 ```typescript
@@ -432,16 +432,16 @@ api.serveDocs(app); // browsable UI (replaces SwaggerModule.setup)
 ```
 
 Where Nest teams reached for `@nestjs/swagger` + `openapi-generator-cli` to
-produce a TypeScript client, zodec generates a standalone one from the same
+produce a TypeScript client, avero generates a standalone one from the same
 contract:
 
 ```typescript
-import { generateTypeScriptClient } from 'zodec';
+import { generateTypeScriptClient } from 'avero';
 await writeFile('api.gen.ts', generateTypeScriptClient(api.contract()));
 ```
 
 ```typescript
-import { createClient } from './api.gen'; // standalone — no zodec runtime dep
+import { createClient } from './api.gen'; // standalone — no avero runtime dep
 const client = createClient({ baseUrl: 'https://api.example.com' });
 const user = await client.users.get({ params: { id } }); // → User; throws on non-2xx
 ```
@@ -457,26 +457,26 @@ const config = new DocumentBuilder().setTitle('My API').setVersion('1.0.0').buil
 SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, config));
 await app.listen(3000);
 
-// zodec
+// avero
 import 'reflect-metadata';
 import express from 'express';
-import { Zodec, zodecErrorHandler } from 'zodec';
+import { Avero, averoErrorHandler } from 'avero';
 
 const app = express();
 app.use(express.json());
 
-const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(new UserService(db))); // you own construction
 api.mount(app);
 api.serveDocs(app);
-app.use(zodecErrorHandler());
+app.use(averoErrorHandler());
 app.listen(3000);
 ```
 
-## Gaps: what zodec doesn't do {#gaps-what-zodec-doesn-t-do}
+## Gaps: what avero doesn't do {#gaps-what-avero-doesn-t-do}
 
-These are real NestJS features with **no zodec equivalent**. Most are intentional
-non-goals — zodec is an Express HTTP layer, not a framework — but be honest with
+These are real NestJS features with **no avero equivalent**. Most are intentional
+non-goals — avero is an Express HTTP layer, not a framework — but be honest with
 yourself about which you depend on before migrating:
 
 - **Dependency-injection container.** No providers, scopes, `@Injectable`,
@@ -488,7 +488,7 @@ yourself about which you depend on before migrating:
   organization is just files. _Rationale: out of scope for a routing layer._
 - **Non-HTTP transports.** No WebSocket gateways, microservices (TCP/Redis/NATS/
   Kafka), or GraphQL. _Rationale: explicit non-goals — see closed
-  [#16](https://github.com/joeferner/zodec/issues/16). zodec is REST/OpenAPI-focused._
+  [#16](https://github.com/joeferner/avero/issues/16). avero is REST/OpenAPI-focused._
 - **Platform adapters.** **Express only** — no Fastify adapter. _Rationale: deep
   Express 5 integration over breadth._
 - **The interceptor pipeline.** No rxjs `Observable` request/response stream,
@@ -497,11 +497,11 @@ yourself about which you depend on before migrating:
 - **Lifecycle hooks.** No `OnModuleInit`/`OnApplicationBootstrap`/`OnModuleDestroy`.
   Do setup/teardown in your own bootstrap code.
 - **The ecosystem.** `@nestjs/config`, `@nestjs/typeorm`, `@nestjs/schedule`,
-  `@nestjs/testing`, CLI scaffolding, etc. — none of it applies. zodec is a single
+  `@nestjs/testing`, CLI scaffolding, etc. — none of it applies. avero is a single
   library; you wire config/ORM/scheduling yourself.
 - **Validation-library choice.** Nest accepts any class-validator setup (and
-  others via custom pipes); zodec is **Zod-only**. DTOs must be rewritten as Zod
+  others via custom pipes); avero is **Zod-only**. DTOs must be rewritten as Zod
   schemas.
 
-If a Nest feature you rely on has no obvious zodec equivalent and you think it
-should, please [open an issue](https://github.com/joeferner/zodec/issues).
+If a Nest feature you rely on has no obvious avero equivalent and you think it
+should, please [open an issue](https://github.com/joeferner/avero/issues).

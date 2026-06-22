@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import { z } from 'zod';
 import { Body, Get, Post, Returns, Route } from './decorators.js';
 import { BodyParam } from './parameters.js';
-import { Zodec } from './zodec.js';
+import { Avero } from './avero.js';
 import { serve, toExpress } from './express.js';
 
 const Greeting = z.object({ message: z.string() });
@@ -27,7 +27,7 @@ class HelloController {
   }
 
   // Returns a value that violates @Returns → a 500 ValidationError, which the
-  // zodec error handler formats as application/problem+json.
+  // avero error handler formats as application/problem+json.
   @Get('bad')
   @Returns(200, Greeting)
   public bad(): z.infer<typeof Greeting> {
@@ -35,10 +35,10 @@ class HelloController {
   }
 }
 
-function api(): Zodec {
-  const zodec = new Zodec({ info: { title: 'Test', version: '1.0.0' } });
-  zodec.register(new HelloController());
-  return zodec;
+function api(): Avero {
+  const avero = new Avero({ info: { title: 'Test', version: '1.0.0' } });
+  avero.register(new HelloController());
+  return avero;
 }
 
 describe('toExpress', () => {
@@ -61,7 +61,7 @@ describe('toExpress', () => {
     expect(docs.status).toBe(200);
     expect((docs.body as { openapi?: string }).openapi).toMatch(/^3\./);
 
-    // The default zodec error handler maps a ValidationError to a JSON problem.
+    // The default avero error handler maps a ValidationError to a JSON problem.
     const bad = await request(app).get('/hello/bad');
     expect(bad.status).toBe(500);
     expect(bad.headers['content-type']).toContain('json');
@@ -78,7 +78,7 @@ describe('toExpress', () => {
     const docs = await request(app).get('/docs/openapi.json');
     expect(docs.status).toBe(404);
 
-    // No zodec error handler → Express default (HTML), not a JSON problem.
+    // No avero error handler → Express default (HTML), not a JSON problem.
     const bad = await request(app).get('/hello/bad');
     expect(bad.status).toBe(500);
     expect(bad.headers['content-type']).not.toContain('json');

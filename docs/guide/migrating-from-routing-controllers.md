@@ -2,7 +2,7 @@
 
 [routing-controllers](https://github.com/typestack/routing-controllers) (with
 [`routing-controllers-openapi`](https://github.com/epiphone/routing-controllers-openapi)
-and class-validator) is the closest decorator-for-decorator analog to zodec: both
+and class-validator) is the closest decorator-for-decorator analog to avero: both
 describe Express routes with class decorators and generate OpenAPI. If you're
 coming from it, the routing maps almost 1:1 — the real shift is the same one as
 the NestJS migration: **class-validator DTOs → Zod schemas**, with the spec
@@ -13,7 +13,7 @@ derived from that one schema instead of a separate documentation layer.
   from class-validator decorators on DTO classes; the OpenAPI document is produced
   by `routing-controllers-openapi` (which runs `class-validator-jsonschema` to turn
   those classes into schemas), often supplemented by `@OpenAPI()`/`@ResponseSchema()`.
-- **zodec is decorators + Zod, one source.** The Zod schema validates the request,
+- **avero is decorators + Zod, one source.** The Zod schema validates the request,
   serializes the response, **and** becomes the OpenAPI component — no
   class-validator, no `class-validator-jsonschema`, no separate
   `@ResponseSchema`/`@OpenAPI` declarations to keep in sync.
@@ -31,15 +31,15 @@ across the codebase, or you lean on its tight IoC integration (`useContainer` wi
 typedi/typeorm), the Koa adapter, or the action-based extras and don't want to
 rewrite DTOs.
 
-**zodec is the better fit if** you want:
+**avero is the better fit if** you want:
 
 - **One schema instead of three declarations.** In routing-controllers a field's
   truth is split across class-validator (`@IsEmail`), class-transformer (`@Type`),
   and the doc layer (`@ResponseSchema`, `@OpenAPI`, or `class-validator-jsonschema`
-  inference). zodec collapses that to a single Zod schema. No drift.
+  inference). avero collapses that to a single Zod schema. No drift.
 - **Response validation on by default.** `routing-controllers-openapi` documents
   responses via `@ResponseSchema`, but nothing validates that the returned object
-  matches it. zodec parses every response through its `@Returns` schema (extra
+  matches it. avero parses every response through its `@Returns` schema (extra
   fields stripped; a mismatch throws `500`).
 - **No reflection-fragility around generics/optionals.** `class-validator-jsonschema`
   inference can miss nested generics, `Record`s, and unions; Zod models all of
@@ -73,7 +73,7 @@ The same contract as a single Zod schema — validates the request, serializes t
 response, **and** becomes the `CreateUser` component:
 
 ```typescript
-// zodec
+// avero
 import { z } from 'zod';
 
 export const CreateUserSchema = z
@@ -94,7 +94,7 @@ The class-validator → Zod translations are the same as the
 
 ## At a glance
 
-| routing-controllers (+ openapi)                         | zodec                                                         | Notes                                               |
+| routing-controllers (+ openapi)                         | avero                                                         | Notes                                               |
 | ------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
 | `@JsonController('/users')` / `@Controller`             | `@Route('users')`                                             | Nearly identical (drop the leading slash).          |
 | `@Get('/:id')`, `@Post()`, …                            | `@Get('{id}')`, `@Post()`, …                                  | `:id` → `{id}`.                                     |
@@ -114,10 +114,10 @@ The class-validator → Zod translations are the same as the
 | `@UploadedFile()` / `@UploadedFiles()`                  | `z.file()` in `@Body` + `@File`/`@Files`                      | Auto-detected multipart; web-standard `File`.       |
 | return a stream / set headers for downloads             | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`      | Disposition + range negotiation handled.            |
 | (no built-in SSE)                                       | [`@Sse(schema?)`](/guide/server-sent-events)                  | Validated + documented `text/event-stream`.         |
-| `useContainer(Container)` (container owns construction) | `api.register(new C(deps))` — or register a resolved instance | Container-agnostic; you hand zodec the instance.    |
+| `useContainer(Container)` (container owns construction) | `api.register(new C(deps))` — or register a resolved instance | Container-agnostic; you hand avero the instance.    |
 | `routingControllersToSpec(storage, options)`            | `api.swagger()` / `generateSwagger([...])`                    | Native, Zod-derived; no class-validator-jsonschema. |
 | `useExpressServer(app, { controllers })`                | `api.mount(app)`                                              | Wires routes + validation.                          |
-| Express **or Koa** driver                               | **Express only**                                              | zodec targets Express 5.                            |
+| Express **or Koa** driver                               | **Express only**                                              | avero targets Express 5.                            |
 
 ## A controller, side by side
 
@@ -151,12 +151,12 @@ export class UsersController {
 }
 ```
 
-**zodec** — Zod schemas + `@Returns` (which also validates); you hand `register` a
+**avero** — Zod schemas + `@Returns` (which also validates); you hand `register` a
 constructed instance:
 
 ```typescript
 import { z } from 'zod';
-import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'zodec';
+import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'avero';
 import createError from 'http-errors';
 
 @Route('users')
@@ -199,7 +199,7 @@ routing-controllers **owns** the container: you call `useContainer(Container)` a
 it resolves every controller (and its dependencies) for you, which couples your app
 to that specific IoC setup.
 
-zodec is **container-agnostic**. `api.register()` takes an already-constructed
+avero is **container-agnostic**. `api.register()` takes an already-constructed
 instance, so where that instance comes from is entirely up to you:
 
 ```typescript
@@ -211,13 +211,13 @@ import { Container } from 'typedi';
 api.register(Container.get(UsersController));
 ```
 
-So this isn't "you must give up DI" — it's the opposite of `useContainer`: zodec
+So this isn't "you must give up DI" — it's the opposite of `useContainer`: avero
 doesn't take over construction, it accepts whatever you hand it. The practical
 effects:
 
-- **You're decoupled from the container.** zodec never reaches into typedi's global
+- **You're decoupled from the container.** avero never reaches into typedi's global
   state; it has no `useContainer` to register. Swap DI libraries, or use none,
-  without touching zodec.
+  without touching avero.
 - **Construction is explicit at the registration site.** Whether that's `new C(...)`
   or `Container.get(C)`, it's plain, type-checked code — no boot-time
   token-resolution surprises.
@@ -248,13 +248,13 @@ useExpressServer(app, {
 me(@CurrentUser() user: User) { return user; }
 ```
 
-zodec registers each named scheme once — definition **and** handler together — and
+avero registers each named scheme once — definition **and** handler together — and
 injects the principal with `@Principal()`:
 
 ```typescript
-import { Zodec, Security, Principal, bearer, SecurityError } from 'zodec';
+import { Avero, Security, Principal, bearer, SecurityError } from 'avero';
 
-const api = new Zodec({
+const api = new Avero({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -281,7 +281,7 @@ automatically — no separate documentation of the security scheme. See
 ## Files, downloads, and SSE
 
 routing-controllers injects multer files with `@UploadedFile()`/`@UploadedFiles()`
-and leaves downloads to raw stream returns. zodec models the form as a `@Body`
+and leaves downloads to raw stream returns. avero models the form as a `@Body`
 schema and has dedicated response types:
 
 - **Upload:** `z.file()` in a `@Body` schema → auto-detected `multipart/form-data`,
@@ -289,12 +289,12 @@ schema and has dedicated response types:
 - **Download / range:** `@ReturnsFile(...)` + `FileResponse` / `RangeFileResponse`
   (automatic `Content-Disposition`, `206`/`416` negotiation). See [File downloads](/guide/file-downloads).
 - **SSE:** [`@Sse(schema?)`](/guide/server-sent-events) — routing-controllers has no
-  built-in SSE; zodec validates and documents it.
+  built-in SSE; avero validates and documents it.
 
 ## OpenAPI & the typed client
 
 routing-controllers builds the spec with `routingControllersToSpec(...)`, feeding
-it schemas from `class-validator-jsonschema`. zodec derives the document directly
+it schemas from `class-validator-jsonschema`. avero derives the document directly
 from Zod — no second conversion step:
 
 ```typescript
@@ -304,7 +304,7 @@ api.serveDocs(app); // browsable UI
 await writeFile('api.gen.ts', generateTypeScriptClient(api.contract())); // standalone client
 ```
 
-routing-controllers has no first-party typed client; zodec generates one from the
+routing-controllers has no first-party typed client; avero generates one from the
 same contract. See [Typed Client](/guide/typed-client).
 
 ## Bootstrapping
@@ -316,35 +316,35 @@ import { useExpressServer } from 'routing-controllers';
 const app = express();
 useExpressServer(app, { controllers: [UsersController] });
 
-// zodec
+// avero
 import 'reflect-metadata';
 import express from 'express';
-import { Zodec, zodecErrorHandler } from 'zodec';
+import { Avero, averoErrorHandler } from 'avero';
 
 const app = express();
 app.use(express.json());
-const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service)); // new it, or Container.get(UsersController)
 api.mount(app);
 api.serveDocs(app);
-app.use(zodecErrorHandler());
+app.use(averoErrorHandler());
 app.listen(3000);
 ```
 
-## Gaps: what routing-controllers does that zodec doesn't
+## Gaps: what routing-controllers does that avero doesn't
 
 - **Built-in container ownership** (`useContainer` auto-resolving controllers).
-  zodec is container-agnostic — you can still use any DI library, you just resolve
-  and `register` the instance yourself rather than handing zodec the container (see
+  avero is container-agnostic — you can still use any DI library, you just resolve
+  and `register` the instance yourself rather than handing avero the container (see
   [above](#dependency-injection-keep-your-container-or-drop-it)).
-- **Koa driver.** routing-controllers runs on Express **or** Koa; zodec is
-  **Express 5 only** (see [#2](https://github.com/joeferner/zodec/issues/2)).
+- **Koa driver.** routing-controllers runs on Express **or** Koa; avero is
+  **Express 5 only** (see [#2](https://github.com/joeferner/avero/issues/2)).
 - **Action-based middleware extras** — `@Middleware`, global interceptors
-  (`@Interceptor`), `@UseBefore`/`@UseAfter` ordering nuances. zodec uses plain
+  (`@Interceptor`), `@UseBefore`/`@UseAfter` ordering nuances. avero uses plain
   Express middleware via `@Use`.
-- **class-validator/class-transformer ecosystem** — zodec is **Zod-only**; DTOs
+- **class-validator/class-transformer ecosystem** — avero is **Zod-only**; DTOs
   must be rewritten as Zod schemas (the [NestJS cookbook](/guide/migrating-from-nestjs#validation-class-validator-zod-cookbook)
   applies directly).
 
-If you hit a routing-controllers feature without an obvious zodec equivalent,
-please [open an issue](https://github.com/joeferner/zodec/issues).
+If you hit a routing-controllers feature without an obvious avero equivalent,
+please [open an issue](https://github.com/joeferner/avero/issues).

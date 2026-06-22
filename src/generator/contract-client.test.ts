@@ -118,7 +118,7 @@ describe('generateTypeScriptClient — output', () => {
 
   it('inlines the runtime so the module has no imports', () => {
     expect(client).not.toMatch(/^\s*import\s/m);
-    expect(client).toContain('export class ZodecClientError');
+    expect(client).toContain('export class AveroClientError');
     expect(client).toContain('export function createClient');
   });
 
@@ -163,7 +163,7 @@ describe('generateTypeScriptClient — JSDoc from descriptions', () => {
 
 describe('generateTypeScriptClient — type-checks under strict mode', () => {
   it('produces a client module with zero compiler diagnostics', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'zodec-client-'));
+    const dir = mkdtempSync(join(tmpdir(), 'avero-client-'));
     const file = join(dir, 'api.gen.ts');
     writeFileSync(file, client);
     try {
@@ -220,7 +220,7 @@ async function instantiate(
   const js = ts.transpileModule(client, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText;
-  const dir = mkdtempSync(join(tmpdir(), 'zodec-client-rt-'));
+  const dir = mkdtempSync(join(tmpdir(), 'avero-client-rt-'));
   tmpDirs.push(dir);
   const file = join(dir, `client-${tmpDirs.length}.mjs`);
   writeFileSync(file, js);
@@ -296,10 +296,10 @@ describe('generated client — runtime behavior', () => {
     expect(calls[0]?.headers['content-type']).toBeUndefined(); // boundary set by runtime
   });
 
-  it('throws ZodecClientError carrying status + parsed body on non-2xx', async () => {
+  it('throws AveroClientError carrying status + parsed body on non-2xx', async () => {
     const { api } = await loadClient(() => ({ status: 404, body: { message: 'nope' } }));
     await expect(api.users.get({ params: { id: 'missing' } })).rejects.toMatchObject({
-      name: 'ZodecClientError',
+      name: 'AveroClientError',
       status: 404,
       body: { message: 'nope' },
     });
@@ -388,7 +388,7 @@ describe("generateTypeScriptClient — validating ({ validate: 'zod' }) output",
   it('wires request-input and response validators into the operation specs', () => {
     expect(vClient).toContain('responses: { 200: z.lazy(() => Visit$schema) }'); // response
     expect(vClient).toContain('body: z.object({ name: z.string().min(3) })'); // request body
-    expect(vClient).toContain('export class ZodecClientValidationError');
+    expect(vClient).toContain('export class AveroClientValidationError');
   });
 });
 
@@ -410,7 +410,7 @@ async function instantiateValidating(
   const js = ts.transpileModule(vClient, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
   }).outputText;
-  const dir = mkdtempSync(join(process.cwd(), 'zodec-vclient-'));
+  const dir = mkdtempSync(join(process.cwd(), 'avero-vclient-'));
   tmpDirs.push(dir);
   const file = join(dir, 'client.mjs');
   writeFileSync(file, js);
@@ -437,10 +437,10 @@ describe("generateTypeScriptClient — validating ({ validate: 'zod' }) runtime"
     expect(visit.at.toISOString()).toBe('2020-01-02T03:04:05.000Z');
   });
 
-  it('throws ZodecClientValidationError when a response violates its schema', async () => {
+  it('throws AveroClientValidationError when a response violates its schema', async () => {
     const api = await instantiateValidating(() => Promise.resolve(jsonResponse(200, { id: 'v1' }))); // missing `at`
     await expect(api.visits.get({ params: { id: 'v1' } })).rejects.toMatchObject({
-      name: 'ZodecClientValidationError',
+      name: 'AveroClientValidationError',
       phase: 'response',
     });
   });
@@ -452,7 +452,7 @@ describe("generateTypeScriptClient — validating ({ validate: 'zod' }) runtime"
       return Promise.resolve(jsonResponse(201, { id: 'v1', at: '2020-01-02T03:04:05.000Z' }));
     });
     await expect(api.visits.create({ body: { name: 'ab' } })).rejects.toMatchObject({
-      name: 'ZodecClientValidationError',
+      name: 'AveroClientValidationError',
       phase: 'request',
     });
     expect(fetched).toBe(false);

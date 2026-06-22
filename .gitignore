@@ -19,4 +19,4 @@ examples/**/api.validated.gen.ts
 !examples/**/__snapshots__/api.validated.gen.ts
 
 # Transient dirs from the validating-client runtime tests (cleaned up in afterAll)
-zodec-vclient-*/
+avero-vclient-*/

@@ -146,7 +146,7 @@ export function Headers(schema: ZodObject): MethodDecorator {
  * and documents each property as an `in: cookie` OpenAPI parameter. The parsed
  * (coerced) values are what `@CookieParam` injects. A failure responds `400`.
  *
- * zodec reads `req.cookies`, so a cookie parser (e.g. `cookie-parser`) must be
+ * avero reads `req.cookies`, so a cookie parser (e.g. `cookie-parser`) must be
  * installed as middleware ahead of the route; without it `req.cookies` is empty
  * and validation sees no cookies.
  *
@@ -219,7 +219,7 @@ export function Returns(
 
 /**
  * Declares a binary/file response for a status code. Stackable. The handler
- * should return a `FileResponse` for this status (zodec streams it); this
+ * should return a `FileResponse` for this status (avero streams it); this
  * decorator only advertises the binary body in the generated OpenAPI document
  * (`{ type: 'string', format: 'binary' }`).
  *
@@ -240,7 +240,7 @@ export interface SseOptions {
   /** HTTP status for the stream response. Defaults to `200`. */
   status?: number;
   /**
-   * Heartbeat interval in milliseconds. When set, zodec sends a comment frame
+   * Heartbeat interval in milliseconds. When set, avero sends a comment frame
    * (`: \n\n`) this often to keep idle connections alive through proxies.
    */
   keepAlive?: number;
@@ -249,7 +249,7 @@ export interface SseOptions {
 /**
  * Declares the route as a **Server-Sent Events** (`text/event-stream`) stream.
  * The handler returns an `AsyncIterable` of events (typically an async
- * generator); zodec sets the SSE headers, frames each yielded value as an event,
+ * generator); avero sets the SSE headers, frames each yielded value as an event,
  * and on client disconnect calls the iterator's `return()` so the generator's
  * `finally` runs (cleanup/abort). Yield a plain value to emit a `data:` frame, or
  * a {@link import('./sse.js').SseEvent} to set `event`/`id`/`retry`.
@@ -279,14 +279,14 @@ export function Sse(schema?: ZodType, options: SseOptions = {}): MethodDecorator
 
 /**
  * Declares a security requirement for the operation, matching a named scheme in
- * the `Zodec` instance's `security` map. Before the handler runs, zodec invokes
+ * the `Avero` instance's `security` map. Before the handler runs, avero invokes
  * that scheme's handler; on success the principal is available via `@Principal()`.
  *
  * Usable on a method or on the controller class (applies to every route that
  * doesn't declare its own). **Stackable** — multiple `@Security` decorators are
  * alternatives (OR): the request is allowed if any one is satisfied.
  *
- * @param scheme - The security scheme name (a key in `new Zodec({ security })`).
+ * @param scheme - The security scheme name (a key in `new Avero({ security })`).
  * @param scopes - Scopes the route requires for this scheme (passed to the handler).
  *
  * @example
@@ -314,7 +314,7 @@ export function Security(scheme: string, scopes: string[] = []): ClassDecorator 
  *
  * Usable on a method or on the controller class (applies to every route).
  * Class-level runs first, then method-level, in source order. In the full chain
- * zodec builds, `@Use` runs **after** `@Security` and **before** multipart parsing
+ * avero builds, `@Use` runs **after** `@Security` and **before** multipart parsing
  * (`security → @Use → multipart → handler`). Middleware that sends a response
  * (or doesn't call `next`) short-circuits — the handler won't run.
  *

@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { generateSwagger } from 'zodec';
+import { generateSwagger } from 'avero';
 import { apiInfo } from './api-info.js';
 import { additionalSchemas } from './api-schemas.js';
 import { securitySchemes } from './api-security.js';
@@ -7,7 +7,7 @@ import { HealthController } from './controllers/HealthController.js';
 import { UsersController } from './controllers/UsersController.js';
 import { AuthController } from './controllers/AuthController.js';
 
-// Static: pass the controller classes directly — no Zodec instance, no service
+// Static: pass the controller classes directly — no Avero instance, no service
 // construction. The @Security requirements come off the classes; the scheme
 // *definitions* and standalone `schemas` are instance config, so we hand in the
 // same values the running server uses (api-security.ts / api.ts) — keeping this

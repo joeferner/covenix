@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { z } from 'zod';
 import { Get, Returns, Route } from './decorators.js';
-import { Zodec } from './zodec.js';
+import { Avero } from './avero.js';
 import { generateSwagger } from './swagger.js';
 
 @Route('users')
@@ -34,10 +34,10 @@ class RootController {
   }
 }
 
-function build(configure: (api: Zodec) => void): express.Express {
+function build(configure: (api: Avero) => void): express.Express {
   const instance = express();
   instance.use(express.json());
-  const api = new Zodec({ info: { title: 'Grouping', version: '1.0.0' } });
+  const api = new Avero({ info: { title: 'Grouping', version: '1.0.0' } });
   configure(api);
   api.mount(instance);
   return instance;
@@ -104,7 +104,7 @@ describe('grouping / versioning — routes', () => {
 
 describe('grouping / versioning — spec', () => {
   it('the generated paths carry the base prefix', () => {
-    const api = new Zodec({ info: { title: 'Grouping', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'Grouping', version: '1.0.0' } });
     api.group('/v1', (v1) => {
       v1.register(new UsersController());
       v1.register(new HealthController());
@@ -114,7 +114,7 @@ describe('grouping / versioning — spec', () => {
   });
 
   it('two versions of one controller produce two path entries', () => {
-    const api = new Zodec({ info: { title: 'Grouping', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'Grouping', version: '1.0.0' } });
     api.register(new UsersController(), { prefix: '/v1' });
     api.register(new UsersController(), { prefix: '/v2' });
     const doc = api.swagger();
@@ -122,7 +122,7 @@ describe('grouping / versioning — spec', () => {
   });
 
   it('generateSwagger({ controller, prefix }) matches api.swagger() for the same prefix', () => {
-    const api = new Zodec({ info: { title: 'Grouping', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'Grouping', version: '1.0.0' } });
     api.register(new UsersController(), { prefix: '/v1' });
     const fromInstance = api.swagger();
     const fromClasses = generateSwagger([{ controller: UsersController, prefix: '/v1' }], {

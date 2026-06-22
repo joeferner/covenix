@@ -67,7 +67,7 @@ function classify(name: string, node: ZodInternal | undefined): MultipartFileFie
 
 /**
  * Inspects a `@Body` schema and returns its file-typed fields. A non-empty
- * result means the route is `multipart/form-data`: zodec parses the request with
+ * result means the route is `multipart/form-data`: avero parses the request with
  * multer, adapts each uploaded file to a web-standard `File`, and validates the
  * assembled body against the schema like any other body.
  *

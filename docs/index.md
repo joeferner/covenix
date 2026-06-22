@@ -1,7 +1,7 @@
 ---
 layout: home
 hero:
-  name: zodec
+  name: avero
   text: Zod-powered decorators for Express
   tagline: Typed routes, runtime validation, and accurate OpenAPI from a single source of truth.
   actions:

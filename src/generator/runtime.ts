@@ -12,14 +12,14 @@ export interface ClientOptions {
 }
 
 /** Thrown by the default call form on a non-2xx response; carries the parsed body. */
-export class ZodecClientError extends Error {
+export class AveroClientError extends Error {
   constructor(
     public readonly status: number,
     public readonly body: unknown,
     public readonly headers: Headers,
   ) {
-    super('zodec client: request failed with status ' + status);
-    this.name = 'ZodecClientError';
+    super('avero client: request failed with status ' + status);
+    this.name = 'AveroClientError';
   }
 }
 
@@ -174,7 +174,7 @@ async function request(
 ): Promise<unknown> {
   const res = await fetchRaw(options, spec, args);
   if (!isOk(res.status)) {
-    throw new ZodecClientError(res.status, await parseBody(res), res.headers);
+    throw new AveroClientError(res.status, await parseBody(res), res.headers);
   }
   if (spec.stream) return sseStream(res);
   if (spec.binary) return res.blob();

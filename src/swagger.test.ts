@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { generateSwagger, toJsonSchema } from './swagger.js';
 import { apiKey as apiKeyScheme, bearer } from './security.js';
-import { Zodec } from './zodec.js';
+import { Avero } from './avero.js';
 import {
   Body,
   Deprecated,
@@ -73,8 +73,8 @@ describe('api.swagger()', () => {
     }
   }
 
-  function buildDoc(): ReturnType<Zodec['swagger']> {
-    const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+  function buildDoc(): ReturnType<Avero['swagger']> {
+    const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
     api.register(new UsersController());
     return api.swagger();
   }
@@ -113,7 +113,7 @@ describe('api.swagger()', () => {
         return null;
       }
     }
-    const api = new Zodec({ info: { title: 'T', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'T', version: '1.0.0' } });
     api.register(new ReportsController());
     const params = api.swagger().paths?.['/reports']?.get?.parameters ?? [];
 
@@ -164,7 +164,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new FileController());
     const doc = api.swagger();
 
@@ -195,7 +195,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new WidgetController());
     const res200 = api.swagger().paths?.['/widgets']?.get?.responses?.['200'];
 
@@ -224,7 +224,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new UploadController());
     const post = api.swagger().paths?.['/uploads']?.post;
 
@@ -260,7 +260,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new WidgetController());
     const op = api.swagger().paths?.['/widgets/{id}']?.get;
 
@@ -282,7 +282,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new GadgetController());
     const op = api.swagger().paths?.['/gadgets']?.get;
 
@@ -300,7 +300,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'My API', version: '2.0.0', description: 'Does things.' },
       servers: [{ url: 'https://api.example.com/v1' }],
       externalDocs: { url: 'https://docs.example.com' },
@@ -330,7 +330,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new OrderController());
     const responses = api.swagger().paths?.['/orders/{id}']?.get?.responses;
 
@@ -348,7 +348,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new ThingController());
     const res204 = api.swagger().paths?.['/things/{id}']?.get?.responses?.['204'];
 
@@ -372,7 +372,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new WidgetController());
     const doc = api.swagger();
 
@@ -404,7 +404,7 @@ describe('api.swagger()', () => {
       }
     }
 
-    const api = new Zodec({
+    const api = new Avero({
       info: { title: 'API', version: '1.0.0' },
       security: {
         bearerAuth: bearer(() => ({})),
@@ -445,8 +445,8 @@ describe('api.swagger()', () => {
       }
     }
 
-    function doc(specVersion?: '3.0' | '3.1'): ReturnType<Zodec['swagger']> {
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+    function doc(specVersion?: '3.0' | '3.1'): ReturnType<Avero['swagger']> {
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new ThingsController());
       return api.swagger(specVersion ? { specVersion } : {});
     }
@@ -489,7 +489,7 @@ describe('api.swagger()', () => {
     }
 
     it('emits a standalone schema under components.schemas (via api.swagger({ schemas }))', () => {
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new ThingController());
       const doc = api.swagger({ schemas: [WsChatMessage] });
 
@@ -505,7 +505,7 @@ describe('api.swagger()', () => {
     });
 
     it('throws when a standalone schema is not named via .meta({ id })', () => {
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       expect(() => api.swagger({ schemas: [z.object({ x: z.string() })] })).toThrow(
         /named via \.meta/,
       );
@@ -533,7 +533,7 @@ describe('api.swagger()', () => {
     }
 
     function notificationSchema(specVersion?: '3.0' | '3.1'): Record<string, unknown> {
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new EventController());
       const doc = api.swagger(specVersion ? { specVersion } : {});
       return doc.components?.schemas?.['Notification'] as Record<string, unknown>;
@@ -564,7 +564,7 @@ describe('api.swagger()', () => {
         },
       });
       // The discriminator property is still 3.0-shaped on the variant.
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new EventController());
       const doc = api.swagger({ specVersion: '3.0' });
       expect(
@@ -584,7 +584,7 @@ describe('api.swagger()', () => {
         }
       }
 
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new EnvelopeController());
       const schema = api.swagger().components?.schemas?.['Notification'] as Record<string, unknown>;
       expect(schema['discriminator']).toMatchObject({ propertyName: 'type' });
@@ -604,7 +604,7 @@ describe('api.swagger()', () => {
         }
       }
 
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new MixedController());
       const schema = api.swagger().components?.schemas?.['Mixed'] as Record<string, unknown>;
       expect(schema['discriminator']).toEqual({ propertyName: 'kind' });
@@ -625,7 +625,7 @@ describe('api.swagger()', () => {
         }
       }
 
-      const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+      const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
       api.register(new PlainController());
       const schema = api.swagger().components?.schemas?.['PlainUnion'] as Record<string, unknown>;
       expect(schema).not.toHaveProperty('discriminator');
@@ -636,7 +636,7 @@ describe('api.swagger()', () => {
   it('generateSwagger(classes) matches api.swagger() for the same controllers', () => {
     const info = { title: 'My API', version: '1.0.0' };
 
-    const api = new Zodec({ info });
+    const api = new Avero({ info });
     api.register(new UsersController());
     const fromInstance = api.swagger();
 
@@ -668,8 +668,8 @@ describe('shared (class-level) @Returns', () => {
     }
   }
 
-  function doc(): ReturnType<Zodec['swagger']> {
-    const api = new Zodec({ info: { title: 'API', version: '1.0.0' } });
+  function doc(): ReturnType<Avero['swagger']> {
+    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
     api.register(new WidgetController());
     return api.swagger();
   }

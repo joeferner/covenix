@@ -1,7 +1,7 @@
 # Migrating from Hono OpenAPI
 
 [Hono](https://hono.dev) with [`@hono/zod-openapi`](https://hono.dev/examples/zod-openapi)
-and zodec both give you Zod-validated routes and an OpenAPI document — but they
+and avero both give you Zod-validated routes and an OpenAPI document — but they
 sit at different layers and target different deployment worlds:
 
 - **Hono is a small, multi-runtime web framework.** Its headline feature is
@@ -9,7 +9,7 @@ sit at different layers and target different deployment worlds:
   edge. `@hono/zod-openapi` adds an OpenAPI layer where each route is a **value** —
   `createRoute({ method, path, request, responses })` — registered on an
   `OpenAPIHono` app, with the spec emitted from the same Zod schemas.
-- **zodec is an Express + Node OpenAPI layer.** Routes are **class decorators**;
+- **avero is an Express + Node OpenAPI layer.** Routes are **class decorators**;
   the accurate OpenAPI document and a generated typed client are the primary
   artifacts. It's deliberately Node/Express-only and leans on `reflect-metadata` +
   decorators.
@@ -26,31 +26,31 @@ The single biggest difference isn't the API — it's **where your code runs**.
 
 **Stay on Hono if** you deploy to the edge or a non-Node runtime — Cloudflare
 Workers, Deno Deploy, Bun, Lambda@Edge — or you care about cold-start and bundle
-size on those platforms. zodec is **Express + Node only** and uses
+size on those platforms. avero is **Express + Node only** and uses
 `reflect-metadata` + legacy decorators, which is a poor fit for Workers-style
 edge bundles. This is a hard stop, not a soft preference:
-[multi-runtime is an explicit zodec non-goal](#runtime-deployment-the-big-gap).
+[multi-runtime is an explicit avero non-goal](#runtime-deployment-the-big-gap).
 If Hono's portability is why you chose it, keep it.
 
-**zodec is the better fit if** you're on Node/Express anyway and want:
+**avero is the better fit if** you're on Node/Express anyway and want:
 
 - **Decorator-first ergonomics with the contract _on_ the handler.** Hono splits
   the route definition (`createRoute(...)`) from its implementation
-  (`app.openapi(route, handler)`); zodec keeps the schemas as decorators on the
+  (`app.openapi(route, handler)`); avero keeps the schemas as decorators on the
   method they validate, so there's one place to read.
 - **Response validation on by default.** `@hono/zod-openapi` validates the
   **request** against the route's Zod schemas, but **does not validate the
   response** against `responses[status]` — that schema is documentation only.
-  zodec parses every response through its `@Returns` schema (extra fields
+  avero parses every response through its `@Returns` schema (extra fields
   stripped, a mismatch throws a `500`), so the documented shape and the sent
   shape can't drift.
-- **First-class auth, files, range, and SSE in the spec** — all built into zodec
+- **First-class auth, files, range, and SSE in the spec** — all built into avero
   with dedicated decorators/response types; in Hono you wire middleware and
   `registerComponent` yourself and stream on the raw `Context`.
 - **A generated standalone OpenAPI client _and_ an accurate 3.1 spec** for
   polyglot consumers — see [the client section](#openapi-the-typed-client).
 
-If you need both edge portability **and** zodec's model, you can't have them today.
+If you need both edge portability **and** avero's model, you can't have them today.
 Pick based on the runtime.
 
 ## The shape shift: `createRoute` value → decorators
@@ -84,13 +84,13 @@ app.openapi(getUser, (c) => {
 });
 ```
 
-zodec folds the definition and implementation back together on a class — each
+avero folds the definition and implementation back together on a class — each
 route's schemas sit on the method as decorators:
 
 ```typescript
-// zodec — UsersController.ts
+// avero — UsersController.ts
 import { z } from 'zod';
-import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'zodec';
+import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'avero';
 import createError from 'http-errors';
 
 @Route('users')
@@ -115,32 +115,32 @@ Three differences to internalize:
 
 1. **`path: '/users/{id}'` → `@Route('users')` + `@Get('{id}')`.** The prefix
    moves to the class. (Both use `{id}` brace syntax in the OpenAPI path — Hono's
-   `createRoute` path matches zodec's here.)
+   `createRoute` path matches avero's here.)
 2. **`responses` map → stacked `@Returns(status, schema)`.** One decorator per
    status instead of a nested `content['application/json'].schema` object; the
    first 2xx is the success status.
-3. **`return c.json(body, status)` → `return body`.** zodec infers the status
+3. **`return c.json(body, status)` → `return body`.** avero infers the status
    from the matched `@Returns`; `c.req.valid('param')` becomes the injected
    `@Param('id')`. For a non-success status you `throw` and let error middleware
    map it.
 
 ## At a glance
 
-| Hono (`@hono/zod-openapi`)                                           | zodec                                                         | Notes                                                       |
+| Hono (`@hono/zod-openapi`)                                           | avero                                                         | Notes                                                       |
 | -------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
 | `createRoute({ method, path, ... })` (a value)                       | decorators on a controller method                             | Contract is metadata on the method, not a standalone value. |
 | `method: 'get'`, `path: '/users/{id}'`                               | `@Get('{id}')` + `@Route('users')`                            | Prefix on the class.                                        |
 | `request: { params: Schema }`                                        | `@Params(Schema)` + `@Param('id')`                            | Schema on the method; injection on the parameter.           |
 | `request: { query: Schema }`                                         | `@Query(Schema)` + `@QueryParam('q')`                         | Same split.                                                 |
 | `request: { body: { content: { 'application/json': { schema } } } }` | `@Body(Schema)` + `@BodyParam()`                              | Far less nesting.                                           |
-| `request: { headers: Schema }`                                       | `@Headers(Schema)` + `@HeaderParam('x-id')`                   | Both validate the header schema; zodec also documents it.   |
+| `request: { headers: Schema }`                                       | `@Headers(Schema)` + `@HeaderParam('x-id')`                   | Both validate the header schema; avero also documents it.   |
 | `responses: { 200: { content: {...}, description } }`                | `@Returns(200, Schema)`                                       | Stackable, one per status.                                  |
 | `c.req.valid('param' \| 'query' \| 'json' \| 'form')`                | `@Param` / `@QueryParam` / `@BodyParam` / `@File`             | Injection by parameter decorator.                           |
 | `app.openapi(route, handler)`                                        | implementation is the decorated method                        | Definition and handler are one unit.                        |
 | `return c.json(body, status)`                                        | `return body` (status from `@Returns`; `throw` to err)        | No `Context` envelope.                                      |
 | `Schema.openapi('User')` (component name)                            | `Schema.meta({ id: 'User' })`                                 | Names the reusable component.                               |
 | `Schema.openapi({ example, description })`                           | `Schema.meta({ example, description })` / `.describe()`       | Field/schema metadata.                                      |
-| **request validation only** (response is doc-only)                   | request **and** response validated + serialized               | zodec parses the response through `@Returns`.               |
+| **request validation only** (response is doc-only)                   | request **and** response validated + serialized               | avero parses the response through `@Returns`.               |
 | `z.object(...).openapi(...)` + multipart `form`                      | `z.file()` in `@Body` + `@File`/`@Files`                      | Auto-detected multipart; web-standard `File`.               |
 | stream on raw `Context` (`streamSSE`)                                | [`@Sse(schema?)`](/guide/server-sent-events) + async iterable | Validated + documented `text/event-stream`.                 |
 | `c.body(stream)` / manual headers for downloads                      | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`      | Disposition + range negotiation handled.                    |
@@ -149,7 +149,7 @@ Three differences to internalize:
 | `app.getOpenAPIDocument({...})` / `app.doc(...)`                     | `api.swagger()` / `generateSwagger([...])`                    | Native, Zod-derived.                                        |
 | `hc<AppType>()` (typed RPC client, inferred)                         | `generateTypeScriptClient(api.contract())` (generated)        | Inference vs codegen — see below.                           |
 | Multi-runtime (Workers/Deno/Bun/Node/Lambda)                         | **Express + Node only**                                       | The biggest gap — see below.                                |
-| Zod / Valibot / others (Standard Schema validators)                  | **Zod only**                                                  | zodec is Zod-4-native.                                      |
+| Zod / Valibot / others (Standard Schema validators)                  | **Zod only**                                                  | avero is Zod-4-native.                                      |
 
 ## Validation: mostly a copy-paste
 
@@ -174,7 +174,7 @@ app.openapi(route, (c) => {
   return c.json(service.get(id, verbose), 200);
 });
 
-// zodec
+// avero
 @Get('{id}')
 @Params(z.object({ id: z.uuid() }))
 @Query(z.object({ verbose: z.coerce.boolean().optional() }))
@@ -188,17 +188,17 @@ Two behavioral notes:
 
 - **Response validation.** Hono validates the request but treats
   `responses[status].schema` as **documentation only** — the handler's `c.json`
-  payload isn't checked against it. zodec validates **and serializes** every
+  payload isn't checked against it. avero validates **and serializes** every
   response against its `@Returns` schema, so the documented and actual shapes
   can't diverge. See [Validation & Errors](/guide/validation).
-- **Failure statuses.** zodec uses `400` for params/query validation failures and
+- **Failure statuses.** avero uses `400` for params/query validation failures and
   **`422`** for body, surfaced as a `ValidationError` through your error pipeline.
   Hono's default validation hook returns `400`; adjust client expectations.
 
 ## Naming components: `.openapi('Name')` → `.meta({ id })`
 
 `@hono/zod-openapi` registers a reusable component when you call `.openapi('Name')`
-on a schema (and attaches example/description metadata the same way). zodec uses
+on a schema (and attaches example/description metadata the same way). avero uses
 Zod's native `.meta()`:
 
 ```typescript
@@ -210,7 +210,7 @@ const UserSchema = z
   })
   .openapi('User');
 
-// zodec
+// avero
 const UserSchema = z
   .object({ id: z.uuid(), email: z.email().describe('Login email') })
   .meta({ id: 'User' });
@@ -223,7 +223,7 @@ client's JSDoc.
 ## Responses, files, range, and SSE
 
 Hono streams and sets headers on the raw `Context` (`stream`, `streamSSE`,
-`c.body(...)`); the spec side is whatever you put in `responses`. zodec has
+`c.body(...)`); the spec side is whatever you put in `responses`. avero has
 dedicated decorators and response types that document themselves:
 
 - **Upload:** a `z.file()` field in a `@Body` schema auto-detects
@@ -234,21 +234,21 @@ dedicated decorators and response types that document themselves:
 - **Range / partial content:** return a `RangeFileResponse` — `206`/`416`/full
   negotiation is automatic. See [File downloads](/guide/file-downloads).
 - **Server-Sent Events:** [`@Sse(schema?, options?)`](/guide/server-sent-events) —
-  return an async iterable; zodec frames, validates, and documents it as
+  return an async iterable; avero frames, validates, and documents it as
   `text/event-stream` (vs Hono's `streamSSE` on the raw context, undocumented).
 
 ## Authentication
 
 Hono composes auth from middleware (`bearerAuth()`, custom) plus a
 `app.openAPIRegistry.registerComponent('securitySchemes', ...)` call and a
-`security` field on the route to make it appear in the spec — two places. zodec
+`security` field on the route to make it appear in the spec — two places. avero
 registers a scheme once (definition **and** handler together) and marks routes
 with `@Security`, injecting the principal via `@Principal()`:
 
 ```typescript
-import { Zodec, Security, Principal, bearer, SecurityError } from 'zodec';
+import { Avero, Security, Principal, bearer, SecurityError } from 'avero';
 
-const api = new Zodec({
+const api = new Avero({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -274,7 +274,7 @@ requirement on the spec automatically. See [Authentication](/guide/authenticatio
 
 Both emit the document from Zod, so this is close. The differences:
 
-- **Spec version.** zodec emits **OpenAPI 3.1** natively and can down-convert to
+- **Spec version.** avero emits **OpenAPI 3.1** natively and can down-convert to
   3.0 (`api.swagger({ specVersion: '3.0' })`); confirm the version your tooling
   expects.
 - **Document call.** `app.getOpenAPIDocument(...)` / `app.doc('/doc', ...)` →
@@ -287,15 +287,15 @@ On the **client**, the two take opposite routes — mirroring the [ts-rest decis
   app's type, get `client.users[':id'].$get(...)`. Like ts-rest, its edge is that
   there's nothing to regenerate — but it's TypeScript-only and couples the client
   to the server's types.
-- **zodec generates a standalone client** from the contract:
+- **avero generates a standalone client** from the contract:
 
   ```typescript
-  import { generateTypeScriptClient } from 'zodec';
+  import { generateTypeScriptClient } from 'avero';
   await writeFile('api.gen.ts', generateTypeScriptClient(api.contract()));
   ```
 
   ```typescript
-  import { createClient } from './api.gen'; // standalone — no zodec/runtime dep
+  import { createClient } from './api.gen'; // standalone — no avero/runtime dep
   const client = createClient({ baseUrl: 'https://api.example.com' });
   const user = await client.users.get({ params: { id } }); // → User; throws on non-2xx
   ```
@@ -314,62 +314,62 @@ app.openapi(getUser, getUserHandler);
 app.doc('/doc', { openapi: '3.1.0', info: { title: 'My API', version: '1.0.0' } });
 export default app; // runtime adapter (Workers/Node/Bun/…) takes it from here
 
-// zodec
+// avero
 import 'reflect-metadata';
 import express from 'express';
-import { Zodec, zodecErrorHandler } from 'zodec';
+import { Avero, averoErrorHandler } from 'avero';
 
 const app = express();
 app.use(express.json());
 
-const api = new Zodec({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service)); // you own construction
 api.mount(app);
 api.serveDocs(app);
-app.use(zodecErrorHandler());
+app.use(averoErrorHandler());
 app.listen(3000);
 ```
 
 ## Runtime & deployment: the big gap {#runtime-deployment-the-big-gap}
 
-This is the deciding factor, and zodec is on the losing side of it.
+This is the deciding factor, and avero is on the losing side of it.
 
 **Hono is multi-runtime by design** — the same app runs on Cloudflare Workers,
 Deno, Bun, Node, and Lambda / edge, with tiny bundles and fast cold starts. That
 portability is the main reason teams pick Hono.
 
-**zodec is Express + Node only, and this is a stated non-goal — not a roadmap
+**avero is Express + Node only, and this is a stated non-goal — not a roadmap
 item.** The reasoning:
 
-- zodec is built on **legacy decorators + `reflect-metadata`**, which depend on a
+- avero is built on **legacy decorators + `reflect-metadata`**, which depend on a
   Node-style module/runtime environment and don't fit Workers-style edge bundles
   (no `reflect-metadata`, aggressive tree-shaking, small-bundle constraints).
 - It targets **Express 5** specifically — `api.mount(app)` wires Express routes,
   middleware (`@Use`), file handling (multer), and the error pipeline
-  (`zodecErrorHandler`) directly onto Express primitives. There is no `Context`
+  (`averoErrorHandler`) directly onto Express primitives. There is no `Context`
   abstraction to port across runtimes.
 - The project's focus is **accurate OpenAPI + typed clients from decorators on
   Node**, not runtime portability. Adding a runtime-agnostic core would be a
   fundamentally different architecture.
 
-So: if you deploy to the edge or a non-Node runtime, **stay on Hono** — zodec
+So: if you deploy to the edge or a non-Node runtime, **stay on Hono** — avero
 cannot run there and isn't planning to. If you're committed to Node/Express, the
-rest of this guide is why zodec's decorator model, default response validation,
+rest of this guide is why avero's decorator model, default response validation,
 and first-class files/SSE/auth-in-spec may be worth the move.
 
-## Gaps: what Hono does that zodec doesn't
+## Gaps: what Hono does that avero doesn't
 
-- **Multi-runtime / edge deployment** — Workers, Deno, Bun, Lambda@Edge. zodec is
+- **Multi-runtime / edge deployment** — Workers, Deno, Bun, Lambda@Edge. avero is
   Node/Express only (see [above](#runtime-deployment-the-big-gap)). _Stated
   non-goal._
-- **Tiny bundle size / fast cold start** — Hono is optimized for edge; zodec's
+- **Tiny bundle size / fast cold start** — Hono is optimized for edge; avero's
   `reflect-metadata` + decorator model is Node-oriented and heavier.
-- **Inferred zero-codegen RPC client** (`hc<AppType>()`) — zodec generates a
+- **Inferred zero-codegen RPC client** (`hc<AppType>()`) — avero generates a
   client instead of inferring it (the standalone/open-artifact tradeoff above).
 - **Multiple validation libraries** — Hono's validator middleware accepts various
-  Standard Schema libraries; zodec is **Zod-only**.
+  Standard Schema libraries; avero is **Zod-only**.
 - **`hono/jsx` / full web-framework features** — Hono is a general web framework
-  (JSX rendering, etc.); zodec is purely an API/OpenAPI layer.
+  (JSX rendering, etc.); avero is purely an API/OpenAPI layer.
 
-If you hit a Hono feature without an obvious zodec equivalent and you're on Node,
-please [open an issue](https://github.com/joeferner/zodec/issues).
+If you hit a Hono feature without an obvious avero equivalent and you're on Node,
+please [open an issue](https://github.com/joeferner/avero/issues).

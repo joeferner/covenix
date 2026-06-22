@@ -1,9 +1,9 @@
 {
-  "zodecContract": "0.1",
+  "averoContract": "0.1",
   "info": {
     "title": "Kitchen Sink API",
     "version": "1.0.0",
-    "description": "Exercises every zodec feature end to end.",
+    "description": "Exercises every avero feature end to end.",
     "license": {
       "name": "MIT"
     }

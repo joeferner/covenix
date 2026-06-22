@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Aspirational zodec example — represents the desired state once tmp/requirements.md is implemented and README.md is fulfilled. Will not compile until zodec exists.",
+  "description": "Aspirational avero example — represents the desired state once tmp/requirements.md is implemented and README.md is fulfilled. Will not compile until avero exists.",
   "scripts": {
     "verify": "bash verify.sh"
   },

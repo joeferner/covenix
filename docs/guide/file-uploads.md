@@ -1,7 +1,7 @@
 # File Uploads
 
 To **receive** files, declare them in your [`@Body`](/api/functions/Body) schema
-as [`z.file()`](https://zod.dev) fields. zodec auto-detects the route as
+as [`z.file()`](https://zod.dev) fields. avero auto-detects the route as
 `multipart/form-data` (there is no `@Multipart` marker), parses it with
 [multer](https://github.com/expressjs/multer), and injects each uploaded file as
 a web-standard [`File`](https://developer.mozilla.org/docs/Web/API/File) via
@@ -9,7 +9,7 @@ a web-standard [`File`](https://developer.mozilla.org/docs/Web/API/File) via
 
 ```typescript
 import { z } from 'zod';
-import { Route, Post, Params, Body, Returns, Param, File, BodyParam } from 'zodec';
+import { Route, Post, Params, Body, Returns, Param, File, BodyParam } from 'avero';
 
 const AvatarUpload = z.object({
   // The z.file() field is what makes this route multipart. Size/mime
@@ -39,7 +39,7 @@ class UsersController {
 ## How it works
 
 A `@Body` schema is normally validated as JSON. The moment it contains a file
-field, zodec switches the route to `multipart/form-data` and:
+field, avero switches the route to `multipart/form-data` and:
 
 - runs **multer** before the handler, so text fields land on `req.body` and files
   on `req.files`,
@@ -89,16 +89,16 @@ spec and the runtime check never drift.
 ## Storage and limits
 
 By default uploads are buffered **in memory**, so each handler receives a `File`
-backed by the bytes. Configure multer through the `Zodec` constructor — the
+backed by the bytes. Configure multer through the `Avero` constructor — the
 `multipart` option is passed straight to multer:
 
 ```typescript
 import multer from 'multer';
 
-const api = new Zodec({
+const api = new Avero({
   info: { title: 'My API', version: '1.0.0' },
   multipart: {
-    // Disk storage for large uploads — zodec still hands the handler a `File`,
+    // Disk storage for large uploads — avero still hands the handler a `File`,
     // backed lazily by the file on disk (it isn't read into memory until you
     // read the File).
     storage: multer.diskStorage({ destination: '/tmp/uploads' }),
