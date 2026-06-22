@@ -16,14 +16,14 @@ Anonymous inline schemas are allowed but produce inlined swagger (no `$ref`).
 
 ## From a running instance
 
-The same [`Avero`](/api/classes/Avero) instance you registered controllers on
+The same [`Covenix`](/api/classes/Covenix) instance you registered controllers on
 generates the spec — no need to list controllers a second time:
 
 ```typescript
 app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 ```
 
-[`api.swagger()`](/api/classes/Avero#swagger) builds the OpenAPI 3.1 document
+[`api.swagger()`](/api/classes/Covenix#swagger) builds the OpenAPI 3.1 document
 from the registered controllers' metadata. It doesn't depend on routes being
 mounted.
 
@@ -59,13 +59,13 @@ spec you don't have to construct controllers (or their dependencies) at all.
 
 ```typescript
 import { writeFile } from 'node:fs/promises';
-import { generateSwagger } from 'avero';
+import { generateSwagger } from 'covenix';
 
 const swagger = generateSwagger([UsersController, HealthController]);
 await writeFile('swagger.json', JSON.stringify(swagger, null, 2));
 ```
 
-This is the lightest path for CI spec checks and client codegen: no `Avero`
+This is the lightest path for CI spec checks and client codegen: no `Covenix`
 instance, no service wiring, no Express — just the classes and their decorators.
 
 ## Schemas not tied to a route
@@ -107,7 +107,7 @@ tool.
 
 ## Discriminated unions
 
-A `z.discriminatedUnion` is emitted as `oneOf`, and avero also adds an OpenAPI
+A `z.discriminatedUnion` is emitted as `oneOf`, and covenix also adds an OpenAPI
 **`discriminator`** read straight from the union (no guessing the key back out of
 the JSON). When every variant is named with `.meta({ id })`, the `discriminator`
 includes a `mapping` from each discriminator value to that variant's component
@@ -147,7 +147,7 @@ variant drops the `mapping` (the `propertyName` is still emitted). The
 
 ## Spec version: 3.1 (default) or 3.0
 
-avero emits **OpenAPI 3.1.0 by default**. This is its native form: Zod 4's
+covenix emits **OpenAPI 3.1.0 by default**. This is its native form: Zod 4's
 `z.toJSONSchema()` produces JSON Schema draft 2020-12, which OpenAPI 3.1 uses
 verbatim — so the spec is a faithful, lossless view of your schemas.
 
@@ -155,7 +155,7 @@ Some tooling only partially supports 3.1. The most common case is
 [`openapi-generator`](https://openapi-generator.tech)'s `typescript-fetch`
 template, which misreads 3.1 constructs like `type: [..., 'null']` nullables and
 numeric `exclusiveMinimum`/`exclusiveMaximum`. For those consumers, pass
-`specVersion: '3.0'` and avero down-converts the document:
+`specVersion: '3.0'` and covenix down-converts the document:
 
 ```typescript
 app.get('/swagger.json', (_req, res) => res.json(api.swagger({ specVersion: '3.0' })));
@@ -164,7 +164,7 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger({ specVersion: '3.0
 const swagger = generateSwagger([UsersController], info, { specVersion: '3.0' });
 ```
 
-The down-conversion rewrites the 3.1-only constructs avero emits into their 3.0
+The down-conversion rewrites the 3.1-only constructs covenix emits into their 3.0
 equivalents:
 
 | 3.1 (default)                                        | 3.0 (`specVersion: '3.0'`)                          |

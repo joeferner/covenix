@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import type { ZodType } from 'zod';
 import type { Request, RequestHandler, Response } from 'express';
 
-/** HTTP methods avero routes can be mapped to. */
+/** HTTP methods covenix routes can be mapped to. */
 export type HttpMethod = 'get' | 'post' | 'put' | 'patch' | 'delete';
 
 /**
@@ -80,7 +80,7 @@ export interface RouteMetadata {
 
 /** A single `@Security` requirement: a scheme name and the scopes it requires. */
 export interface SecurityRequirement {
-  /** The security scheme name (a key in the `Avero` instance's `security` map). */
+  /** The security scheme name (a key in the `Covenix` instance's `security` map). */
   scheme: string;
   /** Scopes the route requires for this scheme; `[]` when none. */
   scopes: string[];
@@ -166,9 +166,9 @@ export interface ParamMetadata {
  * together from many keys. {@link HANDLER_NAMES_KEY} is the registry of which
  * methods are routes (reflect-metadata can't enumerate decorated members).
  */
-const ROUTE_KEY = Symbol('avero:route');
-const CONTROLLER_KEY = Symbol('avero:controller');
-const HANDLER_NAMES_KEY = Symbol('avero:handlerNames');
+const ROUTE_KEY = Symbol('covenix:route');
+const CONTROLLER_KEY = Symbol('covenix:controller');
+const HANDLER_NAMES_KEY = Symbol('covenix:handlerNames');
 
 /** Mutable per-method storage, accumulated by the method/parameter decorators. */
 interface RouteEntry {
@@ -257,7 +257,7 @@ function controllerEntry(target: object): ControllerEntry {
 
 const STATUS_CONFLICT = (handlerName: string, status: number): Error =>
   new Error(
-    `avero: status ${status} on "${handlerName}" has more than one body kind — only one of @Returns / @ReturnsFile / @Sse is allowed per status`,
+    `covenix: status ${status} on "${handlerName}" has more than one body kind — only one of @Returns / @ReturnsFile / @Sse is allowed per status`,
   );
 
 /**
@@ -327,7 +327,7 @@ export function setBodySchema(target: object, handlerName: string, schema: ZodTy
   const entry = routeEntry(target, handlerName);
   if (entry.body && entry.body !== schema) {
     throw new Error(
-      `avero: "${handlerName}" declares its request body more than once — use either @Body(schema) or @BodyParam(schema), not both`,
+      `covenix: "${handlerName}" declares its request body more than once — use either @Body(schema) or @BodyParam(schema), not both`,
     );
   }
   entry.body = schema;

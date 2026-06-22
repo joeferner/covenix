@@ -9,7 +9,7 @@ import {
   type SecurityRequirement,
   type SseResponseDecl,
 } from './metadata.js';
-import { AVERO_PRINCIPAL } from './parameters.js';
+import { COVENIX_PRINCIPAL } from './parameters.js';
 import { Readable } from 'node:stream';
 import { Blob, File } from 'node:buffer';
 import { openAsBlob } from 'node:fs';
@@ -33,7 +33,7 @@ import {
   type OpenApiInfo,
   type SpecVersion,
 } from './swagger.js';
-import { generateContractDocument, type ContractOptions, type AveroContract } from './contract.js';
+import { generateContractDocument, type ContractOptions, type CovenixContract } from './contract.js';
 
 /**
  * Per-request values the handler's injected parameters resolve from. Each source
@@ -53,12 +53,12 @@ interface RequestValues {
  * OpenAPI `info` block for the generated document — the full OpenAPI Info Object
  * (`title` + `version` required; `description`/`contact`/`license`/… optional).
  */
-export type AveroInfo = OpenApiInfo;
+export type CovenixInfo = OpenApiInfo;
 
-/** Options for constructing a {@link Avero} instance. */
-export interface AveroOptions {
+/** Options for constructing a {@link Covenix} instance. */
+export interface CovenixOptions {
   /** OpenAPI `info` block (`title` + `version` required; rest optional). */
-  info: AveroInfo;
+  info: CovenixInfo;
   /** `servers` array for the generated document (base URLs). */
   servers?: OpenAPIV3_1.ServerObject[];
   /** Top-level `externalDocs` for the generated document. */
@@ -84,12 +84,12 @@ export interface AveroOptions {
 /** A controller handler method, called with the assembled argument list. */
 type HandlerFn = (...args: unknown[]) => unknown;
 
-/** Options for {@link Avero.register} / {@link ControllerGroup.register}. */
+/** Options for {@link Covenix.register} / {@link ControllerGroup.register}. */
 export interface RegisterOptions {
   /**
    * Base path prepended to this controller's `@Route` prefix — e.g. `'/v1'` for
    * versioning. Reflected in both the mounted Express routes and the generated
-   * `paths`. Composes with any enclosing {@link Avero.group}.
+   * `paths`. Composes with any enclosing {@link Covenix.group}.
    */
   prefix?: string | undefined;
 }
@@ -106,7 +106,7 @@ function joinPrefix(base: string, extra?: string): string {
 }
 
 /**
- * A registration scope created by {@link Avero.group}: registers controllers
+ * A registration scope created by {@link Covenix.group}: registers controllers
  * under a shared base path (e.g. a `/v1` version segment). Groups nest — a
  * nested {@link ControllerGroup.group} appends its prefix to the enclosing one.
  *
@@ -119,7 +119,7 @@ function joinPrefix(base: string, extra?: string): string {
  * ```
  */
 export class ControllerGroup {
-  /** @internal — constructed by {@link Avero.group}. */
+  /** @internal — constructed by {@link Covenix.group}. */
   public constructor(
     private readonly add: (instance: object, prefix: string) => void,
     private readonly basePrefix: string,
@@ -221,7 +221,7 @@ function validate(route: RouteMetadata, req: Request): RequestValues {
 }
 
 /**
- * The fields avero reads off a multer file. Modeled structurally so the source
+ * The fields covenix reads off a multer file. Modeled structurally so the source
  * doesn't depend on multer's (Express-augmenting) types. Memory storage provides
  * `buffer`; disk (and custom) storage provides `path`.
  */
@@ -234,7 +234,7 @@ interface RawMultipartFile {
 }
 
 /** Where the adapted `File`s are stashed on the request, keyed by field name. */
-const AVERO_FILES = Symbol('avero:files');
+const COVENIX_FILES = Symbol('covenix:files');
 
 /** Adapts a multer file into a web-standard `File` the handler can consume. */
 async function toWebFile(file: RawMultipartFile): Promise<File> {
@@ -264,7 +264,7 @@ async function adaptMultipartFiles(req: Request, fileFields: MultipartFileField[
   for (const field of fileFields) {
     adapted[field.name] = await Promise.all((raw[field.name] ?? []).map(toWebFile));
   }
-  (req as unknown as Record<symbol, unknown>)[AVERO_FILES] = adapted;
+  (req as unknown as Record<symbol, unknown>)[COVENIX_FILES] = adapted;
 }
 
 /**
@@ -279,7 +279,7 @@ function assembleMultipartBody(
   const body: Record<string, unknown> = {
     ...((req.body as Record<string, unknown> | undefined) ?? {}),
   };
-  const files = ((req as unknown as Record<symbol, unknown>)[AVERO_FILES] ?? {}) as Record<
+  const files = ((req as unknown as Record<symbol, unknown>)[COVENIX_FILES] ?? {}) as Record<
     string,
     File[] | undefined
   >;
@@ -542,7 +542,7 @@ function sendHttpResponse(
   if (response.status !== undefined && !decl) {
     next(
       new Error(
-        `avero: HttpResponse status ${response.status} has no matching @Returns on ` +
+        `covenix: HttpResponse status ${response.status} has no matching @Returns on ` +
           `${route.method.toUpperCase()} /${route.path}`,
       ),
     );
@@ -625,7 +625,7 @@ async function streamSse(
 ): Promise<void> {
   const iterable = value as AsyncIterable<unknown> | null | undefined;
   if (!iterable || typeof iterable[Symbol.asyncIterator] !== 'function') {
-    throw new Error('avero: an @Sse handler must return an AsyncIterable of events');
+    throw new Error('covenix: an @Sse handler must return an AsyncIterable of events');
   }
 
   res.status(status);
@@ -705,13 +705,13 @@ async function buildArgs(
  *
  * @example
  * ```ts
- * const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
+ * const api = new Covenix({ info: { title: 'My API', version: '1.0.0' } });
  * api.register(new UsersController(db));
  * api.mount(app);
  * app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
  * ```
  */
-export class Avero {
+export class Covenix {
   private readonly controllers: RegisteredController[] = [];
   /** Lazily-built multer instance, shared across all multipart routes. */
   private uploader: Multer | undefined;
@@ -719,10 +719,10 @@ export class Avero {
   /**
    * @param options - Instance options, including the OpenAPI `info` block.
    */
-  public constructor(private readonly options: AveroOptions) {}
+  public constructor(private readonly options: CovenixOptions) {}
 
   /** The OpenAPI `info` block this instance was constructed with. */
-  public get info(): AveroInfo {
+  public get info(): CovenixInfo {
     return this.options.info;
   }
 
@@ -733,7 +733,7 @@ export class Avero {
 
   /**
    * Records a pre-constructed controller instance. The caller owns construction
-   * and dependency injection; {@link Avero.mount} does the wiring later.
+   * and dependency injection; {@link Covenix.mount} does the wiring later.
    *
    * @param instance - A controller instance (not a class).
    * @param options - Registration options, e.g. a `prefix` base path.
@@ -768,7 +768,7 @@ export class Avero {
 
   /**
    * Builds the OpenAPI document from the registered controllers' metadata.
-   * Independent of {@link Avero.mount} — does not require routes to be wired.
+   * Independent of {@link Covenix.mount} — does not require routes to be wired.
    *
    * @param options - Generation options. `specVersion` defaults to `'3.1'`.
    *   `schemas` adds standalone (route-less) named schemas to
@@ -800,15 +800,15 @@ export class Avero {
   }
 
   /**
-   * Builds the high-fidelity {@link AveroContract} (the codegen IR) from the
-   * registered controllers' metadata — the contract sibling of {@link Avero.swagger}.
-   * Independent of {@link Avero.mount}; serialize it to `contract.json` for a
+   * Builds the high-fidelity {@link CovenixContract} (the codegen IR) from the
+   * registered controllers' metadata — the contract sibling of {@link Covenix.swagger}.
+   * Independent of {@link Covenix.mount}; serialize it to `contract.json` for a
    * client generator.
    *
    * @param options - Extra inputs, e.g. route-less `schemas` (named via `.meta({ id })`).
    * @returns The validated contract document.
    */
-  public contract(options: ContractOptions = {}): AveroContract {
+  public contract(options: ContractOptions = {}): CovenixContract {
     const sources = this.controllers.map(({ instance, prefix }) => ({
       prototype: Object.getPrototypeOf(instance) as object,
       basePrefix: prefix,
@@ -895,7 +895,7 @@ export class Avero {
   private securityMiddleware(requirements: SecurityRequirement[]): RequestHandler {
     return (req, _res, next) => {
       this.authenticate(requirements, req).then((principal) => {
-        (req as unknown as Record<symbol, unknown>)[AVERO_PRINCIPAL] = principal;
+        (req as unknown as Record<symbol, unknown>)[COVENIX_PRINCIPAL] = principal;
         next();
       }, next);
     };
@@ -913,7 +913,7 @@ export class Avero {
     for (const requirement of requirements) {
       const scheme = config[requirement.scheme];
       if (!scheme) {
-        throw new Error(`avero: no security handler registered for "${requirement.scheme}"`);
+        throw new Error(`covenix: no security handler registered for "${requirement.scheme}"`);
       }
       try {
         const principal = await scheme.handler(req, requirement.scopes);
@@ -975,7 +975,7 @@ export class Avero {
     const status = successStatus(route.responses);
     const fn = (instance as Record<string, HandlerFn | undefined>)[route.handlerName];
     if (typeof fn !== 'function') {
-      throw new Error(`avero: handler "${route.handlerName}" is not a function`);
+      throw new Error(`covenix: handler "${route.handlerName}" is not a function`);
     }
     const params = getParams(proto, route.handlerName);
     return (req, res, next) => {
@@ -1018,7 +1018,7 @@ export class Avero {
           // Always-on response validation: the return value must match its
           // declared @Returns schema. A mismatch is a server bug, so it throws
           // a 500 ValidationError through the same error pipeline as everything
-          // else — avero never decides what to do with it. The *parsed* value is
+          // else — covenix never decides what to do with it. The *parsed* value is
           // what's sent, so the schema also serializes the response: unknown keys
           // are stripped and transforms/defaults applied (use `.loose()` to keep
           // extra keys). Without a schema, the value is sent as-is.

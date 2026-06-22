@@ -14,7 +14,7 @@ export type SecuritySchemes = Record<string, SecuritySchemeObject>;
  * as `401`; throwing rejects with that error (e.g. a `403` for insufficient
  * scope). The handler owns the scope check.
  */
-export type SecurityHandler = (req: Request, scopes: string[]) => unknown | Promise<unknown>; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents -- keep `Promise<unknown>` visible to document that async handlers are supported (avero awaits the result)
+export type SecurityHandler = (req: Request, scopes: string[]) => unknown | Promise<unknown>; // eslint-disable-line @typescript-eslint/no-redundant-type-constituents -- keep `Promise<unknown>` visible to document that async handlers are supported (covenix awaits the result)
 
 /** A named security scheme: its OpenAPI definition plus the runtime handler. */
 export interface SecurityScheme {
@@ -24,7 +24,7 @@ export interface SecurityScheme {
   handler: SecurityHandler;
 }
 
-/** The `security` map passed to `new Avero({ security })`, keyed by scheme name. */
+/** The `security` map passed to `new Covenix({ security })`, keyed by scheme name. */
 export type SecurityConfig = Record<string, SecurityScheme>;
 
 /** Options for the {@link bearer} builder. */
@@ -41,7 +41,7 @@ export interface BearerOptions {
  *
  * @example
  * ```ts
- * new Avero({ info, security: { bearerAuth: bearer((req) => verifyJwt(req)) } });
+ * new Covenix({ info, security: { bearerAuth: bearer((req) => verifyJwt(req)) } });
  * ```
  */
 export function bearer(handler: SecurityHandler, options: BearerOptions = {}): SecurityScheme {

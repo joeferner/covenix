@@ -7,7 +7,7 @@ export const UserSchema = z
     email: z.string().email().describe('Primary contact email; also the login identifier.'),
     role: z.enum(['admin', 'user']).default('user').describe('Authorization role for the user.'),
     createdAt: z.string().datetime(),
-    // A real `z.date()` in a response: the handler returns a `Date`, avero
+    // A real `z.date()` in a response: the handler returns a `Date`, covenix
     // serializes it to an ISO string on the wire, and the *validating* generated
     // client revives it back into a `Date`. (Documented as date-time in OpenAPI.)
     lastSeenAt: z.date().optional().describe('When the user was last seen.'),
@@ -43,7 +43,7 @@ export const UserListSchema = z
   .meta({ id: 'UserList' });
 
 /**
- * A multipart/form-data upload. The `z.file()` field is what makes avero treat
+ * A multipart/form-data upload. The `z.file()` field is what makes covenix treat
  * the body as `multipart/form-data` (auto-detected) and document it as a binary
  * part; the size/mime constraints come straight from the schema. Multipart form
  * schemas stay inline (no `.meta({ id })`) — they aren't reused as components.

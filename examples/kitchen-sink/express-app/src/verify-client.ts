@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 // The generated standalone client (written next to this file by `npm run client`).
-import { createClient, AveroClientError } from './api.gen.js';
+import { createClient, CovenixClientError } from './api.gen.js';
 
 // Exercises the *generated* client against the running kitchen-sink server — the
 // real proof that codegen output works end to end (typed calls, path params,
@@ -40,9 +40,9 @@ async function main(): Promise<void> {
       body: { username: 'hdr', email: 'hdr@example.com' },
       headers: { 'x-request-id': 'not-a-uuid' },
     }),
-    (err: unknown) => err instanceof AveroClientError && err.status === 400,
+    (err: unknown) => err instanceof CovenixClientError && err.status === 400,
   );
-  ok('users.create({ x-request-id: invalid }) → AveroClientError(400) (@Headers validation)');
+  ok('users.create({ x-request-id: invalid }) → CovenixClientError(400) (@Headers validation)');
 
   const fetched = await api.users.get({ params: { id: created.id } });
   assert.equal(fetched.username, 'clientuser');
@@ -61,9 +61,9 @@ async function main(): Promise<void> {
   const missing = '00000000-0000-0000-0000-000000000000';
   await assert.rejects(
     api.users.get({ params: { id: missing } }),
-    (err: unknown) => err instanceof AveroClientError && err.status === 404,
+    (err: unknown) => err instanceof CovenixClientError && err.status === 404,
   );
-  ok('users.get(missing) throws AveroClientError(404)');
+  ok('users.get(missing) throws CovenixClientError(404)');
 
   const raw = await api.users.get.raw({ params: { id: missing } });
   assert.equal(raw.status, 404);

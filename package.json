@@ -1,5 +1,5 @@
 {
-  "name": "avero",
+  "name": "covenix",
   "version": "0.1.0",
   "description": "Zod-powered decorators for Express APIs — typed routes, runtime validation, and accurate OpenAPI from a single source of truth.",
   "license": "MIT",

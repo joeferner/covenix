@@ -1,9 +1,9 @@
 import express from 'express';
 import type { Express, RequestHandler } from 'express';
 import { createServer, type Server } from 'node:http';
-import { averoErrorHandler } from './errors.js';
+import { covenixErrorHandler } from './errors.js';
 import type { ServeDocsOptions } from './serve-docs.js';
-import type { Avero } from './avero.js';
+import type { Covenix } from './covenix.js';
 
 /** Options for {@link express.json} (the body-parser JSON options). */
 type JsonOptions = Parameters<typeof express.json>[0];
@@ -18,7 +18,7 @@ type UrlencodedOptions = Parameters<typeof express.urlencoded>[0];
 export interface ToExpressOptions {
   /**
    * An existing Express app to build onto. Defaults to a fresh `express()`. Use
-   * this to layer avero onto an app you've already partly configured.
+   * this to layer covenix onto an app you've already partly configured.
    */
   app?: Express;
   /**
@@ -32,13 +32,13 @@ export interface ToExpressOptions {
    */
   urlencoded?: boolean | UrlencodedOptions;
   /**
-   * Serve the docs UI via {@link Avero.serveDocs}. `true` (default) mounts at
+   * Serve the docs UI via {@link Covenix.serveDocs}. `true` (default) mounts at
    * `/docs`; an object customizes `path` and the UI options; `false` skips it.
    */
   docs?: boolean | (ServeDocsOptions & { path?: string });
   /**
    * Install an error handler **last**. `true` (default) uses
-   * {@link averoErrorHandler}; a function installs your own; `false` skips it.
+   * {@link covenixErrorHandler}; a function installs your own; `false` skips it.
    */
   errorHandler?: boolean | RequestHandler;
   /**
@@ -65,15 +65,15 @@ export interface ServeOptions extends ToExpressOptions {
 
 /**
  * Convenience builder that assembles a ready-to-listen Express app for a
- * {@link Avero} instance, collapsing the usual boilerplate
- * (`express()` + `express.json()` + `mount` + `serveDocs` + `averoErrorHandler`)
+ * {@link Covenix} instance, collapsing the usual boilerplate
+ * (`express()` + `express.json()` + `mount` + `serveDocs` + `covenixErrorHandler`)
  * into one call — with the middleware order fixed by construction:
  *
  * `configure` → body parsers (json / urlencoded) → routes → docs → `after`
  * → error handler.
  *
  * This is **opt-in sugar**, not the only way in: you can still build the app
- * yourself and call {@link Avero.mount} / {@link Avero.serveDocs} directly. Each
+ * yourself and call {@link Covenix.mount} / {@link Covenix.serveDocs} directly. Each
  * step here can be disabled (`false`) or customized via {@link ToExpressOptions}.
  * Returns the app **without listening** — ideal for supertest-style tests; use
  * {@link serve} to also listen.
@@ -86,7 +86,7 @@ export interface ServeOptions extends ToExpressOptions {
  * });
  * ```
  */
-export function toExpress(api: Avero, options: ToExpressOptions = {}): Express {
+export function toExpress(api: Covenix, options: ToExpressOptions = {}): Express {
   const app = options.app ?? express();
 
   // Pre-route middleware (cors/helmet/logging/static/header-auth).
@@ -119,7 +119,7 @@ export function toExpress(api: Avero, options: ToExpressOptions = {}): Express {
   // Error handler, last.
   if (options.errorHandler !== false) {
     app.use(
-      typeof options.errorHandler === 'function' ? options.errorHandler : averoErrorHandler(),
+      typeof options.errorHandler === 'function' ? options.errorHandler : covenixErrorHandler(),
     );
   }
 
@@ -138,7 +138,7 @@ export function toExpress(api: Avero, options: ToExpressOptions = {}): Express {
  * // server is a http.Server — attach websockets, close on shutdown, …
  * ```
  */
-export async function serve(api: Avero, options: ServeOptions = {}): Promise<Server> {
+export async function serve(api: Covenix, options: ServeOptions = {}): Promise<Server> {
   const app = toExpress(api, options);
   const server = createServer(app);
   const port = options.port ?? 3000;

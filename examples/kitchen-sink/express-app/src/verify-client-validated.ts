@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 // The generated *validating* client (written by `npm run client -- … --validate`).
 // It imports zod and parses requests/responses at runtime.
-import { createClient, AveroClientValidationError } from './api.validated.gen.js';
+import { createClient, CovenixClientValidationError } from './api.validated.gen.js';
 
 // Exercises the validating client against the running server: proves real server
 // responses parse cleanly against the regenerated schemas, and that request-input
@@ -13,7 +13,7 @@ async function main(): Promise<void> {
   const api = createClient({ baseUrl });
 
   // Each call parses the server's response through the regenerated Zod schema; a
-  // drift would throw AveroClientValidationError. Reaching the assertions proves
+  // drift would throw CovenixClientValidationError. Reaching the assertions proves
   // the responses conform.
   // Send a real Date in the request body; it round-trips back as a real Date.
   const lastSeenAt = new Date('2020-06-15T10:00:00.000Z');
@@ -36,12 +36,12 @@ async function main(): Promise<void> {
   ok('users.list() → response validated');
 
   // Request-input validation fires *before* the network: an invalid body throws
-  // a AveroClientValidationError (phase 'request') rather than hitting the server.
+  // a CovenixClientValidationError (phase 'request') rather than hitting the server.
   await assert.rejects(
     api.users.create({ body: { username: 'x', email: 'nope' } }),
-    (err: unknown) => err instanceof AveroClientValidationError && err.phase === 'request',
+    (err: unknown) => err instanceof CovenixClientValidationError && err.phase === 'request',
   );
-  ok('users.create(invalid) → AveroClientValidationError (request, no network)');
+  ok('users.create(invalid) → CovenixClientValidationError (request, no network)');
 
   console.log('validating client exercised the live server successfully');
 }

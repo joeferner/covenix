@@ -1,6 +1,6 @@
 # Getting Started
 
-`avero` lets you describe each endpoint with explicit [Zod](https://zod.dev)
+`covenix` lets you describe each endpoint with explicit [Zod](https://zod.dev)
 schemas and ergonomic decorators. From that one description it wires Express
 routes, validates every request, and generates a `swagger.json` that always
 matches what the code actually does.
@@ -8,10 +8,10 @@ matches what the code actually does.
 ## Installation
 
 ```bash
-npm install avero zod reflect-metadata express
+npm install covenix zod reflect-metadata express
 ```
 
-avero requires **Zod 4+** and **TypeScript 5+** with experimental decorators.
+covenix requires **Zod 4+** and **TypeScript 5+** with experimental decorators.
 
 ### TypeScript configuration
 
@@ -26,7 +26,7 @@ avero requires **Zod 4+** and **TypeScript 5+** with experimental decorators.
 ```
 
 - `"type": "module"` is required in `package.json` (ESM).
-- `emitDecoratorMetadata` is **not** required — avero uses explicit parameter
+- `emitDecoratorMetadata` is **not** required — covenix uses explicit parameter
   decorators, so it never needs runtime type metadata.
 - Import `reflect-metadata` once at your app's entry point.
 
@@ -35,7 +35,7 @@ avero requires **Zod 4+** and **TypeScript 5+** with experimental decorators.
 ```typescript
 import { z } from 'zod';
 import createError from 'http-errors';
-import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'avero';
+import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'covenix';
 
 const UserSchema = z
   .object({
@@ -76,10 +76,10 @@ export class UsersController {
 ```typescript
 // app.ts
 import 'reflect-metadata';
-import { Avero, serve } from 'avero';
+import { Covenix, serve } from 'covenix';
 import { UsersController } from './users.controller.js';
 
-const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Covenix({ info: { title: 'My API', version: '1.0.0' } });
 
 // You own construction — inject dependencies explicitly.
 api.register(new UsersController(db));
@@ -89,7 +89,7 @@ api.register(new UsersController(db));
 await serve(api, { port: 3000 });
 ```
 
-A single [`Avero`](/api/classes/Avero) instance owns your controllers;
+A single [`Covenix`](/api/classes/Covenix) instance owns your controllers;
 [`serve`](/api/functions/serve) is opt-in convenience that assembles a ready Express
 app and listens. The same instance also generates swagger.
 
@@ -97,20 +97,20 @@ app and listens. The same instance also generates swagger.
 
 `serve`/[`toExpress`](/api/functions/toExpress) are sugar, not a requirement. When
 you need full control, build the app and call
-[`mount`](/api/classes/Avero#mount) directly:
+[`mount`](/api/classes/Covenix#mount) directly:
 
 ```typescript
 import express from 'express';
-import { Avero, averoErrorHandler } from 'avero';
+import { Covenix, covenixErrorHandler } from 'covenix';
 
 const app = express();
 app.use(express.json());
 
-const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Covenix({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(db));
 api.mount(app); // wires routes + validation
 api.serveDocs(app); // optional docs UI
-app.use(averoErrorHandler());
+app.use(covenixErrorHandler());
 app.listen(3000);
 ```
 

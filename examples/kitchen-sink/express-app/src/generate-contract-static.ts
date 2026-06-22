@@ -1,12 +1,12 @@
 import { writeFile } from 'node:fs/promises';
-import { generateContract } from 'avero';
+import { generateContract } from 'covenix';
 import { apiInfo } from './api-info.js';
 import { additionalSchemas } from './api-schemas.js';
 import { HealthController } from './controllers/HealthController.js';
 import { UsersController } from './controllers/UsersController.js';
 import { AuthController } from './controllers/AuthController.js';
 
-// Static: build the contract from the controller classes directly — no Avero
+// Static: build the contract from the controller classes directly — no Covenix
 // instance, no service construction. Unlike swagger, the contract needs no
 // security *definitions* (it records scheme names + scopes off the routes), so
 // this is purely the classes. Mirror the instance's `/v1` group with `prefix`

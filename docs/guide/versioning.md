@@ -57,7 +57,7 @@ generated from the document see both versions.
 ::: tip Unversioned infra routes
 Mount operational endpoints that shouldn't be versioned (a `/swagger.json`, a
 `/docs` UI, a load-balancer `/healthz`) directly on the Express app rather than
-inside a group — only avero controllers pick up the group prefix.
+inside a group — only covenix controllers pick up the group prefix.
 :::
 
 ## Static generation
@@ -66,7 +66,7 @@ To keep [static, instance-free generation](/guide/swagger#static-generation)
 identical to `api.swagger()` when you use groups, wrap each class with its prefix:
 
 ```typescript
-import { generateSwagger } from 'avero';
+import { generateSwagger } from 'covenix';
 
 const doc = generateSwagger([
   { controller: UsersController, prefix: '/v1' },

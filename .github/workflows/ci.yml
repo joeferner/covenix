@@ -25,7 +25,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
 
-  # End-to-end: builds avero, boots the kitchen-sink server, exercises every
+  # End-to-end: builds covenix, boots the kitchen-sink server, exercises every
   # feature with curl + the generated client, and checks the generated artifacts
   # (swagger / contract / api.gen.ts) against their committed snapshots.
   kitchen-sink:

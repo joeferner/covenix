@@ -1,12 +1,12 @@
 # File Downloads
 
-Handlers normally return a value that avero serializes to JSON. To send a **file
+Handlers normally return a value that covenix serializes to JSON. To send a **file
 or binary stream** instead — a download, an export, a generated PDF — return a
 [`FileResponse`](/api/classes/FileResponse) and declare the response with
 [`@ReturnsFile`](/api/functions/ReturnsFile).
 
 ```typescript
-import { Route, Get, Params, ReturnsFile, Returns, Param, FileResponse } from 'avero';
+import { Route, Get, Params, ReturnsFile, Returns, Param, FileResponse } from 'covenix';
 
 @Route('users')
 class UsersController {
@@ -28,7 +28,7 @@ class UsersController {
 
 ## How it works
 
-When a handler returns a `FileResponse`, avero:
+When a handler returns a `FileResponse`, covenix:
 
 - sets the **status** (`FileResponse.status`, else the route's declared success
   status, else `200`),
@@ -108,8 +108,8 @@ response and JSON error responses.
 
 For large or seekable content (video, audio, big files), return a
 [`RangeFileResponse`](/api/classes/RangeFileResponse) instead. It **guarantees
-HTTP `Range` support**: its body type is narrowed to sources avero can serve a
-byte slice from, so returning one is the opt-in. avero advertises
+HTTP `Range` support**: its body type is narrowed to sources covenix can serve a
+byte slice from, so returning one is the opt-in. covenix advertises
 `Accept-Ranges: bytes` and emits `206 Partial Content` for a single satisfiable
 range, `416 Range Not Satisfiable` for an unsatisfiable one, and a full `200` for
 a multi-range or malformed request. It takes the same options as `FileResponse`.
@@ -117,11 +117,11 @@ a multi-range or malformed request. It takes the same options as `FileResponse`.
 Three body kinds:
 
 ```typescript
-// 1. Bytes — size is intrinsic; avero slices.
+// 1. Bytes — size is intrinsic; covenix slices.
 return new RangeFileResponse(buffer, { contentType: 'image/png', disposition: 'inline' });
 
 // 2. A range-aware stream source — for large/remote content (object storage, a
-//    big file). avero calls stream(range) for just the requested slice.
+//    big file). covenix calls stream(range) for just the requested slice.
 return new RangeFileResponse(
   { size: object.size, stream: (range) => store.getStream(key, range) },
   { contentType: 'video/mp4', filename: 'clip.mp4' },
@@ -133,7 +133,7 @@ return RangeFileResponse.fromPath('/var/media/clip.mp4', { contentType: 'video/m
 ```
 
 The stream source receives `{ start, end }` (inclusive) for a range request, or
-no argument for a full response. avero resolves the slice **before** writing any
+no argument for a full response. covenix resolves the slice **before** writing any
 header, so a source that throws (e.g. not found) still produces a clean error
 response. Conditional GET is handled only on the `fromPath` path; the byte
 sources support `Range` only.

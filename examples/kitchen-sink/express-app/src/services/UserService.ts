@@ -3,7 +3,7 @@ import type { CreateUser, UpdateUser, User, UserList } from '@kitchen-sink/schem
 
 /**
  * A fake in-memory store. A real app would inject a database client here — the
- * point is that avero doesn't care: you own construction and DI, and pass the
+ * point is that covenix doesn't care: you own construction and DI, and pass the
  * built instance to `api.register(new UsersController(userService))`.
  */
 export class UserService {

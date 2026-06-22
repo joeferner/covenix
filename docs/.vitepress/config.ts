@@ -2,12 +2,13 @@ import { defineConfig } from 'vitepress';
 import typedocSidebar from '../api/typedoc-sidebar.json';
 
 export default defineConfig({
-  title: 'avero',
+  title: 'covenix',
   description:
     'Zod-powered decorators for Express APIs — typed routes, runtime validation, and accurate OpenAPI from a single source of truth.',
-  // Project Pages serve from https://joeferner.github.io/avero/
-  base: '/avero/',
+  // Project Pages serve from https://joeferner.github.io/covenix/
+  base: '/covenix/',
   themeConfig: {
+    logo: '/logo.png',
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
       { text: 'API', link: '/api/' },
@@ -45,7 +46,7 @@ export default defineConfig({
       ],
       '/api/': [{ text: 'Overview', link: '/api/' }, ...typedocSidebar],
     },
-    socialLinks: [{ icon: 'github', link: 'https://github.com/joeferner/avero' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/joeferner/covenix' }],
     search: { provider: 'local' },
   },
 });

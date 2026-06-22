@@ -1,42 +1,42 @@
 # Migrating from a hand-written OpenAPI document
 
 If you currently author `openapi.json` / `openapi.yaml` by hand (or with an editor
-like Stoplight/Swagger Editor) and then implement handlers to match, avero
+like Stoplight/Swagger Editor) and then implement handlers to match, covenix
 inverts the workflow:
 
-- **You stop writing the document.** You write Zod schemas + decorators; avero
+- **You stop writing the document.** You write Zod schemas + decorators; covenix
   **generates** the OpenAPI 3.1 document from them.
 - **Validation comes free.** The same schema that produces a `requestBody` also
   validates the request at runtime — the spec and the implementation can't drift,
   because they're the same source.
 - **The generated document is still a plain object.** `api.swagger()` returns a
-  mutable `OpenAPIV3_1.Document`, so anything avero doesn't emit you can add by
+  mutable `OpenAPIV3_1.Document`, so anything covenix doesn't emit you can add by
   post-processing it (see [the escape hatch](#the-escape-hatch-post-processing)).
 
 The mental shift: a hand-written spec is the source of truth that your code must
-chase; in avero the **code is the source of truth** and the spec is a build
+chase; in covenix the **code is the source of truth** and the spec is a build
 artifact.
 
 ## Document structure
 
-| OpenAPI document field                         | avero                                                                                                               |
+| OpenAPI document field                         | covenix                                                                                                               |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `openapi: '3.1.0'`                             | Emitted automatically (3.1 default; `swagger({ specVersion: '3.0' })`).                                             |
-| `info.title` / `info.version`                  | `new Avero({ info: { title, version } })`                                                                           |
-| `info.description` / `contact` / `license` / … | `new Avero({ info })` takes the full OpenAPI Info Object                                                            |
-| `servers`                                      | `new Avero({ servers: [{ url }] })`                                                                                 |
+| `info.title` / `info.version`                  | `new Covenix({ info: { title, version } })`                                                                           |
+| `info.description` / `contact` / `license` / … | `new Covenix({ info })` takes the full OpenAPI Info Object                                                            |
+| `servers`                                      | `new Covenix({ servers: [{ url }] })`                                                                                 |
 | `paths`                                        | `@Route` prefix + `@Get`/`@Post`/… (with `{id}` path params)                                                        |
 | `components.schemas`                           | Named (`.meta({ id })`) Zod schemas — referenced by routes, or passed via the `schemas` option for route-less types |
-| `components.securitySchemes`                   | The `security` map on `new Avero({ security })` (or the builders)                                                   |
+| `components.securitySchemes`                   | The `security` map on `new Covenix({ security })` (or the builders)                                                   |
 | `security` (global)                            | `@Security` on the controller class (applies to all its routes)                                                     |
 | `tags` (names)                                 | `@Tags(...)` on the controller class                                                                                |
-| `tags` (descriptions)                          | `new Avero({ tags: [{ name, description }] })`                                                                      |
-| `externalDocs`                                 | `new Avero({ externalDocs: { url } })`                                                                              |
+| `tags` (descriptions)                          | `new Covenix({ tags: [{ name, description }] })`                                                                      |
+| `externalDocs`                                 | `new Covenix({ externalDocs: { url } })`                                                                              |
 | `webhooks` / `x-*`                             | Post-process the generated document                                                                                 |
 
 ## Operations
 
-| Operation field       | avero                                                               |
+| Operation field       | covenix                                                               |
 | --------------------- | ------------------------------------------------------------------- |
 | HTTP method + path    | `@Get('{id}')`, `@Post()`, `@Put`, `@Patch`, `@Delete`              |
 | `summary`             | `@Summary('…')`                                                     |
@@ -52,11 +52,11 @@ artifact.
 
 ## Parameters
 
-avero decomposes a `@Params`/`@Query` **object schema** into one OpenAPI
+covenix decomposes a `@Params`/`@Query` **object schema** into one OpenAPI
 parameter per property — path params are always `required`, query params follow
 the schema's optionality.
 
-| Hand-written parameter            | avero                                                                                                               |
+| Hand-written parameter            | covenix                                                                                                               |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `in: path`                        | `@Params(z.object({ id: z.string() }))` + `@Param('id')`                                                            |
 | `in: query`                       | `@Query(z.object({ page: z.coerce.number() }))` + `@QueryParam('page')`                                             |
@@ -65,21 +65,21 @@ the schema's optionality.
 | parameter `description`/`example` | `.describe(...)` / `.meta({ examples })` on the property schema                                                     |
 | `required`                        | Path → always; query/header/cookie → non-`.optional()` property                                                     |
 | parameter `deprecated`            | `.meta({ deprecated: true })` on the property → `deprecated` on the parameter                                       |
-| `style` / `explode`               | Post-process (avero emits the default `schema` form)                                                                |
+| `style` / `explode`               | Post-process (covenix emits the default `schema` form)                                                                |
 
 ## Request bodies
 
-| Hand-written requestBody                             | avero                                                                                                       |
+| Hand-written requestBody                             | covenix                                                                                                       |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `application/json`                                   | `@Body(z.object({ … }))`                                                                                    |
 | `multipart/form-data` (file upload)                  | `@Body` with a `z.file()` / `z.array(z.file())` field — auto-detected ([File uploads](/guide/file-uploads)) |
 | `required: true`                                     | Always set when `@Body` is present                                                                          |
-| `application/x-www-form-urlencoded`, `text/*`, other | Post-process (avero emits JSON or multipart)                                                                |
+| `application/x-www-form-urlencoded`, `text/*`, other | Post-process (covenix emits JSON or multipart)                                                                |
 | request `example`                                    | `@Example(value)` (no `status`)                                                                             |
 
 ## Responses
 
-| Hand-written response          | avero                                                                                                                                        |
+| Hand-written response          | covenix                                                                                                                                        |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `responses.<code>` (JSON)      | `@Returns(code, schema)` — stackable, one per status                                                                                         |
 | no-body response (e.g. `204`)  | `@Returns(204)` (omit the schema)                                                                                                            |
@@ -115,7 +115,7 @@ spelling. Name a schema with `.meta({ id })` to get a `#/components/schemas/*`
 | `multipleOf`                                   | `.multipleOf(n)`                                                 |
 | `minItems` / `maxItems`                        | `.min(n)` / `.max(n)` on an array                                |
 | `default`                                      | `.default(v)`                                                    |
-| `additionalProperties: false`                  | `z.object({ … })` (avero's default — objects are strict)         |
+| `additionalProperties: false`                  | `z.object({ … })` (covenix's default — objects are strict)         |
 | `additionalProperties: <schema>`               | `z.record(z.string(), T)` or `z.object({…}).catchall(T)`         |
 | `allOf`                                        | `z.intersection(A, B)` / `A.extend({ … })`                       |
 | `anyOf`                                        | `z.union([A, B])`                                                |
@@ -140,7 +140,7 @@ them.
 
 ## Security schemes
 
-| OpenAPI security scheme              | avero                                                   |
+| OpenAPI security scheme              | covenix                                                   |
 | ------------------------------------ | ------------------------------------------------------- |
 | `type: http`, `scheme: bearer`       | `bearer(handler, { bearerFormat })`                     |
 | `type: http`, `scheme: basic`        | `basic(handler)`                                        |
@@ -164,7 +164,7 @@ before serving or writing it:
 function buildSpec() {
   const doc = api.swagger();
 
-  // Things avero doesn't model — webhooks, vendor extensions, response links:
+  // Things covenix doesn't model — webhooks, vendor extensions, response links:
   (doc as Record<string, unknown>)['x-internal-build'] = process.env.BUILD_SHA;
   doc.webhooks = {
     userCreated: { post: { requestBody: { content: { 'application/json': {} } } } },
@@ -183,10 +183,10 @@ schemas.
 
 Going from a hand-maintained document to generated-from-code means the spec
 **cannot lie**: the request body shape in the document is the exact schema that
-rejects a bad request, the response shape is the exact schema avero validates your
+rejects a bad request, the response shape is the exact schema covenix validates your
 handler's return value against, and a renamed field changes both at once. The
-parts avero doesn't model yet are a small, additive post-processing step rather
+parts covenix doesn't model yet are a small, additive post-processing step rather
 than a second source of truth to maintain.
 
-If you hit an OpenAPI feature you expected avero to emit, please
-[open an issue](https://github.com/joeferner/avero/issues).
+If you hit an OpenAPI feature you expected covenix to emit, please
+[open an issue](https://github.com/joeferner/covenix/issues).

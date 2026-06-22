@@ -4,7 +4,7 @@ import request from 'supertest';
 import { z } from 'zod';
 import { Cookies, Get, Headers, Returns, Route } from './decorators.js';
 import { CookieParam, HeaderParam } from './parameters.js';
-import { Avero } from './avero.js';
+import { Covenix } from './covenix.js';
 import { toExpress } from './express.js';
 import { generateContract } from './contract.js';
 
@@ -29,8 +29,8 @@ class ThingsController {
   }
 }
 
-function buildApi(): Avero {
-  const api = new Avero({ info: { title: 'T', version: '1.0.0' } });
+function buildApi(): Covenix {
+  const api = new Covenix({ info: { title: 'T', version: '1.0.0' } });
   api.register(new ThingsController());
   return api;
 }

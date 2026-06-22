@@ -3,12 +3,12 @@ import { addParam, setBodySchema, type ParamContext } from './metadata.js';
 
 /**
  * Where the resolved `@Security` principal is stashed on the request (set by
- * avero's security middleware, read by {@link Principal}). Exported for internal
+ * covenix's security middleware, read by {@link Principal}). Exported for internal
  * use across modules.
  *
  * @internal
  */
-export const AVERO_PRINCIPAL = Symbol('avero:principal');
+export const COVENIX_PRINCIPAL = Symbol('covenix:principal');
 
 /**
  * Builds a custom parameter decorator from a resolver. The resolver runs at
@@ -154,7 +154,7 @@ export function HeaderParam(name: string): ParameterDecorator {
 
 /**
  * Injects a request cookie value as a handler argument. Resolves to the value
- * parsed by `@Cookies` when present, otherwise the raw cookie. avero reads
+ * parsed by `@Cookies` when present, otherwise the raw cookie. covenix reads
  * `req.cookies`, so a cookie parser (e.g. `cookie-parser`) must run as middleware
  * ahead of the route.
  *
@@ -173,7 +173,7 @@ export function CookieParam(name: string): ParameterDecorator {
  * — it's the canonical example of a custom injected value.
  */
 export const Principal = createParamDecorator(
-  ({ req }) => (req as unknown as Record<symbol, unknown>)[AVERO_PRINCIPAL],
+  ({ req }) => (req as unknown as Record<symbol, unknown>)[COVENIX_PRINCIPAL],
 );
 
 /**
@@ -187,7 +187,7 @@ export function Req(): ParameterDecorator {
 
 /**
  * Escape hatch: injects the raw Express `Response` object. When a handler writes
- * to it, avero skips its automatic JSON response.
+ * to it, covenix skips its automatic JSON response.
  */
 export function Res(): ParameterDecorator {
   return (target, propertyKey, index) => {

@@ -3,12 +3,12 @@ import type { ErrorRequestHandler } from 'express';
 import type { ZodError } from 'zod';
 
 /**
- * Base class for the errors avero raises. Carries the HTTP `status`; subclasses
- * add detail. avero never sends a response itself — it calls `next(err)`, so
+ * Base class for the errors covenix raises. Carries the HTTP `status`; subclasses
+ * add detail. covenix never sends a response itself — it calls `next(err)`, so
  * these travel the normal Express error pipeline (Express's default handler
- * honors `status`, and callers can match on `AveroError` in their own middleware).
+ * honors `status`, and callers can match on `CovenixError` in their own middleware).
  */
-export class AveroError extends Error {
+export class CovenixError extends Error {
   /** HTTP status to associate with the failure. */
   public readonly status: number;
 
@@ -18,7 +18,7 @@ export class AveroError extends Error {
    */
   public constructor(status: number, message: string) {
     super(message);
-    this.name = 'AveroError';
+    this.name = 'CovenixError';
     this.status = status;
   }
 }
@@ -28,7 +28,7 @@ export class AveroError extends Error {
  * params/query, `422` for body, `500` for a response that violates its `@Returns`
  * schema.
  */
-export class ValidationError extends AveroError {
+export class ValidationError extends CovenixError {
   /** The Zod issues describing what failed validation. */
   public readonly issues: ZodError['issues'];
 
@@ -44,12 +44,12 @@ export class ValidationError extends AveroError {
 }
 
 /**
- * Raised when a request fails authentication/authorization (`@Security`). avero
+ * Raised when a request fails authentication/authorization (`@Security`). covenix
  * throws this with `401` when a security handler returns `null`/`undefined`; a
  * handler can throw it directly (e.g. `new SecurityError(403, 'Forbidden')`) for
  * authenticated-but-not-authorized.
  */
-export class SecurityError extends AveroError {
+export class SecurityError extends CovenixError {
   /**
    * @param status - HTTP status to associate with the failure (defaults to `401`).
    * @param message - Human-readable message (defaults to `'Unauthorized'`).
@@ -62,7 +62,7 @@ export class SecurityError extends AveroError {
 
 /**
  * An [RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457) Problem Details
- * object — the default error body avero emits (`application/problem+json`).
+ * object — the default error body covenix emits (`application/problem+json`).
  */
 export interface ProblemDetails {
   /** A URI identifying the problem type; `'about:blank'` means "see `title`". */
@@ -80,18 +80,18 @@ export interface ProblemDetails {
   errors?: { path: PropertyKey[]; message: string }[];
 }
 
-/** Options for {@link averoErrorHandler}. */
-export interface AveroErrorHandlerOptions {
+/** Options for {@link covenixErrorHandler}. */
+export interface CovenixErrorHandlerOptions {
   /**
-   * Overrides the response body for a {@link AveroError}. When provided, the
+   * Overrides the response body for a {@link CovenixError}. When provided, the
    * response is sent as `application/json` (rather than the default
    * `application/problem+json`), since the body is no longer Problem-shaped.
    */
-  formatError?: (error: AveroError) => unknown;
+  formatError?: (error: CovenixError) => unknown;
 }
 
-/** Builds the default RFC 9457 Problem Details body for a {@link AveroError}. */
-function defaultProblem(error: AveroError): ProblemDetails {
+/** Builds the default RFC 9457 Problem Details body for a {@link CovenixError}. */
+function defaultProblem(error: CovenixError): ProblemDetails {
   const title = STATUS_CODES[error.status] ?? 'Error';
   const problem: ProblemDetails = { type: 'about:blank', title, status: error.status };
   if (error instanceof ValidationError) {
@@ -103,21 +103,21 @@ function defaultProblem(error: AveroError): ProblemDetails {
 }
 
 /**
- * Optional convenience Express error middleware. Renders a {@link AveroError}
+ * Optional convenience Express error middleware. Renders a {@link CovenixError}
  * (`ValidationError`/`SecurityError`) as an [RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457)
  * Problem Details object with `Content-Type: application/problem+json`, and
  * passes every other error through untouched so it composes with a caller's own
- * handlers. You are never required to use it — match on `AveroError` yourself for
+ * handlers. You are never required to use it — match on `CovenixError` yourself for
  * full control.
  *
  * @param options - Optional `formatError` override (switches the body to
  *   `application/json`).
  * @returns An Express error-handling middleware.
  */
-export function averoErrorHandler(options: AveroErrorHandlerOptions = {}): ErrorRequestHandler {
+export function covenixErrorHandler(options: CovenixErrorHandlerOptions = {}): ErrorRequestHandler {
   const { formatError } = options;
   return (err, _req, res, next) => {
-    if (!(err instanceof AveroError)) {
+    if (!(err instanceof CovenixError)) {
       next(err);
       return;
     }

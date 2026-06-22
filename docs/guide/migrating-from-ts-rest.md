@@ -1,6 +1,6 @@
 # Migrating from ts-rest
 
-[ts-rest](https://ts-rest.com) and avero both give you typed routes and runtime
+[ts-rest](https://ts-rest.com) and covenix both give you typed routes and runtime
 validation from schemas, but they optimize for **opposite ends of the wire**:
 
 - **ts-rest is contract-first and client-first.** You declare a **contract** —
@@ -8,7 +8,7 @@ validation from schemas, but they optimize for **opposite ends of the wire**:
   client** import. The headline feature is the client: `initClient(contract)`
   gives end-to-end type safety with no code generation. OpenAPI is a secondary,
   opt-in output.
-- **avero is decorator-first and spec-first.** You describe each endpoint with
+- **covenix is decorator-first and spec-first.** You describe each endpoint with
   decorators on a controller class, and the accurate **OpenAPI document** is the
   primary artifact — the thing other teams, languages, and codegen tools consume.
 
@@ -18,34 +18,34 @@ read the honesty section first.
 
 ## Should you migrate? (the honest version)
 
-avero **does** ship a typed client — a generated, standalone
+covenix **does** ship a typed client — a generated, standalone
 [TypeScript client](/guide/typed-client) — but it gets there differently than
 ts-rest. ts-rest's contract is a _value_ the client infers from directly (zero
-codegen); avero's contract comes from _decorators_ (erased at the type level), so
+codegen); covenix's contract comes from _decorators_ (erased at the type level), so
 its client is a **generated file** you regenerate when the API changes. In return,
-avero's client is fully standalone (no runtime dependency) and the contract it's
+covenix's client is fully standalone (no runtime dependency) and the contract it's
 built from is an open artifact any generator can target.
 
 **Stay on ts-rest if** your main win is the _zero-codegen_ inferred client in a
 monorepo where the front end imports the contract directly — that one-import,
-nothing-to-regenerate DX is ts-rest's edge, and avero's codegen step is a small
+nothing-to-regenerate DX is ts-rest's edge, and covenix's codegen step is a small
 tax against it (though far lighter than the `openapi-generator-cli` route).
 
-**avero is the better fit if** any of these dominate:
+**covenix is the better fit if** any of these dominate:
 
 - **The OpenAPI document is the product** — a public API, partner integrations,
-  or polyglot/non-TS consumers generating clients. avero emits accurate **3.1**
+  or polyglot/non-TS consumers generating clients. covenix emits accurate **3.1**
   (and down-converts to 3.0) natively from Zod 4; in ts-rest, OpenAPI is a
   bolt-on (`@ts-rest/open-api`) whose built-in Zod support is **Zod 3** and is
   [being removed in v4](https://ts-rest.com/docs/openapi) — Zod 4 requires you to
   wire up your own async schema transformer.
-- **You want validation that can't silently drift.** avero validates **and
+- **You want validation that can't silently drift.** covenix validates **and
   serializes** every response by default (extra fields stripped). ts-rest's
   `responseValidation` is **off by default** on both server and client.
 - **You need first-class auth, file, range, or SSE responses in the spec** (see
-  below) — all built into avero, all DIY in ts-rest.
+  below) — all built into covenix, all DIY in ts-rest.
 
-You get both worlds: avero's [generated client](/guide/typed-client) for
+You get both worlds: covenix's [generated client](/guide/typed-client) for
 first-party TS consumers, **and** an accurate OpenAPI document for everyone else
 (other teams, languages, or any standard codegen) — from the one source.
 
@@ -89,13 +89,13 @@ const router = s.router(contract, {
 createExpressEndpoints(contract, router, app);
 ```
 
-avero folds the contract and the implementation back together on a class — each
+covenix folds the contract and the implementation back together on a class — each
 route's schemas sit on the method as decorators:
 
 ```typescript
-// avero — UsersController.ts
+// covenix — UsersController.ts
 import { z } from 'zod';
-import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'avero';
+import { Route, Tags, Get, Post, Params, Body, Returns, Summary, Param, BodyParam } from 'covenix';
 import createError from 'http-errors';
 
 @Route('users')
@@ -129,38 +129,38 @@ Three differences to internalize:
    to the class; path params switch from `:id` to `{id}`.
 2. **`responses` map → stacked `@Returns(status, schema)`.** One decorator per
    status; the first 2xx is the success status.
-3. **`return { status, body }` → `return body`.** avero infers the status from
+3. **`return { status, body }` → `return body`.** covenix infers the status from
    the matched `@Returns`; for a non-success status you `throw` (e.g. an
    `http-errors` `NotFound`) and let your error middleware map it.
 
 ## At a glance
 
-| ts-rest                                                | avero                                                                 | Notes                                                          |
+| ts-rest                                                | covenix                                                                 | Notes                                                          |
 | ------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `initContract()` + `c.router({...})`                   | decorators on a controller class                                      | Contract is metadata on methods, not a standalone value.       |
 | `method: 'GET'`, `path: '/users/:id'`                  | `@Get('{id}')` + `@Route('users')`                                    | Prefix on the class; `:id` → `{id}`.                           |
 | `pathParams: z.object({...})`                          | `@Params(z.object({...}))` + `@Param('id')`                           | Schema on the method, injection on the parameter.              |
 | `query: z.object({...})`                               | `@Query(z.object({...}))` + `@QueryParam('q')`                        | Same split.                                                    |
 | `body: Schema`                                         | `@Body(Schema)` + `@BodyParam()`                                      | Same split.                                                    |
-| `headers: { 'x-id': z.string() }`                      | `@Headers(z.object({ 'x-id': z.string() }))` + `@HeaderParam('x-id')` | Both validate request headers; avero also documents them.      |
+| `headers: { 'x-id': z.string() }`                      | `@Headers(z.object({ 'x-id': z.string() }))` + `@HeaderParam('x-id')` | Both validate request headers; covenix also documents them.      |
 | `responses: { 200: S, 404: E }`                        | `@Returns(200, S)` `@Returns(404, E)`                                 | Stackable, one per status.                                     |
-| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec                  | avero has dedicated decorators for binary/stream.              |
+| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec                  | covenix has dedicated decorators for binary/stream.              |
 | `c.noBody()` (e.g. `204`)                              | `@Returns(204)` (omit the schema)                                     | No-content response.                                           |
 | `return { status, body }`                              | `return body` (status from `@Returns`; `throw` to err)                | No status/body envelope.                                       |
 | `contentType: 'multipart/form-data'` + `body`          | `z.file()` in `@Body` + `@File`/`@Files`                              | Auto-detected multipart; web-standard `File`.                  |
 | `summary` / `metadata`                                 | `@Summary` / `@Description` / `@OperationId`                          | First-class decorators.                                        |
-| `strictStatusCodes`                                    | always validates the matched `@Returns`                               | avero validates the response you actually send.                |
+| `strictStatusCodes`                                    | always validates the matched `@Returns`                               | covenix validates the response you actually send.                |
 | `pathPrefix: '/v1'` (router option)                    | `api.group('/v1', …)` / `register(c, { prefix })`                     | See [Grouping & Versioning](/guide/versioning).                |
 | `commonResponses` / `baseHeaders`                      | class-level `@Returns(status, Schema, { headers })`                   | Shared responses merged into every route; route-level wins.    |
 | `initServer().router(contract, {...})`                 | `new C(deps)` + `api.register(c)`                                     | Implementation lives on the class; explicit construction.      |
 | `createExpressEndpoints(contract, router, app)`        | `api.mount(app)`                                                      | Wires routes + validation.                                     |
 | `globalMiddleware` / per-route middleware              | `@Use(...)` (class or method)                                         | Express middleware.                                            |
-| `requestValidationErrorHandler`                        | `ValidationError` → `averoErrorHandler()`                             | 400 params/query, 422 body, 500 bad response.                  |
+| `requestValidationErrorHandler`                        | `ValidationError` → `covenixErrorHandler()`                             | 400 params/query, 422 body, 500 bad response.                  |
 | `generateOpenApi(contract, ...)` (`@ts-rest/open-api`) | `api.swagger()` / `generateSwagger([...])`                            | Native, no extra package or transformer.                       |
 | `initClient(contract)` (typed client)                  | `generateTypeScriptClient(contract)` (generated)                      | Standalone client; codegen step vs ts-rest's inference.        |
 | `@ts-rest/react-query`                                 | **no equivalent** (yet)                                               | The contract is open for a hooks generator; or keep ts-rest's. |
-| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                                      | avero targets Express 5.                                       |
-| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                                          | avero is Zod-4-native.                                         |
+| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                                      | covenix targets Express 5.                                       |
+| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                                          | covenix is Zod-4-native.                                         |
 
 ## Validation: mostly a copy-paste
 
@@ -177,7 +177,7 @@ getUser: {
   responses: { 200: UserSchema },
 }
 
-// avero
+// covenix
 @Get('{id}')
 @Params(z.object({ id: z.uuid() }))
 @Query(z.object({ verbose: z.coerce.boolean().optional() }))
@@ -188,11 +188,11 @@ getUser(@Param('id') id: string, @QueryParam('verbose') verbose?: boolean) { /* 
 Two behavioral notes:
 
 - **Failure statuses.** ts-rest returns `400` for any request validation failure.
-  avero uses `400` for params/query and **`422`** for body — adjust client
+  covenix uses `400` for params/query and **`422`** for body — adjust client
   expectations. See [Validation & Errors](/guide/validation).
 - **Multiple schema libraries.** ts-rest accepts any
   [Standard Schema](https://standardschema.dev/) library (Zod, Valibot, Arktype,
-  Effect). avero is **Zod-only** — Valibot/Arktype contracts must be rewritten as
+  Effect). covenix is **Zod-only** — Valibot/Arktype contracts must be rewritten as
   Zod schemas.
 
 ## Responses, status codes, and response validation
@@ -201,7 +201,7 @@ In ts-rest a handler returns a `{ status, body }` discriminated union, and
 **response validation is off by default** — you opt in with `responseValidation:
 true` on the server (and `validateResponse: true` on the client).
 
-avero inverts the default: every response is validated against its `@Returns`
+covenix inverts the default: every response is validated against its `@Returns`
 schema **and serialized through it** (unknown keys stripped, transforms/defaults
 applied). A mismatch throws a `500` `ValidationError` through your error pipeline,
 in every environment — so a handler can't silently over-share fields the contract
@@ -211,7 +211,7 @@ didn't declare.
 // ts-rest — drift ships unless you opt in
 createExpressEndpoints(contract, router, app, { responseValidation: true });
 
-// avero — always on; the return value is parsed by the @Returns schema
+// covenix — always on; the return value is parsed by the @Returns schema
 @Returns(200, UserSchema) // extra fields on the returned object are stripped
 async getUser(@Param('id') id: string) { return this.service.get(id); }
 ```
@@ -231,10 +231,10 @@ class UsersController {}
 ## Files, downloads, range, and SSE
 
 ts-rest models non-JSON with `c.otherResponse({ contentType, body })` and leaves
-the streaming/headers to you on the raw `res`. avero has dedicated decorators and
+the streaming/headers to you on the raw `res`. covenix has dedicated decorators and
 response objects that also document themselves in the spec:
 
-- **Upload:** put a `z.file()` field in a `@Body` schema — avero auto-detects
+- **Upload:** put a `z.file()` field in a `@Body` schema — covenix auto-detects
   `multipart/form-data`, parses it with multer, and injects a web-standard `File`
   via `@File`/`@Files`. See [File uploads](/guide/file-uploads).
 - **Download:** `@ReturnsFile(...)` + return a `FileResponse` (handles
@@ -242,7 +242,7 @@ response objects that also document themselves in the spec:
 - **Range / partial content:** return a `RangeFileResponse` — `206`/`416`/full
   negotiation is automatic. See [File downloads](/guide/file-downloads).
 - **Server-Sent Events:** [`@Sse(schema?, options?)`](/guide/server-sent-events)
-  - return an async iterable; avero frames, validates, and documents it as
+  - return an async iterable; covenix frames, validates, and documents it as
     `text/event-stream`.
 
 ## The typed client
@@ -251,16 +251,16 @@ ts-rest's `initClient(contract)` and `@ts-rest/react-query` are its crown jewel:
 import the contract, get a typed `client.getUser({ params: { id } })` returning a
 status-discriminated union, with **zero codegen**.
 
-avero's answer is a **generated** [standalone TypeScript client](/guide/typed-client) —
+covenix's answer is a **generated** [standalone TypeScript client](/guide/typed-client) —
 the same ergonomics, reached by a build step instead of inference:
 
 ```typescript
-import { generateTypeScriptClient } from 'avero';
+import { generateTypeScriptClient } from 'covenix';
 await writeFile('api.gen.ts', generateTypeScriptClient(api.contract()));
 ```
 
 ```typescript
-import { createClient } from './api.gen'; // standalone — no avero/runtime dep
+import { createClient } from './api.gen'; // standalone — no covenix/runtime dep
 
 const api = createClient({ baseUrl: 'https://api.example.com' });
 const user = await api.users.get({ params: { id } }); // → User; throws on non-2xx
@@ -268,8 +268,8 @@ const res = await api.users.get.raw({ params: { id } }); // → { status, body }
 ```
 
 The honest difference: ts-rest infers the client from a contract _value_ (nothing
-to regenerate); avero generates the client from _decorator_ metadata (regenerate
-on change). In exchange, avero's client is fully standalone, and the contract it's
+to regenerate); covenix generates the client from _decorator_ metadata (regenerate
+on change). In exchange, covenix's client is fully standalone, and the contract it's
 built from is an open artifact any generator can target. The client is types-only
 by default; pass `{ validate: 'zod' }` for opt-in runtime request/response
 validation (and `Date` revival). There are no React-Query hooks yet. See
@@ -287,7 +287,7 @@ with sharp edges:
   `metadata`.
 - `operationId`s are off unless you pass `setOperationId`.
 
-In avero the spec is the native artifact and needs none of that wiring:
+In covenix the spec is the native artifact and needs none of that wiring:
 
 ```typescript
 api.swagger(); // OpenAPI 3.1 from Zod 4, no transformer
@@ -303,14 +303,14 @@ See [OpenAPI / Swagger](/guide/swagger).
 ## Authentication
 
 ts-rest has no auth concept — you add Express middleware and, for the spec, hand
-security objects to `operationMapper`. avero makes it first-class: register a
+security objects to `operationMapper`. covenix makes it first-class: register a
 named scheme on the instance (definition **and** handler together) and mark
 routes with `@Security`, injecting the result via `@Principal()`:
 
 ```typescript
-import { Avero, Security, Principal, bearer, SecurityError } from 'avero';
+import { Covenix, Security, Principal, bearer, SecurityError } from 'covenix';
 
-const api = new Avero({
+const api = new Covenix({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -336,13 +336,13 @@ requirement onto the spec — no `operationMapper`. See
 ## Versioning
 
 ts-rest's `pathPrefix` (a router option, combinable across nested routers) maps
-directly to avero's [grouping](/guide/versioning):
+directly to covenix's [grouping](/guide/versioning):
 
 ```typescript
 // ts-rest
 const v1 = c.router({ users: usersContract }, { pathPrefix: '/v1' });
 
-// avero
+// covenix
 api.group('/v1', (v1) => v1.register(new UsersController(svc)));
 ```
 
@@ -356,9 +356,9 @@ const router = s.router(contract, {
 });
 createExpressEndpoints(contract, router, app, { responseValidation: true });
 
-// avero
+// covenix
 import 'reflect-metadata';
-const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Covenix({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service)); // you own construction (DI)
 api.mount(app);
 app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
@@ -366,7 +366,7 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 
 ## What you lose, what you gain
 
-| Leaving ts-rest you give up…                            | …and you gain in avero                                                             |
+| Leaving ts-rest you give up…                            | …and you gain in covenix                                                             |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **Zero-codegen** client inference + React Query hooks   | A generated standalone client **and** accurate **OpenAPI 3.1/3.0** from one source |
 | Multiple validation libs (Valibot/Arktype/Effect)       | Zod-4-native conversion with first-class `.meta({ id })` components                |
@@ -376,9 +376,9 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 | —                                                       | Built-in `FileResponse`, `RangeFileResponse`, `@Sse`, Problem Details, `serveDocs` |
 
 The first row is now a _difference in approach_, not a missing feature: ts-rest
-infers the client with no build step; avero generates one. If the zero-codegen,
+infers the client with no build step; covenix generates one. If the zero-codegen,
 nothing-to-regenerate loop is your core value, ts-rest keeps its edge — otherwise
-the rest of the table is why avero exists.
+the rest of the table is why covenix exists.
 
-If you hit a ts-rest feature without an obvious avero equivalent, please
-[open an issue](https://github.com/joeferner/avero/issues).
+If you hit a ts-rest feature without an obvious covenix equivalent, please
+[open an issue](https://github.com/joeferner/covenix/issues).

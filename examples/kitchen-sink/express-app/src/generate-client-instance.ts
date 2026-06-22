@@ -1,5 +1,5 @@
 import { writeFile } from 'node:fs/promises';
-import { generateTypeScriptClient } from 'avero';
+import { generateTypeScriptClient } from 'covenix';
 import { api } from './api.js';
 import { additionalSchemas } from './api-schemas.js';
 

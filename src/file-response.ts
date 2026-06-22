@@ -5,7 +5,7 @@ import { ResponseBase, type ResponseBaseOptions } from './response.js';
 /**
  * Options for a {@link FileResponse}. Inherits `status`/`headers`/`cookies` from
  * {@link ResponseBaseOptions}; the inherited `headers` are applied last, so they
- * override the headers avero derives from `contentType`/`filename`/`disposition`.
+ * override the headers covenix derives from `contentType`/`filename`/`disposition`.
  */
 export interface FileResponseOptions extends ResponseBaseOptions {
   /** `Content-Type` for the response (e.g. `'application/pdf'`). */
@@ -22,7 +22,7 @@ export interface FileResponseOptions extends ResponseBaseOptions {
 
 /**
  * A non-JSON response: a binary body (a `Uint8Array`/`Buffer` or a `Readable`
- * stream) that avero streams to the client, setting `Content-Type` and
+ * stream) that covenix streams to the client, setting `Content-Type` and
  * `Content-Disposition` and skipping JSON serialization and response validation.
  * Return one from a handler (typically alongside `@ReturnsFile`).
  *

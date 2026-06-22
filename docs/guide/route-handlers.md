@@ -1,13 +1,13 @@
 # Route Handlers
 
-A avero API is a set of **controller classes**. Each public method decorated with
+A covenix API is a set of **controller classes**. Each public method decorated with
 an HTTP verb becomes a route; decorators on the method and its parameters describe
 the request, the response, and everything the OpenAPI document needs. This page is
 the catalog of those decorators and of what a handler may return.
 
 ```typescript
 import { z } from 'zod';
-import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'avero';
+import { Route, Tags, Get, Post, Params, Body, Returns, Param, BodyParam } from 'covenix';
 import createError from 'http-errors';
 
 @Route('users') // path prefix for every route in the class
@@ -32,7 +32,7 @@ Two rules underpin everything below:
 1. **Method-level decorators carry schemas; parameter-level decorators inject.**
    `@Query(schema)` validates the whole query object once; `@QueryParam('q')` pulls
    one parsed field into an argument.
-2. **The return value is the response.** avero infers the status from `@Returns`
+2. **The return value is the response.** covenix infers the status from `@Returns`
    and validates/serializes the body through its schema. For an error status you
    `throw`; for response metadata (headers/cookies/status) you return an
    [`HttpResponse`](#httpresponse-headers-status-cookies).
@@ -170,8 +170,8 @@ poisons the handler body. Two things keep you honest:
    create(@BodyParam(CreateUserSchema) user: z.infer<typeof CreateUserSchema>) {}
    ```
 
-2. **avero checks what it can at registration.** Types are erased, but names and
-   schema shape aren't — so when you `mount` (or `toExpress`/`serve`) avero throws
+2. **covenix checks what it can at registration.** Types are erased, but names and
+   schema shape aren't — so when you `mount` (or `toExpress`/`serve`) covenix throws
    on the **structural** mismatches it can see:
    - `@BodyParam('field')` naming a field absent from the `@Body` schema;
    - any body/file injector when the handler declares no `@Body` schema;
@@ -186,7 +186,7 @@ builds your own from a resolver that receives `{ req, res }` (plus any `data` yo
 pass) and returns the value — **sync or async**:
 
 ```typescript
-import { createParamDecorator } from 'avero';
+import { createParamDecorator } from 'covenix';
 
 const ClientIp = createParamDecorator(({ req }) => req.ip);
 const Tenant = createParamDecorator(({ req }) => req.hostname.split('.')[0]);
@@ -217,9 +217,9 @@ The **first declared 2xx** is the success status; there's no `setStatus` call.
 ## Dates
 
 A JavaScript `Date` has no JSON form — it travels as an **ISO string** over the
-wire. avero keeps the schema honest about which side holds a real `Date`:
+wire. covenix keeps the schema honest about which side holds a real `Date`:
 
-- **Responses → `z.date()`.** Your handler returns a `Date`; avero validates it
+- **Responses → `z.date()`.** Your handler returns a `Date`; covenix validates it
   and serializes it to an ISO string. Documented in OpenAPI as
   `{ type: 'string', format: 'date-time' }`.
 - **Requests → `z.coerce.date()`.** The incoming JSON value is a string, so
@@ -267,7 +267,7 @@ These enrich the OpenAPI operation and the generated client's JSDoc.
 
 ### `@Security(name, scopes?)`
 
-Requires a named scheme (registered on the `Avero` instance) and injects the
+Requires a named scheme (registered on the `Covenix` instance) and injects the
 result via `@Principal()`. Stack it for an OR of schemes. Full details in
 [Authentication](/guide/authentication).
 
@@ -284,7 +284,7 @@ list() { /* ... */ }
 
 ## What a handler can return
 
-avero inspects the returned value and dispatches accordingly:
+covenix inspects the returned value and dispatches accordingly:
 
 | Return value                            | Behaviour                                                                  |
 | --------------------------------------- | -------------------------------------------------------------------------- |

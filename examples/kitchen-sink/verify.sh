@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Verifies the kitchen-sink example end to end:
-#   1. builds avero + installs the example workspace
+#   1. builds covenix + installs the example workspace
 #   2. boots the Express server and exercises endpoints with curl
 #   3. checks the instance and static swagger generators produce identical output
 #
@@ -24,7 +24,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "==> Building avero"
+echo "==> Building covenix"
 npm --prefix "$ROOT" run build >/dev/null
 
 echo "==> Installing example workspace"
@@ -72,7 +72,7 @@ else
 fi
 
 # @Use middleware on the controller stamps a header on every route.
-if curl -s -D - -o /dev/null "$BASE/v1/health" | grep -qi '^x-health-source: *avero'; then
+if curl -s -D - -o /dev/null "$BASE/v1/health" | grep -qi '^x-health-source: *covenix'; then
   echo "    ✓ @Use middleware sets the X-Health-Source header"
 else
   echo "    ✗ @Use middleware did not set X-Health-Source"

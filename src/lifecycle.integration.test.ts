@@ -5,8 +5,8 @@ import createError from 'http-errors';
 import { z } from 'zod';
 import { Body, Delete, Get, Params, Patch, Post, Put, Returns, Route } from './decorators.js';
 import { BodyParam, Param } from './parameters.js';
-import { Avero } from './avero.js';
-import { averoErrorHandler } from './errors.js';
+import { Covenix } from './covenix.js';
+import { covenixErrorHandler } from './errors.js';
 
 const Item = z.object({ id: z.string(), name: z.string() }).meta({ id: 'Item' });
 const Upsert = z.object({ name: z.string().min(1) });
@@ -69,10 +69,10 @@ class ItemsController {
 function app(): express.Express {
   const instance = express();
   instance.use(express.json());
-  const api = new Avero({ info: { title: 'Items', version: '1.0.0' } });
+  const api = new Covenix({ info: { title: 'Items', version: '1.0.0' } });
   api.register(new ItemsController());
   api.mount(instance);
-  instance.use(averoErrorHandler());
+  instance.use(covenixErrorHandler());
   return instance;
 }
 
@@ -116,13 +116,13 @@ describe('full request lifecycle per HTTP method', () => {
 
 describe('error handler responses', () => {
   it('propagates a thrown http-errors with its status', async () => {
-    // createError.NotFound is not a ValidationError, so averoErrorHandler passes
+    // createError.NotFound is not a ValidationError, so covenixErrorHandler passes
     // it through; Express honors its `status`.
     const res = await request(app()).get('/items/missing');
     expect(res.status).toBe(404);
   });
 
-  it('renders a ValidationError through averoErrorHandler', async () => {
+  it('renders a ValidationError through covenixErrorHandler', async () => {
     const res = await request(app()).post('/items').send({ name: '' });
     const body = res.body as { status: number; errors: unknown[] };
     expect(res.status).toBe(422);

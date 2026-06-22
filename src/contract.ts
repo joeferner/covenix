@@ -5,7 +5,7 @@ import { SchemaConverter } from './contract-convert.js';
 import type { ControllerSource, OpenApiInfo, StaticController } from './swagger.js';
 
 /**
- * The avero **contract** — a high-fidelity, language-agnostic intermediate
+ * The covenix **contract** — a high-fidelity, language-agnostic intermediate
  * representation of an API, produced from the same controller metadata that
  * drives `swagger()`. Unlike OpenAPI it is purpose-built for client codegen: a
  * flat operations list and a schema representation ({@link SchemaNode}) that
@@ -208,8 +208,8 @@ export const ContractOperationSchema = z.object({
 });
 
 /** The contract document: version, info, the flat operations list, and shared schemas. */
-export const AveroContractSchema = z.object({
-  averoContract: z.literal(CONTRACT_VERSION),
+export const CovenixContractSchema = z.object({
+  covenixContract: z.literal(CONTRACT_VERSION),
   info: z.object({ title: z.string(), version: z.string() }).loose(),
   operations: z.array(ContractOperationSchema),
   schemas: z.record(z.string(), SchemaNodeSchema),
@@ -221,19 +221,19 @@ export type ContractBody = z.infer<typeof ContractBodySchema>;
 export type ContractResponse = z.infer<typeof ContractResponseSchema>;
 /** A single operation in the contract. */
 export type ContractOperation = z.infer<typeof ContractOperationSchema>;
-/** A complete avero contract document. */
-export type AveroContract = z.infer<typeof AveroContractSchema>;
+/** A complete covenix contract document. */
+export type CovenixContract = z.infer<typeof CovenixContractSchema>;
 
 /**
- * Validates an unknown value as a {@link AveroContract} — use this when reading a
+ * Validates an unknown value as a {@link CovenixContract} — use this when reading a
  * `contract.json` in a generator. Throws (with a version-mismatch error for an
- * unrecognised `averoContract`) if it doesn't conform.
+ * unrecognised `covenixContract`) if it doesn't conform.
  *
  * @param value - The parsed JSON to validate.
  * @returns The validated contract.
  */
-export function parseContract(value: unknown): AveroContract {
-  return AveroContractSchema.parse(value);
+export function parseContract(value: unknown): CovenixContract {
+  return CovenixContractSchema.parse(value);
 }
 
 /**
@@ -276,16 +276,16 @@ export interface ContractOptions {
 }
 
 /**
- * Assembles a {@link AveroContract} from controller sources (prototype + optional
+ * Assembles a {@link CovenixContract} from controller sources (prototype + optional
  * registration `basePrefix`). All operations share one {@link SchemaConverter}, so
  * named schemas are hoisted once into `schemas`. The result is validated against
- * {@link AveroContractSchema} before return (validate-on-write).
+ * {@link CovenixContractSchema} before return (validate-on-write).
  */
 export function generateContractDocument(
   sources: ControllerSource[],
   info: OpenApiInfo,
   options: ContractOptions = {},
-): AveroContract {
+): CovenixContract {
   const convert = new SchemaConverter();
   const operations: ContractOperation[] = [];
 
@@ -327,19 +327,19 @@ export function generateContractDocument(
   // Route-less schemas → add to `schemas` (each must be named so it has a key).
   for (const schema of options.schemas ?? []) {
     if (typeof schema.meta()?.id !== 'string') {
-      throw new Error('avero: schemas passed to generateContract must be named via .meta({ id })');
+      throw new Error('covenix: schemas passed to generateContract must be named via .meta({ id })');
     }
     convert.toNode(schema);
   }
 
-  const contract: AveroContract = {
-    averoContract: CONTRACT_VERSION,
+  const contract: CovenixContract = {
+    covenixContract: CONTRACT_VERSION,
     info,
     operations,
     schemas: convert.schemas,
   };
   // Validate on write — the generator's own output must satisfy the IR schema.
-  return AveroContractSchema.parse(contract);
+  return CovenixContractSchema.parse(contract);
 }
 
 /**
@@ -351,7 +351,7 @@ export function generateContractDocument(
  * @param controllers - The controller classes (constructors, not instances).
  * @param info - Contract `info` block. Defaults to `{ title: 'API', version: '1.0.0' }`.
  * @param options - Extra inputs, e.g. route-less `schemas`.
- * @returns The validated {@link AveroContract}.
+ * @returns The validated {@link CovenixContract}.
  *
  * @example
  * ```ts
@@ -363,7 +363,7 @@ export function generateContract(
   controllers: StaticController[],
   info: OpenApiInfo = { title: 'API', version: '1.0.0' },
   options: ContractOptions = {},
-): AveroContract {
+): CovenixContract {
   const sources: ControllerSource[] = controllers.map((c) =>
     'controller' in c
       ? { prototype: c.controller.prototype, basePrefix: c.prefix }

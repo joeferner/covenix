@@ -73,13 +73,13 @@ export type {
   RouteMetadata,
   SecurityRequirement,
 } from './metadata.js';
-export { Avero, ControllerGroup } from './avero.js';
-export type { AveroInfo, AveroOptions, RegisterOptions } from './avero.js';
+export { Covenix, ControllerGroup } from './covenix.js';
+export type { CovenixInfo, CovenixOptions, RegisterOptions } from './covenix.js';
 export { toExpress, serve } from './express.js';
 export type { ToExpressOptions, ServeOptions } from './express.js';
 export type { DocsUi, ServeDocsOptions } from './serve-docs.js';
-export { SecurityError, ValidationError, AveroError, averoErrorHandler } from './errors.js';
-export type { ProblemDetails, AveroErrorHandlerOptions } from './errors.js';
+export { SecurityError, ValidationError, CovenixError, covenixErrorHandler } from './errors.js';
+export type { ProblemDetails, CovenixErrorHandlerOptions } from './errors.js';
 export { toJsonSchema, generateOpenApiDocument, generateSwagger } from './swagger.js';
 export type {
   ControllerSource,
@@ -96,7 +96,7 @@ export {
   ContractOperationSchema,
   ContractResponseSchema,
   SchemaNodeSchema,
-  AveroContractSchema,
+  CovenixContractSchema,
   generateContract,
   generateContractDocument,
   parseContract,
@@ -108,7 +108,7 @@ export type {
   ContractResponse,
   PropertyNode,
   SchemaNode,
-  AveroContract,
+  CovenixContract,
 } from './contract.js';
 export { generateTypeScriptClient } from './generator/contract-client.js';
 export type { GenerateClientOptions, ClientValidation } from './generator/contract-client.js';

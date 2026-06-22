@@ -30,7 +30,7 @@ import {
   FileResponse,
   RangeFileResponse,
   HttpResponse,
-} from 'avero';
+} from 'covenix';
 import {
   CreateUserSchema,
   UpdateUserSchema,
@@ -132,7 +132,7 @@ export class UsersController {
     return { url: `https://avatars.example.com/${id}?size=${dimension}` };
   }
 
-  // File download: return a `FileResponse` instead of JSON. avero streams the
+  // File download: return a `FileResponse` instead of JSON. covenix streams the
   // body and sets Content-Type / Content-Disposition, and `@ReturnsFile`
   // declares the binary media type in the generated OpenAPI (so swagger reflects
   // the non-JSON body). The 404 still flows through the normal error pipeline.
@@ -151,7 +151,7 @@ export class UsersController {
     });
   }
 
-  // File upload (multipart/form-data). avero auto-detects multipart because the
+  // File upload (multipart/form-data). covenix auto-detects multipart because the
   // @Body schema has a `z.file()` field — there's no @Multipart marker. multer
   // (memory storage) parses the request, each file is adapted to a web-standard
   // `File`, and the whole body is validated against the schema like any other:
@@ -193,7 +193,7 @@ export class UsersController {
 
   // Download the avatar uploaded above, with HTTP Range support. Returning a
   // RangeFileResponse (rather than FileResponse) is the opt-in: its body type is
-  // narrowed to range-capable sources, so avero advertises `Accept-Ranges: bytes`
+  // narrowed to range-capable sources, so covenix advertises `Accept-Ranges: bytes`
   // and serves 206/416 automatically. A Uint8Array body is range-capable by
   // construction (the size is intrinsic). `disposition: 'inline'` lets a browser
   // render it in an <img> instead of downloading.

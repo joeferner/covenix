@@ -37,14 +37,14 @@ export type RangeBody = Uint8Array | RangeStreamBody | RangePathBody;
 /**
  * A range-capable binary response. Where {@link FileResponse} sends a body
  * whole, `RangeFileResponse` **guarantees HTTP `Range` support**: its body type
- * is narrowed to sources avero can serve a byte slice from, so a non-seekable
- * stream simply isn't assignable. Returning one is the opt-in — avero advertises
+ * is narrowed to sources covenix can serve a byte slice from, so a non-seekable
+ * stream simply isn't assignable. Returning one is the opt-in — covenix advertises
  * `Accept-Ranges: bytes` and emits `206 Partial Content` for a single satisfiable
  * range, `416 Range Not Satisfiable` for an unsatisfiable one, and a full `200`
  * for a multi-range or malformed request.
  *
- * - **`Uint8Array`** — size is intrinsic; avero slices the bytes.
- * - **`{ size, stream }`** — a range-aware source; avero calls `stream(range)`.
+ * - **`Uint8Array`** — size is intrinsic; covenix slices the bytes.
+ * - **`{ size, stream }`** — a range-aware source; covenix calls `stream(range)`.
  * - **`fromPath(path)`** — a disk file served via Express, which additionally
  *   honors conditional GET (`ETag` / `If-Modified-Since` / `If-Range`).
  *

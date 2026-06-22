@@ -1,20 +1,20 @@
 # Migrating from express-zod-api
 
-[express-zod-api](https://github.com/RobinTail/express-zod-api) and avero are the
+[express-zod-api](https://github.com/RobinTail/express-zod-api) and covenix are the
 closest things to each other in this list: **both are Express + Zod + automatic
 OpenAPI**, on Node, with a generated typed client. If you're on express-zod-api,
-you're already living avero's core thesis — the migration is about **shape**, not
+you're already living covenix's core thesis — the migration is about **shape**, not
 philosophy.
 
 The two differences that matter:
 
 - **Declaration shape.** express-zod-api defines each endpoint as a **value** built
   by a factory — `defaultEndpointsFactory.build({ method, input, output, handler })`
-  — and wires them into a nested `Routing` tree. avero uses **class decorators**,
+  — and wires them into a nested `Routing` tree. covenix uses **class decorators**,
   with the schemas sitting on the method.
 - **The response envelope.** express-zod-api's default result handler wraps every
   success in `{ status: "success", data: … }` (and errors in
-  `{ status: "error", error: … }`). avero returns the **bare** value. This is the
+  `{ status: "error", error: … }`). covenix returns the **bare** value. This is the
   one behavioral change your clients will feel — read that section carefully.
 
 Because both are Express + Node + Zod, there's **no runtime caveat** (unlike the
@@ -23,21 +23,21 @@ Hono migration) and the schemas copy over unchanged.
 ## Should you migrate? (the honest version)
 
 These are genuinely similar tools, so this is more "is the trade worth it" than
-"can avero even do this."
+"can covenix even do this."
 
 **Stay on express-zod-api if** you like the factory/value model and its built-in
 result-handler envelope, or you depend on its specific niceties (the `EndpointsFactory`
 middleware-composition model, its logger integration, `createServer` doing the
 Express bootstrap for you). It's a mature, focused library that does the same job.
 
-**avero is the better fit if** you want:
+**covenix is the better fit if** you want:
 
 - **Decorators with the contract _on_ the handler.** One class, one method, the
   schemas right there — versus a factory value plus a separate `Routing` tree that
   maps paths to endpoints. If you've felt the routing tree drift from your
   endpoints, decorators keep them together.
 - **Split, explicit request schemas.** express-zod-api merges path params, query,
-  and body into a **single `input` schema**; avero keeps `@Params` / `@Query` /
+  and body into a **single `input` schema**; covenix keeps `@Params` / `@Query` /
   `@Body` separate, which maps 1:1 onto the OpenAPI parameter locations and avoids
   collisions between a query field and a body field of the same name.
 - **Bare response bodies by default** (no envelope) — closer to what most REST
@@ -77,12 +77,12 @@ const routing: Routing = {
 await createServer(config, routing);
 ```
 
-avero puts the same endpoint on a class, with the schemas as decorators:
+covenix puts the same endpoint on a class, with the schemas as decorators:
 
 ```typescript
-// avero — UsersController.ts
+// covenix — UsersController.ts
 import { z } from 'zod';
-import { Route, Tags, Get, Params, Returns, Param } from 'avero';
+import { Route, Tags, Get, Params, Returns, Param } from 'covenix';
 import createError from 'http-errors';
 
 @Route('user')
@@ -116,7 +116,7 @@ Differences to internalize:
 
 ## At a glance
 
-| express-zod-api                                          | avero                                                        | Notes                                                 |
+| express-zod-api                                          | covenix                                                        | Notes                                                 |
 | -------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
 | `factory.build({ method, input, output, handler })`      | decorated method on a controller class                       | Endpoint is a method, not a value.                    |
 | `method: 'get'` + routing key                            | `@Get('{id}')` + `@Route('user')`                            | Prefix on the class; `:id` → `{id}`.                  |
@@ -124,12 +124,12 @@ Differences to internalize:
 | destructure `input` in `handler`                         | `@Param` / `@QueryParam` / `@BodyParam`                      | Injection by parameter decorator.                     |
 | `output: z.object({...})`                                | `@Returns(200, Schema)`                                      | Stackable, one per status.                            |
 | `return data` → `{ status: "success", data }`            | `return body` (bare)                                         | **No envelope** — see below.                          |
-| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `averoErrorHandler()`       | Express error pipeline.                               |
+| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `covenixErrorHandler()`       | Express error pipeline.                               |
 | `factory.addMiddleware(...)` / `.use(mw)`                | `@Use(...)` (class or method)                                | Express middleware.                                   |
 | auth middleware returning `options`                      | `@Security('jwt', scopes)` + `bearer()` + `@Principal()`     | First-class scheme + spec.                            |
 | `Routing` nesting / `v1: {...}`                          | `api.group('/v1', …)` / `register(c, { prefix })`            | See [Grouping & Versioning](/guide/versioning).       |
 | `new Documentation({ routing, config }).getSpecAsYaml()` | `api.swagger()` / `generateSwagger([...])`                   | Native; JSON (down-convert to 3.0 available).         |
-| `new Integration({ routing }).print()` (client gen)      | `generateTypeScriptClient(api.contract())`                   | Both generate; avero's is standalone + open-contract. |
+| `new Integration({ routing }).print()` (client gen)      | `generateTypeScriptClient(api.contract())`                   | Both generate; covenix's is standalone + open-contract. |
 | `ez.upload()` in `input`                                 | `z.file()` in `@Body` + `@File`/`@Files`                     | Auto-detected multipart; web-standard `File`.         |
 | `ez.file()` / raw output for downloads                   | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`     | Disposition + range negotiation handled.              |
 | `EventStreamFactory` (SSE)                               | [`@Sse(schema?)`](/guide/server-sent-events)                 | Validated + documented `text/event-stream`.           |
@@ -146,12 +146,12 @@ express-zod-api's **default result handler** wraps every successful response:
 { "status": "error", "error": { "message": "Not found" } }
 ```
 
-avero returns the **bare** value (`{ "id": "…", "name": "…" }`) and maps thrown
-errors through `averoErrorHandler()` to a [Problem Details](/guide/validation)
+covenix returns the **bare** value (`{ "id": "…", "name": "…" }`) and maps thrown
+errors through `covenixErrorHandler()` to a [Problem Details](/guide/validation)
 body. You have two options when migrating:
 
 1. **Drop the envelope (recommended).** Return bare bodies and update front-end
-   consumers to stop reading `.data`. If you use avero's generated client, this is
+   consumers to stop reading `.data`. If you use covenix's generated client, this is
    automatic — it types and returns the bare body. Cleaner, and what most external
    consumers/codegen expect.
 2. **Keep the envelope explicitly.** Model it as a Zod schema so it's still in the
@@ -182,7 +182,7 @@ input: z.object({
   verbose: z.coerce.boolean().optional(), // query
 }),
 
-// avero — split by location
+// covenix — split by location
 @Params(z.object({ id: z.uuid() }))
 @Query(z.object({ verbose: z.coerce.boolean().optional() }))
 getUser(@Param('id') id: string, @QueryParam('verbose') verbose?: boolean) { /* ... */ }
@@ -190,13 +190,13 @@ getUser(@Param('id') id: string, @QueryParam('verbose') verbose?: boolean) { /* 
 
 For a `POST`, the parts of `input` that were the request body move to `@Body`. The
 schemas themselves don't change — only where they're attached. Behavioral note:
-avero returns `400` for params/query validation failures and **`422`** for body;
+covenix returns `400` for params/query validation failures and **`422`** for body;
 adjust client expectations.
 
 ## Files, downloads, and SSE
 
 express-zod-api models these with `ez.upload()` / `ez.file()` helpers and an
-`EventStreamFactory`. avero has decorators and response types that document
+`EventStreamFactory`. covenix has decorators and response types that document
 themselves:
 
 - **Upload:** a `z.file()` field in a `@Body` schema auto-detects
@@ -207,19 +207,19 @@ themselves:
 - **Range / partial content:** return a `RangeFileResponse` — `206`/`416`/full
   negotiation is automatic. See [File downloads](/guide/file-downloads).
 - **Server-Sent Events:** [`@Sse(schema?, options?)`](/guide/server-sent-events) —
-  return an async iterable; avero frames, validates, and documents it.
+  return an async iterable; covenix frames, validates, and documents it.
 
 ## Authentication
 
 express-zod-api does auth with a middleware that reads credentials and contributes
 typed `options` to the handler (and you describe the security scheme separately for
-the docs). avero registers a named scheme once — definition **and** handler
+the docs). covenix registers a named scheme once — definition **and** handler
 together — and injects the principal:
 
 ```typescript
-import { Avero, Security, Principal, bearer, SecurityError } from 'avero';
+import { Covenix, Security, Principal, bearer, SecurityError } from 'covenix';
 
-const api = new Avero({
+const api = new Covenix({
   info,
   security: {
     jwt: bearer((req, scopes) => {
@@ -251,7 +251,7 @@ This is where the two are most alike — both derive the spec from Zod and both
 const yaml = new Documentation({ routing, config, version: '1.0.0', title: 'API' }).getSpecAsYaml();
 const client = new Integration({ routing }).printFormatted();
 
-// avero
+// covenix
 api.swagger(); // OpenAPI 3.1 (api.swagger({ specVersion: '3.0' }) to down-convert)
 generateSwagger([UsersController]); // instance-free, for CI / codegen
 await writeFile('api.gen.ts', generateTypeScriptClient(api.contract()));
@@ -259,14 +259,14 @@ api.serveDocs(app); // browsable UI
 ```
 
 The difference is the client's coupling: express-zod-api's `Integration` client is
-generated from its routing object; avero's is generated from the
+generated from its routing object; covenix's is generated from the
 [contract](/guide/typed-client) — an open artifact any generator (or any language)
-can target, and the emitted client is fully standalone (no avero runtime
+can target, and the emitted client is fully standalone (no covenix runtime
 dependency). See [Typed Client](/guide/typed-client).
 
 ## Bootstrapping
 
-`createServer(config, routing)` maps onto avero's [`serve`](/guide/getting-started#wire-it-up),
+`createServer(config, routing)` maps onto covenix's [`serve`](/guide/getting-started#wire-it-up),
 which does the same one-call bootstrap (body parser, mounted routes, docs, error
 handler, listen):
 
@@ -276,11 +276,11 @@ import { createConfig, createServer } from 'express-zod-api';
 const config = createConfig({ http: { listen: 3000 }, cors: true });
 await createServer(config, routing);
 
-// avero — one call, returns the http.Server
+// covenix — one call, returns the http.Server
 import 'reflect-metadata';
-import { Avero, serve } from 'avero';
+import { Covenix, serve } from 'covenix';
 
-const api = new Avero({ info: { title: 'My API', version: '1.0.0' } });
+const api = new Covenix({ info: { title: 'My API', version: '1.0.0' } });
 api.register(new UsersController(service));
 await serve(api, { port: 3000, configure: (app) => app.use(cors()) });
 ```
@@ -290,13 +290,13 @@ post-route fallback, and `app:` hands in your own Express instance — or use
 `toExpress(api, …)` to get the built app without listening (e.g. for tests). When
 you'd rather wire Express by hand, `api.mount(app)` is still there.
 
-## Gaps: what express-zod-api does that avero doesn't
+## Gaps: what express-zod-api does that covenix doesn't
 
-- **Built-in result-handler envelope.** avero returns bare bodies; replicate the
+- **Built-in result-handler envelope.** covenix returns bare bodies; replicate the
   `{ status, data }` shape with a Zod wrapper schema if you need it (above).
 - **Integrated logger / config object.** express-zod-api ships a config + logger
-  abstraction; avero leaves logging and config to you.
-- **The `EndpointsFactory` middleware-composition model.** avero uses plain Express
+  abstraction; covenix leaves logging and config to you.
+- **The `EndpointsFactory` middleware-composition model.** covenix uses plain Express
   middleware via `@Use` and first-class `@Security` instead of factory-composed,
   option-contributing middleware. For the common case — middleware that contributes
   a typed value the handler consumes (a tenant, a request-scoped lookup) — use
@@ -304,5 +304,5 @@ you'd rather wire Express by hand, `api.mount(app)` is still there.
   its resolver runs per request (sync or async) and injects the value as a handler
   argument.
 
-If you hit an express-zod-api feature without an obvious avero equivalent, please
-[open an issue](https://github.com/joeferner/avero/issues).
+If you hit an express-zod-api feature without an obvious covenix equivalent, please
+[open an issue](https://github.com/joeferner/covenix/issues).

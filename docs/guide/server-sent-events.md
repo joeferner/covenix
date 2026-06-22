@@ -3,12 +3,12 @@
 To stream events to the client over a long-lived connection — token-by-token LLM
 output, progress updates, live notifications — mark the route with
 [`@Sse`](/api/functions/Sse) and return an **async iterable** (typically an async
-generator). avero sets the `text/event-stream` headers, frames each yielded value
+generator). covenix sets the `text/event-stream` headers, frames each yielded value
 as an SSE event, validates it against the schema, and cleans up on disconnect.
 
 ```typescript
 import { z } from 'zod';
-import { Route, Get, Param, Sse, SseEvent } from 'avero';
+import { Route, Get, Param, Sse, SseEvent } from 'covenix';
 
 const Token = z.object({ text: z.string() });
 
@@ -31,7 +31,7 @@ class ChatController {
 
 ## How it works
 
-A `@Sse` route doesn't JSON-respond. avero:
+A `@Sse` route doesn't JSON-respond. covenix:
 
 - sets `Content-Type: text/event-stream` (plus `Cache-Control: no-cache` and
   `X-Accel-Buffering: no` to defeat proxy buffering) and keeps the socket open,
@@ -44,7 +44,7 @@ A `@Sse` route doesn't JSON-respond. avero:
 
 ## Framing: plain values vs `SseEvent`
 
-Yield a **plain value** and avero frames it as a `data:` line (dispatched to the
+Yield a **plain value** and covenix frames it as a `data:` line (dispatched to the
 browser's `onmessage`). Yield an [`SseEvent`](/api/classes/SseEvent) to set the
 other SSE fields:
 
@@ -74,7 +74,7 @@ keeping idle connections from being closed by proxies/load balancers:
 ## Disconnect handling
 
 Because the handler is an async iterable, cleanup is just a `try/finally` (or a
-generator's natural teardown). When the client goes away, avero calls the
+generator's natural teardown). When the client goes away, covenix calls the
 iterator's `return()`, which resumes the generator at its suspension point with a
 return — running `finally`.
 
@@ -89,7 +89,7 @@ relying on `finally` alone.
 
 Each event is validated, but once the first frame is sent the response status is
 already committed — so an event that fails its schema **can't** become a `500`.
-avero terminates the stream and surfaces the error through `next(err)` (logged by
+covenix terminates the stream and surfaces the error through `next(err)` (logged by
 your error handler; it can't change the status). Treat a mid-stream validation
 failure as the server bug it is.
 

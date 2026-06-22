@@ -21,7 +21,7 @@ export interface ResponseCookie {
   options?: CookieOptions;
 }
 
-/** Options common to every avero response envelope ({@link ResponseBase}). */
+/** Options common to every covenix response envelope ({@link ResponseBase}). */
 export interface ResponseBaseOptions {
   /**
    * Explicit HTTP status. Defaults to the route's declared success status (the
@@ -45,13 +45,13 @@ export interface ResponseBaseOptions {
 }
 
 /**
- * Base class for avero's value-style responses — return one from a handler to
+ * Base class for covenix's value-style responses — return one from a handler to
  * describe the response declaratively (status, headers, cookies, …) instead of
  * mutating the raw Express `res`. The concrete subclasses are {@link HttpResponse}
  * (a JSON/validated body), and `FileResponse` / `RangeFileResponse` (binary
  * bodies).
  *
- * avero detects these by `instanceof`, so returning one is always opt-in — a bare
+ * covenix detects these by `instanceof`, so returning one is always opt-in — a bare
  * return value is sent (and validated) exactly as before.
  */
 export abstract class ResponseBase {

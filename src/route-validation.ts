@@ -37,7 +37,7 @@ export function assertValidBodyParams(
     const offender = bodyParams.find((p) => p.name !== undefined || p.file);
     if (offender) {
       throw new Error(
-        `avero: ${injectorLabel(offender)} on "${handlerName}" reads a request body field, but the handler declares no @Body schema`,
+        `covenix: ${injectorLabel(offender)} on "${handlerName}" reads a request body field, but the handler declares no @Body schema`,
       );
     }
     return;
@@ -54,7 +54,7 @@ export function assertValidBodyParams(
     if (param.file === 'single') {
       if (fileFields.get(param.name) !== false) {
         throw new Error(
-          `avero: @File('${param.name}') on "${handlerName}" must name a single z.file() field in the @Body schema`,
+          `covenix: @File('${param.name}') on "${handlerName}" must name a single z.file() field in the @Body schema`,
         );
       }
       continue;
@@ -62,7 +62,7 @@ export function assertValidBodyParams(
     if (param.file === 'multiple') {
       if (fileFields.get(param.name) !== true) {
         throw new Error(
-          `avero: @Files('${param.name}') on "${handlerName}" must name a z.array(z.file()) field in the @Body schema`,
+          `covenix: @Files('${param.name}') on "${handlerName}" must name a z.array(z.file()) field in the @Body schema`,
         );
       }
       continue;
@@ -70,7 +70,7 @@ export function assertValidBodyParams(
     // Plain @BodyParam('name'): the field must exist on an object @Body schema.
     if (fields && !fields.has(param.name)) {
       throw new Error(
-        `avero: @BodyParam('${param.name}') on "${handlerName}" names a field absent from the @Body schema`,
+        `covenix: @BodyParam('${param.name}') on "${handlerName}" names a field absent from the @Body schema`,
       );
     }
   }

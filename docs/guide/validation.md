@@ -18,7 +18,7 @@ environment.
 
 ### The response schema also serializes the response
 
-avero sends the **parsed** result, not the raw return value, so the `@Returns`
+covenix sends the **parsed** result, not the raw return value, so the `@Returns`
 schema doubles as a response serializer:
 
 - **Undeclared fields are stripped.** Return `{ id, passwordHash }` from a handler
@@ -32,17 +32,17 @@ A route with no `@Returns` schema sends the value untouched.
 
 ## Errors flow through Express
 
-avero never sends an error response itself. A failed validation calls
+covenix never sends an error response itself. A failed validation calls
 `next(err)` with a `ValidationError` carrying the Zod issues and a status, so it
 travels the **same** Express error pipeline as anything your handlers throw.
-`ValidationError` and `SecurityError` both extend [`AveroError`](/api/classes/AveroError)
+`ValidationError` and `SecurityError` both extend [`CovenixError`](/api/classes/CovenixError)
 (which carries `.status`), so you can match on that in your own middleware:
 
 ```typescript
-import { AveroError } from 'avero';
+import { CovenixError } from 'covenix';
 
 app.use((err, req, res, next) => {
-  if (err instanceof AveroError) {
+  if (err instanceof CovenixError) {
     return res.status(err.status).json({ status: err.status, message: err.message });
   }
   next(err);
@@ -51,15 +51,15 @@ app.use((err, req, res, next) => {
 
 ## Convenience handler
 
-If you don't want to write that, avero ships an optional
-[`averoErrorHandler`](/api/functions/averoErrorHandler) that renders errors as
+If you don't want to write that, covenix ships an optional
+[`covenixErrorHandler`](/api/functions/covenixErrorHandler) that renders errors as
 [RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457) **Problem Details**
 (`application/problem+json`) — the standard, interoperable error shape:
 
 ```typescript
-import { averoErrorHandler } from 'avero';
+import { covenixErrorHandler } from 'covenix';
 
-app.use(averoErrorHandler());
+app.use(covenixErrorHandler());
 // 422 → application/problem+json
 // {
 //   "type": "about:blank",          // a doc URI when you have one
@@ -77,7 +77,7 @@ Override the body with `formatError` — which switches the response back to
 `application/json`, since your shape isn't Problem Details:
 
 ```typescript
-app.use(averoErrorHandler({ formatError: (err) => ({ ok: false, message: err.message }) }));
+app.use(covenixErrorHandler({ formatError: (err) => ({ ok: false, message: err.message }) }));
 ```
 
 Handlers themselves should throw standard

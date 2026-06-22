@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { Body, Get, Params, Post, Query, Returns, Route, Security, Sse } from './decorators.js';
 import { ReturnsFile } from './decorators.js';
-import { Avero } from './avero.js';
+import { Covenix } from './covenix.js';
 import {
   CONTRACT_VERSION,
   generateContract,
   parseContract,
-  AveroContractSchema,
+  CovenixContractSchema,
   type ContractOperation,
   type SchemaNode,
 } from './contract.js';
@@ -46,7 +46,7 @@ describe('generateContract', () => {
 
   it('emits a versioned, validated contract', () => {
     const contract = generateContract([UsersController], { title: 'Users', version: '2.0.0' });
-    expect(contract.averoContract).toBe(CONTRACT_VERSION);
+    expect(contract.covenixContract).toBe(CONTRACT_VERSION);
     expect(contract.info).toEqual({ title: 'Users', version: '2.0.0' });
     // Validate-on-write means the output already conforms; re-parsing must pass.
     expect(() => parseContract(contract)).not.toThrow();
@@ -95,10 +95,10 @@ describe('generateContract', () => {
     });
   });
 
-  it('matches Avero#contract() for the same controllers', () => {
+  it('matches Covenix#contract() for the same controllers', () => {
     const info = { title: 'API', version: '1.0.0' };
     const fromClasses = generateContract([UsersController], info);
-    const api = new Avero({ info });
+    const api = new Covenix({ info });
     api.register(new UsersController());
     expect(api.contract()).toEqual(fromClasses);
   });
@@ -287,8 +287,8 @@ describe('route-less schemas option', () => {
     expect(contract.operations.some((o) => JSON.stringify(o).includes('WsMessage'))).toBe(false);
   });
 
-  it('is available on Avero#contract() too', () => {
-    const api = new Avero({ info: { title: 'API', version: '1.0.0' } });
+  it('is available on Covenix#contract() too', () => {
+    const api = new Covenix({ info: { title: 'API', version: '1.0.0' } });
     api.register(new C());
     expect(api.contract({ schemas: [Msg] }).schemas).toHaveProperty('WsMessage');
   });
@@ -317,12 +317,12 @@ describe('parseContract / versioning', () => {
 
   it('rejects a contract with a mismatched version', () => {
     expect(() =>
-      parseContract({ averoContract: '9.9', info: {}, operations: [], schemas: {} }),
+      parseContract({ covenixContract: '9.9', info: {}, operations: [], schemas: {} }),
     ).toThrow();
   });
 
   it('rejects a malformed contract', () => {
     expect(() => parseContract({ nope: true })).toThrow();
-    expect(AveroContractSchema.safeParse({}).success).toBe(false);
+    expect(CovenixContractSchema.safeParse({}).success).toBe(false);
   });
 });

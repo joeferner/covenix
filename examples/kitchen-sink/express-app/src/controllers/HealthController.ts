@@ -12,7 +12,7 @@ import {
   Res,
   createParamDecorator,
   HttpResponse,
-} from 'avero';
+} from 'covenix';
 
 const HealthSchema = z
   .object({
@@ -22,9 +22,9 @@ const HealthSchema = z
   .meta({ id: 'Health' });
 
 // Plain Express middleware — runs before every route in this controller via the
-// class-level @Use below. Stamps a header so callers can tell avero served it.
+// class-level @Use below. Stamps a header so callers can tell covenix served it.
 const stampSource: RequestHandler = (_req, res, next) => {
-  res.setHeader('X-Health-Source', 'avero');
+  res.setHeader('X-Health-Source', 'covenix');
   next();
 };
 
@@ -52,7 +52,7 @@ export class HealthController {
     );
   }
 
-  // Server-Sent Events: the handler returns an async generator and avero frames
+  // Server-Sent Events: the handler returns an async generator and covenix frames
   // each yielded value as an SSE event (text/event-stream), validating it against
   // HealthSchema. This one is finite; a real stream (e.g. LLM tokens) would loop,
   // and its `finally` would run when the client disconnects.
@@ -67,7 +67,7 @@ export class HealthController {
   }
 
   // Escape hatch: no @Returns, no schema — grab the raw Express objects and
-  // write the response yourself. avero stays out of the way.
+  // write the response yourself. covenix stays out of the way.
   @Get('raw')
   @Summary('Plain-text ping, written straight to the Express response')
   public rawPing(@Req() req: Request, @Res() res: Response): void {

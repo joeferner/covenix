@@ -14,7 +14,7 @@ import {
   Cookies,
   CookieParam,
   Principal,
-} from 'avero';
+} from 'covenix';
 import {
   LoginSchema,
   TokenSchema,
@@ -61,7 +61,7 @@ export class AuthController {
   }
 
   // @Cookies documents `sid` as an `in: cookie` parameter (and validates it);
-  // @CookieParam injects the parsed value. avero reads `req.cookies`, so a cookie
+  // @CookieParam injects the parsed value. covenix reads `req.cookies`, so a cookie
   // parser must run ahead of the route — see main.ts (`configure: cookieParser()`).
   @Get('session')
   @Summary('Report whether a session cookie is present')

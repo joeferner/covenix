@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 /** Documentation UI `serveDocs` can render. */
 export type DocsUi = 'scalar' | 'swagger-ui' | 'redoc';
 
-/** Options for {@link import('./avero.js').Avero.serveDocs}. */
+/** Options for {@link import('./covenix.js').Covenix.serveDocs}. */
 export interface ServeDocsOptions {
   /** Which UI to render. Defaults to `'scalar'`. */
   ui?: DocsUi;
@@ -25,7 +25,7 @@ export interface ServeDocsOptions {
   specVersion?: SpecVersion;
   /**
    * Route-less named schemas (`.meta({ id })`) to add to the served document's
-   * `components.schemas` — the same `schemas` accepted by {@link import('./avero.js').Avero.swagger}.
+   * `components.schemas` — the same `schemas` accepted by {@link import('./covenix.js').Covenix.swagger}.
    * Pass these so the docs spec includes types not referenced by any route.
    */
   schemas?: ZodType[];
@@ -71,7 +71,7 @@ function packageDir(name: string): string {
 /** Friendly error when a self-hosted UI's package isn't installed. */
 function missing(ui: DocsUi): Error {
   return new Error(
-    `avero: serveDocs({ ui: '${ui}' }) needs "${UI_PACKAGE[ui]}" installed ` +
+    `covenix: serveDocs({ ui: '${ui}' }) needs "${UI_PACKAGE[ui]}" installed ` +
       `(npm i ${UI_PACKAGE[ui]}), or pass { cdn: true } to load it from a CDN.`,
   );
 }
