@@ -107,4 +107,5 @@ export type {
   SchemaNode,
   ZodecContract,
 } from './contract.js';
-export { generateTypeScriptClient } from './contract-client.js';
+export { generateTypeScriptClient } from './generator/contract-client.js';
+export type { GenerateClientOptions, ClientValidation } from './generator/contract-client.js';

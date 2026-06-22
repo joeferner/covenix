@@ -10,7 +10,8 @@
     "contract": "tsx src/generate-contract-instance.ts",
     "contract:static": "tsx src/generate-contract-static.ts",
     "client": "tsx src/generate-client-instance.ts",
-    "verify:client": "tsx src/verify-client.ts"
+    "verify:client": "tsx src/verify-client.ts",
+    "verify:client:validated": "tsx src/verify-client-validated.ts"
   },
   "dependencies": {
     "@kitchen-sink/schemas": "*",

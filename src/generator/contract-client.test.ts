@@ -18,8 +18,8 @@ import {
   Sse,
   Summary,
   Tags,
-} from './decorators.js';
-import { generateContract } from './contract.js';
+} from '../decorators.js';
+import { generateContract } from '../contract.js';
 import { generateTypeScriptClient } from './contract-client.js';
 
 const User = z.object({ id: z.uuid(), name: z.string() }).meta({ id: 'User' });
@@ -100,7 +100,7 @@ describe('generateTypeScriptClient — output', () => {
     expect(client).toContain('stream: true');
   });
 
-  it('renders z.date() as string (dates travel as ISO strings over JSON; no revival in v1)', () => {
+  it('renders z.date() as string in the default client (revival is opt-in via validate)', () => {
     @Route('cal')
     class CalController {
       @Post('events')
@@ -343,5 +343,118 @@ describe('generated client — runtime behavior', () => {
     // `.raw()` surfaces response headers as a standard Headers object.
     expect(res.headers).toBeInstanceOf(Headers);
     expect(res.headers.get('content-type')).toContain('json');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Validating client ({ validate: 'zod' })
+// ---------------------------------------------------------------------------
+
+const Visit = z.object({ id: z.string(), at: z.date() }).meta({ id: 'Visit' });
+
+@Route('visits')
+@Tags('Visits')
+class VisitsController {
+  @Get('{id}')
+  @Params(z.object({ id: z.string() }))
+  @Returns(200, Visit)
+  public get(): unknown {
+    return null;
+  }
+
+  @Post()
+  @Body(z.object({ name: z.string().min(3) }))
+  @Returns(201, Visit)
+  public create(): unknown {
+    return null;
+  }
+}
+
+const vContract = generateContract([VisitsController], { title: 'Test', version: '1.0.0' });
+const vClient = generateTypeScriptClient(vContract, { validate: 'zod' });
+
+describe("generateTypeScriptClient — validating ({ validate: 'zod' }) output", () => {
+  it('imports zod and emits a validator const per named schema', () => {
+    expect(vClient).toContain("import { z } from 'zod';");
+    expect(vClient).toContain('const Visit$schema: z.ZodType<Visit> = z.object({');
+  });
+
+  it('revives z.date() as a real Date (typed Date, parsed with z.coerce.date)', () => {
+    expect(vClient).toContain('at: Date'); // interface field
+    expect(vClient).toContain('z.coerce.date()'); // validator
+    expect(vClient).not.toContain('at: string');
+  });
+
+  it('wires request-input and response validators into the operation specs', () => {
+    expect(vClient).toContain('responses: { 200: z.lazy(() => Visit$schema) }'); // response
+    expect(vClient).toContain('body: z.object({ name: z.string().min(3) })'); // request body
+    expect(vClient).toContain('export class ZodecClientValidationError');
+  });
+});
+
+/** A validating client typed loosely for the runtime tests. */
+interface VClient {
+  visits: {
+    get(args: { params: { id: string } }): Promise<{ id: string; at: Date }>;
+    create(args: { body: { name: string } }): Promise<{ id: string; at: Date }>;
+  };
+}
+
+/**
+ * Transpiles + imports the validating client. Written inside the repo so its
+ * `import { z } from 'zod'` resolves to the project's node_modules.
+ */
+async function instantiateValidating(
+  fakeFetch: (url: string, init: RequestInit) => Promise<Response>,
+): Promise<VClient> {
+  const js = ts.transpileModule(vClient, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext },
+  }).outputText;
+  const dir = mkdtempSync(join(process.cwd(), 'zodec-vclient-'));
+  tmpDirs.push(dir);
+  const file = join(dir, 'client.mjs');
+  writeFileSync(file, js);
+  const mod = (await import(pathToFileURL(file).href)) as {
+    createClient: (opts: unknown) => VClient;
+  };
+  return mod.createClient({ baseUrl: 'https://api.test', fetch: fakeFetch });
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+}
+
+describe("generateTypeScriptClient — validating ({ validate: 'zod' }) runtime", () => {
+  it('parses a valid response and revives z.date() into a real Date', async () => {
+    const api = await instantiateValidating(() =>
+      Promise.resolve(jsonResponse(200, { id: 'v1', at: '2020-01-02T03:04:05.000Z' })),
+    );
+    const visit = await api.visits.get({ params: { id: 'v1' } });
+    expect(visit.at).toBeInstanceOf(Date);
+    expect(visit.at.toISOString()).toBe('2020-01-02T03:04:05.000Z');
+  });
+
+  it('throws ZodecClientValidationError when a response violates its schema', async () => {
+    const api = await instantiateValidating(() => Promise.resolve(jsonResponse(200, { id: 'v1' }))); // missing `at`
+    await expect(api.visits.get({ params: { id: 'v1' } })).rejects.toMatchObject({
+      name: 'ZodecClientValidationError',
+      phase: 'response',
+    });
+  });
+
+  it('validates request inputs before sending (no fetch on failure)', async () => {
+    let fetched = false;
+    const api = await instantiateValidating(() => {
+      fetched = true;
+      return Promise.resolve(jsonResponse(201, { id: 'v1', at: '2020-01-02T03:04:05.000Z' }));
+    });
+    await expect(api.visits.create({ body: { name: 'ab' } })).rejects.toMatchObject({
+      name: 'ZodecClientValidationError',
+      phase: 'request',
+    });
+    expect(fetched).toBe(false);
   });
 });

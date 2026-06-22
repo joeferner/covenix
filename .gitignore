@@ -11,7 +11,12 @@ docs/.vitepress/cache/
 examples/**/swagger.json
 examples/**/contract.json
 examples/**/api.gen.ts
+examples/**/api.validated.gen.ts
 # ...but keep the committed snapshots used by verify.sh
 !examples/**/__snapshots__/swagger.json
 !examples/**/__snapshots__/contract.json
 !examples/**/__snapshots__/api.gen.ts
+!examples/**/__snapshots__/api.validated.gen.ts
+
+# Transient dirs from the validating-client runtime tests (cleaned up in afterAll)
+zodec-vclient-*/

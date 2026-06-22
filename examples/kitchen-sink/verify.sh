@@ -309,6 +309,40 @@ else
 fi
 rm -f "$GEN_CLIENT" # generated artifact — not committed (see .gitignore)
 
+# The validating client variant (`--validate`): imports zod, parses requests and
+# responses against regenerated schemas. Same checks as the base client plus a
+# live exercise that proves real server responses conform to the contract.
+VGEN_CLIENT="$APP_DIR/src/api.validated.gen.ts"
+npm --prefix "$APP_DIR" run --silent client -- "$VGEN_CLIENT" --validate >/dev/null
+if [ "${UPDATE_SNAPSHOTS:-}" = "1" ]; then
+  cp "$VGEN_CLIENT" "$SNAP/api.validated.gen.ts"
+  echo "    ↻ updated snapshot api.validated.gen.ts"
+else
+  if diff -q "$SNAP/api.validated.gen.ts" "$VGEN_CLIENT" >/dev/null; then
+    echo "    ✓ validating client: output matches __snapshots__/api.validated.gen.ts"
+  else
+    echo "    ✗ validating client: output differs (run UPDATE_SNAPSHOTS=1 bash verify.sh)"
+    fail=1
+  fi
+  if node "$ROOT/node_modules/typescript/bin/tsc" --noEmit --ignoreConfig --strict \
+    --target es2022 --module nodenext --moduleResolution nodenext --lib es2022,dom \
+    "$VGEN_CLIENT" 2>"$TMP/vclient-tsc.log"; then
+    echo "    ✓ validating client: type-checks standalone (with its zod import)"
+  else
+    echo "    ✗ validating client: generated client has type errors"
+    sed -n '1,20p' "$TMP/vclient-tsc.log"
+    fail=1
+  fi
+  if npm --prefix "$APP_DIR" run --silent verify:client:validated -- "$BASE" >"$TMP/vclient-run.log" 2>&1; then
+    sed 's/^/    /' "$TMP/vclient-run.log"
+  else
+    echo "    ✗ validating client: exercising it against the server failed"
+    sed -n '1,30p' "$TMP/vclient-run.log"
+    fail=1
+  fi
+fi
+rm -f "$VGEN_CLIENT" # generated artifact — not committed (see .gitignore)
+
 echo
 if [ "$fail" -eq 0 ]; then
   echo "✓ kitchen-sink verification passed"

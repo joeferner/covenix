@@ -146,7 +146,32 @@ for await (const event of await api.health.events()) {
 }
 ```
 
-## What it does and doesn't do (v1)
+## Runtime validation (opt-in)
+
+By default the client is **types-only** — it trusts the server and ships with no
+dependencies. Pass `{ validate: 'zod' }` to generate a **validating** client that
+parses requests and responses against schemas regenerated from the contract:
+
+```typescript
+const source = generateTypeScriptClient(contract, { validate: 'zod' });
+```
+
+The validating client:
+
+- **`import`s `zod`** (a peer dependency) — install `zod` wherever the client runs.
+- **Validates response bodies** against the matched status's schema and **request
+  inputs** (`params` / `query` / `body`) before sending. A mismatch throws a
+  `ZodecClientValidationError` — the underlying `ZodError` is on `.cause`, and
+  `.phase` is `'request'` or `'response'`. It's the client-side analogue of
+  zodec's always-on **server** response validation, so you catch drift instead of
+  getting bad data typed as valid.
+- **Revives `z.date()` responses into real `Date`s** (typed `Date`, parsed via
+  `z.coerce.date()`) and applies defaults on the way through.
+
+The default client is unchanged — validation is purely opt-in, and only the
+validating build pulls in `zod`.
+
+## What it does and doesn't do
 
 Being honest about the edges:
 
@@ -154,15 +179,14 @@ Being honest about the edges:
   a value the client infers from directly), zodec's contract comes from decorators,
   so the client is a generated file you regenerate on change. In return it's
   standalone (no runtime dependency) and works for any contract consumer.
-- **Types only — no runtime validation yet.** The client trusts the server's
-  responses. Opt-in runtime validation is planned
-  ([#22](https://github.com/joeferner/zodec/issues/22)).
-- **`z.date()` is typed `string`.** Dates travel as ISO strings over JSON and the
-  types-only client does no revival, so `string` is the honest type. Reviving to a
-  real `Date` rides on runtime validation
-  ([#21](https://github.com/joeferner/zodec/issues/21)).
+- **Types-only by default; validation is opt-in.** The default client trusts the
+  server and ships dependency-free; `{ validate: 'zod' }` adds runtime
+  request/response validation (above).
+- **`z.date()` is `string` by default, `Date` when validating.** Dates travel as
+  ISO strings over JSON, so the types-only client types them `string` (the honest
+  wire type); the validating client revives them to real `Date`s.
 - **No React Query / framework hooks** — but the contract is open for a generator
-  that emits them.
+  that emits them ([#28](https://github.com/joeferner/zodec/issues/28)).
 
 For non-TS or external consumers, keep emitting the
 [OpenAPI document](/guide/swagger) and point any standard generator at it; the

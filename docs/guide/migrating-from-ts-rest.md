@@ -270,10 +270,10 @@ const res = await api.users.get.raw({ params: { id } }); // → { status, body }
 The honest difference: ts-rest infers the client from a contract _value_ (nothing
 to regenerate); zodec generates the client from _decorator_ metadata (regenerate
 on change). In exchange, zodec's client is fully standalone, and the contract it's
-built from is an open artifact any generator can target. v1 is types-only (opt-in
-runtime validation is [planned](https://github.com/joeferner/zodec/issues/22)) and
-there are no React-Query hooks yet. See [Typed Client](/guide/typed-client) for
-the full picture.
+built from is an open artifact any generator can target. The client is types-only
+by default; pass `{ validate: 'zod' }` for opt-in runtime request/response
+validation (and `Date` revival). There are no React-Query hooks yet. See
+[Typed Client](/guide/typed-client) for the full picture.
 
 ## OpenAPI generation
 
