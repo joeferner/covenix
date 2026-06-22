@@ -17,7 +17,7 @@ the routing and parameter decorators are nearly identical.
 
 ## At a glance
 
-| tsoa                                              | covenix                                           | Notes                                                             |
+| tsoa                                              | covenix                                         | Notes                                                             |
 | ------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
 | `class C extends Controller`                      | `class C` (plain)                               | No base class.                                                    |
 | `@Route('users')` / `@Tags('Users')`              | `@Route('users')` / `@Tags('Users')`            | Identical.                                                        |
@@ -40,13 +40,13 @@ the routing and parameter decorators are nearly identical.
 | Manual `req.range` / `206` / `416`                | return a `RangeFileResponse`                    | Range negotiation is automatic.                                   |
 | Validation from TS types + `@isInt`/`@minLength`  | Zod schema (`z.number().int()`, `.min()`)       | Runtime, explicit.                                                |
 | Models are interfaces/classes                     | `z.object({…}).meta({ id: 'User' })`            | `.meta({ id })` names the component.                              |
-| `ValidateError` (422), handle it yourself         | `ValidationError` + `covenixErrorHandler()`       | Optional ready-made handler.                                      |
+| `ValidateError` (422), handle it yourself         | `ValidationError` + `covenixErrorHandler()`     | Optional ready-made handler.                                      |
 | `tsoa routes && tsoa spec`, `RegisterRoutes(app)` | `api.mount(app)`, `api.swagger()`               | No generated files.                                               |
 | IoC container (`iocModule`)                       | `api.register(new C(deps))`                     | Explicit construction.                                            |
 | `@Security('jwt', scopes)`                        | `@Security('jwt', scopes)` + `bearer()` handler | Schemes registered on the instance; principal via `@Principal()`. |
 | `@OperationId('x')`                               | `@OperationId('x')`                             | Both default the id to the method name.                           |
 | `@Middlewares(...)`                               | `@Use(...)`                                     | Express middleware, class or method.                              |
-| JSDoc summary / description on the method         | `@Summary('…')` / `@Description('…')`           | covenix uses decorators, not doc comments.                          |
+| JSDoc summary / description on the method         | `@Summary('…')` / `@Description('…')`           | covenix uses decorators, not doc comments.                        |
 | JSDoc `@deprecated` tag                           | `@Deprecated()`                                 | Marks the operation deprecated in the spec.                       |
 
 ## A controller, side by side

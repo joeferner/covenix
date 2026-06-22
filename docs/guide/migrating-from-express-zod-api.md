@@ -116,24 +116,24 @@ Differences to internalize:
 
 ## At a glance
 
-| express-zod-api                                          | covenix                                                        | Notes                                                 |
-| -------------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------- |
-| `factory.build({ method, input, output, handler })`      | decorated method on a controller class                       | Endpoint is a method, not a value.                    |
-| `method: 'get'` + routing key                            | `@Get('{id}')` + `@Route('user')`                            | Prefix on the class; `:id` → `{id}`.                  |
-| `input: z.object({...})` (params+query+body merged)      | `@Params(S)` / `@Query(S)` / `@Body(S)` (split)              | One location per decorator.                           |
-| destructure `input` in `handler`                         | `@Param` / `@QueryParam` / `@BodyParam`                      | Injection by parameter decorator.                     |
-| `output: z.object({...})`                                | `@Returns(200, Schema)`                                      | Stackable, one per status.                            |
-| `return data` → `{ status: "success", data }`            | `return body` (bare)                                         | **No envelope** — see below.                          |
-| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `covenixErrorHandler()`       | Express error pipeline.                               |
-| `factory.addMiddleware(...)` / `.use(mw)`                | `@Use(...)` (class or method)                                | Express middleware.                                   |
-| auth middleware returning `options`                      | `@Security('jwt', scopes)` + `bearer()` + `@Principal()`     | First-class scheme + spec.                            |
-| `Routing` nesting / `v1: {...}`                          | `api.group('/v1', …)` / `register(c, { prefix })`            | See [Grouping & Versioning](/guide/versioning).       |
-| `new Documentation({ routing, config }).getSpecAsYaml()` | `api.swagger()` / `generateSwagger([...])`                   | Native; JSON (down-convert to 3.0 available).         |
+| express-zod-api                                          | covenix                                                      | Notes                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `factory.build({ method, input, output, handler })`      | decorated method on a controller class                       | Endpoint is a method, not a value.                      |
+| `method: 'get'` + routing key                            | `@Get('{id}')` + `@Route('user')`                            | Prefix on the class; `:id` → `{id}`.                    |
+| `input: z.object({...})` (params+query+body merged)      | `@Params(S)` / `@Query(S)` / `@Body(S)` (split)              | One location per decorator.                             |
+| destructure `input` in `handler`                         | `@Param` / `@QueryParam` / `@BodyParam`                      | Injection by parameter decorator.                       |
+| `output: z.object({...})`                                | `@Returns(200, Schema)`                                      | Stackable, one per status.                              |
+| `return data` → `{ status: "success", data }`            | `return body` (bare)                                         | **No envelope** — see below.                            |
+| `createHttpError(404)` → error envelope                  | `throw createError.NotFound()` + `covenixErrorHandler()`     | Express error pipeline.                                 |
+| `factory.addMiddleware(...)` / `.use(mw)`                | `@Use(...)` (class or method)                                | Express middleware.                                     |
+| auth middleware returning `options`                      | `@Security('jwt', scopes)` + `bearer()` + `@Principal()`     | First-class scheme + spec.                              |
+| `Routing` nesting / `v1: {...}`                          | `api.group('/v1', …)` / `register(c, { prefix })`            | See [Grouping & Versioning](/guide/versioning).         |
+| `new Documentation({ routing, config }).getSpecAsYaml()` | `api.swagger()` / `generateSwagger([...])`                   | Native; JSON (down-convert to 3.0 available).           |
 | `new Integration({ routing }).print()` (client gen)      | `generateTypeScriptClient(api.contract())`                   | Both generate; covenix's is standalone + open-contract. |
-| `ez.upload()` in `input`                                 | `z.file()` in `@Body` + `@File`/`@Files`                     | Auto-detected multipart; web-standard `File`.         |
-| `ez.file()` / raw output for downloads                   | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`     | Disposition + range negotiation handled.              |
-| `EventStreamFactory` (SSE)                               | [`@Sse(schema?)`](/guide/server-sent-events)                 | Validated + documented `text/event-stream`.           |
-| `createServer(config, routing)`                          | `serve(api, { port })` / `toExpress(api)` / `api.mount(app)` | One-call bootstrap, or own the app.                   |
+| `ez.upload()` in `input`                                 | `z.file()` in `@Body` + `@File`/`@Files`                     | Auto-detected multipart; web-standard `File`.           |
+| `ez.file()` / raw output for downloads                   | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`     | Disposition + range negotiation handled.                |
+| `EventStreamFactory` (SSE)                               | [`@Sse(schema?)`](/guide/server-sent-events)                 | Validated + documented `text/event-stream`.             |
+| `createServer(config, routing)`                          | `serve(api, { port })` / `toExpress(api)` / `api.mount(app)` | One-call bootstrap, or own the app.                     |
 
 ## The response envelope — the one real gotcha
 

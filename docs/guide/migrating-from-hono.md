@@ -126,21 +126,21 @@ Three differences to internalize:
 
 ## At a glance
 
-| Hono (`@hono/zod-openapi`)                                           | covenix                                                         | Notes                                                       |
+| Hono (`@hono/zod-openapi`)                                           | covenix                                                       | Notes                                                       |
 | -------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
 | `createRoute({ method, path, ... })` (a value)                       | decorators on a controller method                             | Contract is metadata on the method, not a standalone value. |
 | `method: 'get'`, `path: '/users/{id}'`                               | `@Get('{id}')` + `@Route('users')`                            | Prefix on the class.                                        |
 | `request: { params: Schema }`                                        | `@Params(Schema)` + `@Param('id')`                            | Schema on the method; injection on the parameter.           |
 | `request: { query: Schema }`                                         | `@Query(Schema)` + `@QueryParam('q')`                         | Same split.                                                 |
 | `request: { body: { content: { 'application/json': { schema } } } }` | `@Body(Schema)` + `@BodyParam()`                              | Far less nesting.                                           |
-| `request: { headers: Schema }`                                       | `@Headers(Schema)` + `@HeaderParam('x-id')`                   | Both validate the header schema; covenix also documents it.   |
+| `request: { headers: Schema }`                                       | `@Headers(Schema)` + `@HeaderParam('x-id')`                   | Both validate the header schema; covenix also documents it. |
 | `responses: { 200: { content: {...}, description } }`                | `@Returns(200, Schema)`                                       | Stackable, one per status.                                  |
 | `c.req.valid('param' \| 'query' \| 'json' \| 'form')`                | `@Param` / `@QueryParam` / `@BodyParam` / `@File`             | Injection by parameter decorator.                           |
 | `app.openapi(route, handler)`                                        | implementation is the decorated method                        | Definition and handler are one unit.                        |
 | `return c.json(body, status)`                                        | `return body` (status from `@Returns`; `throw` to err)        | No `Context` envelope.                                      |
 | `Schema.openapi('User')` (component name)                            | `Schema.meta({ id: 'User' })`                                 | Names the reusable component.                               |
 | `Schema.openapi({ example, description })`                           | `Schema.meta({ example, description })` / `.describe()`       | Field/schema metadata.                                      |
-| **request validation only** (response is doc-only)                   | request **and** response validated + serialized               | covenix parses the response through `@Returns`.               |
+| **request validation only** (response is doc-only)                   | request **and** response validated + serialized               | covenix parses the response through `@Returns`.             |
 | `z.object(...).openapi(...)` + multipart `form`                      | `z.file()` in `@Body` + `@File`/`@Files`                      | Auto-detected multipart; web-standard `File`.               |
 | stream on raw `Context` (`streamSSE`)                                | [`@Sse(schema?)`](/guide/server-sent-events) + async iterable | Validated + documented `text/event-stream`.                 |
 | `c.body(stream)` / manual headers for downloads                      | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`      | Disposition + range negotiation handled.                    |
@@ -149,7 +149,7 @@ Three differences to internalize:
 | `app.getOpenAPIDocument({...})` / `app.doc(...)`                     | `api.swagger()` / `generateSwagger([...])`                    | Native, Zod-derived.                                        |
 | `hc<AppType>()` (typed RPC client, inferred)                         | `generateTypeScriptClient(api.contract())` (generated)        | Inference vs codegen — see below.                           |
 | Multi-runtime (Workers/Deno/Bun/Node/Lambda)                         | **Express + Node only**                                       | The biggest gap — see below.                                |
-| Zod / Valibot / others (Standard Schema validators)                  | **Zod only**                                                  | covenix is Zod-4-native.                                      |
+| Zod / Valibot / others (Standard Schema validators)                  | **Zod only**                                                  | covenix is Zod-4-native.                                    |
 
 ## Validation: mostly a copy-paste
 

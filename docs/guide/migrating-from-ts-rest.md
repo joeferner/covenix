@@ -135,32 +135,32 @@ Three differences to internalize:
 
 ## At a glance
 
-| ts-rest                                                | covenix                                                                 | Notes                                                          |
+| ts-rest                                                | covenix                                                               | Notes                                                          |
 | ------------------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------- |
 | `initContract()` + `c.router({...})`                   | decorators on a controller class                                      | Contract is metadata on methods, not a standalone value.       |
 | `method: 'GET'`, `path: '/users/:id'`                  | `@Get('{id}')` + `@Route('users')`                                    | Prefix on the class; `:id` → `{id}`.                           |
 | `pathParams: z.object({...})`                          | `@Params(z.object({...}))` + `@Param('id')`                           | Schema on the method, injection on the parameter.              |
 | `query: z.object({...})`                               | `@Query(z.object({...}))` + `@QueryParam('q')`                        | Same split.                                                    |
 | `body: Schema`                                         | `@Body(Schema)` + `@BodyParam()`                                      | Same split.                                                    |
-| `headers: { 'x-id': z.string() }`                      | `@Headers(z.object({ 'x-id': z.string() }))` + `@HeaderParam('x-id')` | Both validate request headers; covenix also documents them.      |
+| `headers: { 'x-id': z.string() }`                      | `@Headers(z.object({ 'x-id': z.string() }))` + `@HeaderParam('x-id')` | Both validate request headers; covenix also documents them.    |
 | `responses: { 200: S, 404: E }`                        | `@Returns(200, S)` `@Returns(404, E)`                                 | Stackable, one per status.                                     |
-| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec                  | covenix has dedicated decorators for binary/stream.              |
+| `c.otherResponse({ contentType, body })`               | `@ReturnsFile(...)` / `@Sse(...)` / content via spec                  | covenix has dedicated decorators for binary/stream.            |
 | `c.noBody()` (e.g. `204`)                              | `@Returns(204)` (omit the schema)                                     | No-content response.                                           |
 | `return { status, body }`                              | `return body` (status from `@Returns`; `throw` to err)                | No status/body envelope.                                       |
 | `contentType: 'multipart/form-data'` + `body`          | `z.file()` in `@Body` + `@File`/`@Files`                              | Auto-detected multipart; web-standard `File`.                  |
 | `summary` / `metadata`                                 | `@Summary` / `@Description` / `@OperationId`                          | First-class decorators.                                        |
-| `strictStatusCodes`                                    | always validates the matched `@Returns`                               | covenix validates the response you actually send.                |
+| `strictStatusCodes`                                    | always validates the matched `@Returns`                               | covenix validates the response you actually send.              |
 | `pathPrefix: '/v1'` (router option)                    | `api.group('/v1', …)` / `register(c, { prefix })`                     | See [Grouping & Versioning](/guide/versioning).                |
 | `commonResponses` / `baseHeaders`                      | class-level `@Returns(status, Schema, { headers })`                   | Shared responses merged into every route; route-level wins.    |
 | `initServer().router(contract, {...})`                 | `new C(deps)` + `api.register(c)`                                     | Implementation lives on the class; explicit construction.      |
 | `createExpressEndpoints(contract, router, app)`        | `api.mount(app)`                                                      | Wires routes + validation.                                     |
 | `globalMiddleware` / per-route middleware              | `@Use(...)` (class or method)                                         | Express middleware.                                            |
-| `requestValidationErrorHandler`                        | `ValidationError` → `covenixErrorHandler()`                             | 400 params/query, 422 body, 500 bad response.                  |
+| `requestValidationErrorHandler`                        | `ValidationError` → `covenixErrorHandler()`                           | 400 params/query, 422 body, 500 bad response.                  |
 | `generateOpenApi(contract, ...)` (`@ts-rest/open-api`) | `api.swagger()` / `generateSwagger([...])`                            | Native, no extra package or transformer.                       |
 | `initClient(contract)` (typed client)                  | `generateTypeScriptClient(contract)` (generated)                      | Standalone client; codegen step vs ts-rest's inference.        |
 | `@ts-rest/react-query`                                 | **no equivalent** (yet)                                               | The contract is open for a hooks generator; or keep ts-rest's. |
-| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                                      | covenix targets Express 5.                                       |
-| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                                          | covenix is Zod-4-native.                                         |
+| Express / Fastify / Nest / Next / serverless adapters  | **Express only**                                                      | covenix targets Express 5.                                     |
+| Zod / Valibot / Arktype / Effect (Standard Schema)     | **Zod only**                                                          | covenix is Zod-4-native.                                       |
 
 ## Validation: mostly a copy-paste
 
@@ -366,7 +366,7 @@ app.get('/swagger.json', (_req, res) => res.json(api.swagger()));
 
 ## What you lose, what you gain
 
-| Leaving ts-rest you give up…                            | …and you gain in covenix                                                             |
+| Leaving ts-rest you give up…                            | …and you gain in covenix                                                           |
 | ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | **Zero-codegen** client inference + React Query hooks   | A generated standalone client **and** accurate **OpenAPI 3.1/3.0** from one source |
 | Multiple validation libs (Valibot/Arktype/Effect)       | Zod-4-native conversion with first-class `.meta({ id })` components                |

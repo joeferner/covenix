@@ -19,24 +19,24 @@ artifact.
 
 ## Document structure
 
-| OpenAPI document field                         | covenix                                                                                                               |
+| OpenAPI document field                         | covenix                                                                                                             |
 | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `openapi: '3.1.0'`                             | Emitted automatically (3.1 default; `swagger({ specVersion: '3.0' })`).                                             |
-| `info.title` / `info.version`                  | `new Covenix({ info: { title, version } })`                                                                           |
-| `info.description` / `contact` / `license` / … | `new Covenix({ info })` takes the full OpenAPI Info Object                                                            |
-| `servers`                                      | `new Covenix({ servers: [{ url }] })`                                                                                 |
+| `info.title` / `info.version`                  | `new Covenix({ info: { title, version } })`                                                                         |
+| `info.description` / `contact` / `license` / … | `new Covenix({ info })` takes the full OpenAPI Info Object                                                          |
+| `servers`                                      | `new Covenix({ servers: [{ url }] })`                                                                               |
 | `paths`                                        | `@Route` prefix + `@Get`/`@Post`/… (with `{id}` path params)                                                        |
 | `components.schemas`                           | Named (`.meta({ id })`) Zod schemas — referenced by routes, or passed via the `schemas` option for route-less types |
-| `components.securitySchemes`                   | The `security` map on `new Covenix({ security })` (or the builders)                                                   |
+| `components.securitySchemes`                   | The `security` map on `new Covenix({ security })` (or the builders)                                                 |
 | `security` (global)                            | `@Security` on the controller class (applies to all its routes)                                                     |
 | `tags` (names)                                 | `@Tags(...)` on the controller class                                                                                |
-| `tags` (descriptions)                          | `new Covenix({ tags: [{ name, description }] })`                                                                      |
-| `externalDocs`                                 | `new Covenix({ externalDocs: { url } })`                                                                              |
+| `tags` (descriptions)                          | `new Covenix({ tags: [{ name, description }] })`                                                                    |
+| `externalDocs`                                 | `new Covenix({ externalDocs: { url } })`                                                                            |
 | `webhooks` / `x-*`                             | Post-process the generated document                                                                                 |
 
 ## Operations
 
-| Operation field       | covenix                                                               |
+| Operation field       | covenix                                                             |
 | --------------------- | ------------------------------------------------------------------- |
 | HTTP method + path    | `@Get('{id}')`, `@Post()`, `@Put`, `@Patch`, `@Delete`              |
 | `summary`             | `@Summary('…')`                                                     |
@@ -56,7 +56,7 @@ covenix decomposes a `@Params`/`@Query` **object schema** into one OpenAPI
 parameter per property — path params are always `required`, query params follow
 the schema's optionality.
 
-| Hand-written parameter            | covenix                                                                                                               |
+| Hand-written parameter            | covenix                                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `in: path`                        | `@Params(z.object({ id: z.string() }))` + `@Param('id')`                                                            |
 | `in: query`                       | `@Query(z.object({ page: z.coerce.number() }))` + `@QueryParam('page')`                                             |
@@ -65,21 +65,21 @@ the schema's optionality.
 | parameter `description`/`example` | `.describe(...)` / `.meta({ examples })` on the property schema                                                     |
 | `required`                        | Path → always; query/header/cookie → non-`.optional()` property                                                     |
 | parameter `deprecated`            | `.meta({ deprecated: true })` on the property → `deprecated` on the parameter                                       |
-| `style` / `explode`               | Post-process (covenix emits the default `schema` form)                                                                |
+| `style` / `explode`               | Post-process (covenix emits the default `schema` form)                                                              |
 
 ## Request bodies
 
-| Hand-written requestBody                             | covenix                                                                                                       |
+| Hand-written requestBody                             | covenix                                                                                                     |
 | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `application/json`                                   | `@Body(z.object({ … }))`                                                                                    |
 | `multipart/form-data` (file upload)                  | `@Body` with a `z.file()` / `z.array(z.file())` field — auto-detected ([File uploads](/guide/file-uploads)) |
 | `required: true`                                     | Always set when `@Body` is present                                                                          |
-| `application/x-www-form-urlencoded`, `text/*`, other | Post-process (covenix emits JSON or multipart)                                                                |
+| `application/x-www-form-urlencoded`, `text/*`, other | Post-process (covenix emits JSON or multipart)                                                              |
 | request `example`                                    | `@Example(value)` (no `status`)                                                                             |
 
 ## Responses
 
-| Hand-written response          | covenix                                                                                                                                        |
+| Hand-written response          | covenix                                                                                                                                      |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | `responses.<code>` (JSON)      | `@Returns(code, schema)` — stackable, one per status                                                                                         |
 | no-body response (e.g. `204`)  | `@Returns(204)` (omit the schema)                                                                                                            |
@@ -115,7 +115,7 @@ spelling. Name a schema with `.meta({ id })` to get a `#/components/schemas/*`
 | `multipleOf`                                   | `.multipleOf(n)`                                                 |
 | `minItems` / `maxItems`                        | `.min(n)` / `.max(n)` on an array                                |
 | `default`                                      | `.default(v)`                                                    |
-| `additionalProperties: false`                  | `z.object({ … })` (covenix's default — objects are strict)         |
+| `additionalProperties: false`                  | `z.object({ … })` (covenix's default — objects are strict)       |
 | `additionalProperties: <schema>`               | `z.record(z.string(), T)` or `z.object({…}).catchall(T)`         |
 | `allOf`                                        | `z.intersection(A, B)` / `A.extend({ … })`                       |
 | `anyOf`                                        | `z.union([A, B])`                                                |
@@ -140,7 +140,7 @@ them.
 
 ## Security schemes
 
-| OpenAPI security scheme              | covenix                                                   |
+| OpenAPI security scheme              | covenix                                                 |
 | ------------------------------------ | ------------------------------------------------------- |
 | `type: http`, `scheme: bearer`       | `bearer(handler, { bearerFormat })`                     |
 | `type: http`, `scheme: basic`        | `basic(handler)`                                        |

@@ -327,7 +327,9 @@ export function generateContractDocument(
   // Route-less schemas → add to `schemas` (each must be named so it has a key).
   for (const schema of options.schemas ?? []) {
     if (typeof schema.meta()?.id !== 'string') {
-      throw new Error('covenix: schemas passed to generateContract must be named via .meta({ id })');
+      throw new Error(
+        'covenix: schemas passed to generateContract must be named via .meta({ id })',
+      );
     }
     convert.toNode(schema);
   }

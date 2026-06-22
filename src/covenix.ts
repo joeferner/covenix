@@ -33,7 +33,11 @@ import {
   type OpenApiInfo,
   type SpecVersion,
 } from './swagger.js';
-import { generateContractDocument, type ContractOptions, type CovenixContract } from './contract.js';
+import {
+  generateContractDocument,
+  type ContractOptions,
+  type CovenixContract,
+} from './contract.js';
 
 /**
  * Per-request values the handler's injected parameters resolve from. Each source

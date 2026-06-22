@@ -52,7 +52,7 @@ schema is just a value and works across module boundaries with no special wiring
 | `serveDocs` (docs UI + spec), standalone `schemas`                | `main.ts`, `api-schemas.ts`                                  |
 | `group('/v1', …)` versioning — every route mounts under `/v1`     | `api.ts`, `generate-swagger-static.ts`                       |
 | `@Req` / `@Res` escape hatch                                      | `HealthController.ts`                                        |
-| `new Covenix({ info })`, `register`, `mount`, `swagger`             | `api.ts`, `main.ts`, `generate-swagger.ts`                   |
-| `covenixErrorHandler()`                                             | `main.ts`                                                    |
+| `new Covenix({ info })`, `register`, `mount`, `swagger`           | `api.ts`, `main.ts`, `generate-swagger.ts`                   |
+| `covenixErrorHandler()`                                           | `main.ts`                                                    |
 | `http-errors` thrown from handlers                                | controllers + services                                       |
 | Named schemas via `.meta({ id })` → `#/components/schemas/*`      | `schemas/`                                                   |

@@ -118,36 +118,36 @@ Three things collapse into one:
 
 ## At a glance
 
-| NestJS                                                      | covenix                                                         | Notes                                                       |
-| ----------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| `@Controller('users')` / `@ApiTags('Users')`                | `@Route('users')` / `@Tags('Users')`                          | Nearly identical.                                           |
-| `@Get(':id')`, `@Post()`, …                                 | `@Get('{id}')`, `@Post()`, …                                  | Path params switch from `:id` to `{id}`.                    |
-| `@Param('id') id: string`                                   | `@Params(Schema)` + `@Param('id') id`                         | Schema validates on the method; param injects.              |
-| `@Query() q: ListDto`                                       | `@Query(Schema)` + `@QueryParam('q') q`                       | Same split.                                                 |
-| `@Body() body: CreateUserDto`                               | `@Body(Schema)` + `@BodyParam() body`                         | Same split.                                                 |
-| `@Headers('x-id') id`                                       | `@Header('x-id') id`                                          | Injection; validate in a schema if needed.                  |
-| `@Req() req` / `@Res() res`                                 | `@Req() req` / `@Res() res`                                   | Escape hatch.                                               |
-| `createParamDecorator((data, ctx) => …)`                    | `createParamDecorator(({ req, res }, data) => …)`             | Custom injectors; sync or async resolver.                   |
-| class-validator (`@IsString`, `@Length`, …)                 | Zod (`z.string().min().max()`)                                | Runtime types move to schemas.                              |
-| `class XDto` + `class-transformer`                          | `z.object({…}).meta({ id: 'X' })` + `z.infer`                 | `.meta({ id })` names the component.                        |
-| `@ApiProperty({ … })`                                       | **removed** — read from the Zod schema                        | The no-drift win; no CLI plugin needed.                     |
-| `@ApiResponse({ status, type })`                            | `@Returns(status, Schema)`                                    | Stackable, one per status.                                  |
-| `@HttpCode(201)` + `return body`                            | `@Returns(201, Schema)` + `return body`                       | First declared 2xx is the success status.                   |
-| `ValidationPipe({ whitelist: true })`                       | always strips unknown keys + validates                        | Whitelist behaviour is the default.                         |
-| `ClassSerializerInterceptor` / `@Exclude`/`@Expose`         | response parsed through `@Returns` schema                     | Output serialization is on by default.                      |
-| `@UseGuards(JwtGuard)` + `@ApiBearerAuth()`                 | `@Security('jwt', scopes)` + `bearer()` handler               | Scheme + spec from one place; principal via `@Principal()`. |
-| Pipe (`ParseIntPipe`, custom transform)                     | `z.coerce.number()` / Zod transform in the schema             | Coercion lives in the schema.                               |
-| Interceptor (logging, wrap, timing)                         | `@Use(middleware)` (class or method)                          | Express middleware; no rxjs.                                |
-| Exception filter (`@Catch`, `HttpException`)                | `throw createError.NotFound()` + `covenixErrorHandler()`        | Express error pipeline.                                     |
-| `@UploadedFile()` (multer interceptor)                      | `z.file()` in `@Body` + `@File('f') f: File`                  | Auto-detected multipart; web-standard `File`.               |
-| `StreamableFile` + `res.set(...)`                           | `@ReturnsFile(...)` + `FileResponse` / `RangeFileResponse`    | Disposition + range negotiation handled.                    |
-| `@Sse()` (`Observable<MessageEvent>`)                       | [`@Sse(schema?)`](/guide/server-sent-events) (async iterable) | Validated + documented as `text/event-stream`; no rxjs.     |
-| `@ApiOperation({ summary, operationId })`                   | `@Summary` / `@Description` / `@OperationId`                  | First-class decorators.                                     |
-| Module + DI container (`@Module`, `@Injectable`, providers) | `new C(deps)` + `api.register(c)`                             | No container — explicit construction. **(big change)**      |
-| Feature modules / `RouterModule` prefixes                   | `api.group('/v1', …)` / `register(c, { prefix })`             | See [Grouping & Versioning](/guide/versioning).             |
-| `SwaggerModule.createDocument(app, config)`                 | `api.swagger()` / `generateSwagger([...])`                    | Native, derived from Zod.                                   |
-| `SwaggerModule.setup('docs', app, doc)`                     | `api.serveDocs(app)`                                          | Browsable UI in one line.                                   |
-| `Test.createTestingModule({...})`                           | `new C(fakeDeps)`                                             | Construct it; that's the test fixture.                      |
+| NestJS                                                      | covenix                                                       | Notes                                                         |
+| ----------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------- |
+| `@Controller('users')` / `@ApiTags('Users')`                | `@Route('users')` / `@Tags('Users')`                          | Nearly identical.                                             |
+| `@Get(':id')`, `@Post()`, …                                 | `@Get('{id}')`, `@Post()`, …                                  | Path params switch from `:id` to `{id}`.                      |
+| `@Param('id') id: string`                                   | `@Params(Schema)` + `@Param('id') id`                         | Schema validates on the method; param injects.                |
+| `@Query() q: ListDto`                                       | `@Query(Schema)` + `@QueryParam('q') q`                       | Same split.                                                   |
+| `@Body() body: CreateUserDto`                               | `@Body(Schema)` + `@BodyParam() body`                         | Same split.                                                   |
+| `@Headers('x-id') id`                                       | `@Header('x-id') id`                                          | Injection; validate in a schema if needed.                    |
+| `@Req() req` / `@Res() res`                                 | `@Req() req` / `@Res() res`                                   | Escape hatch.                                                 |
+| `createParamDecorator((data, ctx) => …)`                    | `createParamDecorator(({ req, res }, data) => …)`             | Custom injectors; sync or async resolver.                     |
+| class-validator (`@IsString`, `@Length`, …)                 | Zod (`z.string().min().max()`)                                | Runtime types move to schemas.                                |
+| `class XDto` + `class-transformer`                          | `z.object({…}).meta({ id: 'X' })` + `z.infer`                 | `.meta({ id })` names the component.                          |
+| `@ApiProperty({ … })`                                       | **removed** — read from the Zod schema                        | The no-drift win; no CLI plugin needed.                       |
+| `@ApiResponse({ status, type })`                            | `@Returns(status, Schema)`                                    | Stackable, one per status.                                    |
+| `@HttpCode(201)` + `return body`                            | `@Returns(201, Schema)` + `return body`                       | First declared 2xx is the success status.                     |
+| `ValidationPipe({ whitelist: true })`                       | always strips unknown keys + validates                        | Whitelist behaviour is the default.                           |
+| `ClassSerializerInterceptor` / `@Exclude`/`@Expose`         | response parsed through `@Returns` schema                     | Output serialization is on by default.                        |
+| `@UseGuards(JwtGuard)` + `@ApiBearerAuth()`                 | `@Security('jwt', scopes)` + `bearer()` handler               | Scheme + spec from one place; principal via `@Principal()`.   |
+| Pipe (`ParseIntPipe`, custom transform)                     | `z.coerce.number()` / Zod transform in the schema             | Coercion lives in the schema.                                 |
+| Interceptor (logging, wrap, timing)                         | `@Use(middleware)` (class or method)                          | Express middleware; no rxjs.                                  |
+| Exception filter (`@Catch`, `HttpException`)                | `throw createError.NotFound()` + `covenixErrorHandler()`      | Express error pipeline.                                       |
+| `@UploadedFile()` (multer interceptor)                      | `z.file()` in `@Body` + `@File('f') f: File`                  | Auto-detected multipart; web-standard `File`.                 |
+| `StreamableFile` + `res.set(...)`                           | `@ReturnsFile(...)` + `FileResponse` / `RangeFileResponse`    | Disposition + range negotiation handled.                      |
+| `@Sse()` (`Observable<MessageEvent>`)                       | [`@Sse(schema?)`](/guide/server-sent-events) (async iterable) | Validated + documented as `text/event-stream`; no rxjs.       |
+| `@ApiOperation({ summary, operationId })`                   | `@Summary` / `@Description` / `@OperationId`                  | First-class decorators.                                       |
+| Module + DI container (`@Module`, `@Injectable`, providers) | `new C(deps)` + `api.register(c)`                             | No container — explicit construction. **(big change)**        |
+| Feature modules / `RouterModule` prefixes                   | `api.group('/v1', …)` / `register(c, { prefix })`             | See [Grouping & Versioning](/guide/versioning).               |
+| `SwaggerModule.createDocument(app, config)`                 | `api.swagger()` / `generateSwagger([...])`                    | Native, derived from Zod.                                     |
+| `SwaggerModule.setup('docs', app, doc)`                     | `api.serveDocs(app)`                                          | Browsable UI in one line.                                     |
+| `Test.createTestingModule({...})`                           | `new C(fakeDeps)`                                             | Construct it; that's the test fixture.                        |
 | Fastify adapter / WebSockets / microservices / GraphQL      | **not supported** (by design)                                 | Express HTTP only. See [Gaps](#gaps-what-covenix-doesn-t-do). |
 
 ## A controller, side by side
@@ -270,7 +270,7 @@ because class-validator decorators don't describe everything the spec needs —
 descriptions, examples, enums, formats. In covenix all of that is already on the
 Zod schema:
 
-| `@ApiProperty` option            | covenix / Zod                                         |
+| `@ApiProperty` option            | covenix / Zod                                       |
 | -------------------------------- | --------------------------------------------------- |
 | `description: '…'`               | `.describe('…')` or `.meta({ description })`        |
 | `example: …`                     | `.meta({ example })` / `@Example(value)`            |

@@ -94,7 +94,7 @@ The class-validator → Zod translations are the same as the
 
 ## At a glance
 
-| routing-controllers (+ openapi)                         | covenix                                                         | Notes                                               |
+| routing-controllers (+ openapi)                         | covenix                                                       | Notes                                               |
 | ------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------- |
 | `@JsonController('/users')` / `@Controller`             | `@Route('users')`                                             | Nearly identical (drop the leading slash).          |
 | `@Get('/:id')`, `@Post()`, …                            | `@Get('{id}')`, `@Post()`, …                                  | `:id` → `{id}`.                                     |
@@ -114,10 +114,10 @@ The class-validator → Zod translations are the same as the
 | `@UploadedFile()` / `@UploadedFiles()`                  | `z.file()` in `@Body` + `@File`/`@Files`                      | Auto-detected multipart; web-standard `File`.       |
 | return a stream / set headers for downloads             | `@ReturnsFile(...)` + `FileResponse`/`RangeFileResponse`      | Disposition + range negotiation handled.            |
 | (no built-in SSE)                                       | [`@Sse(schema?)`](/guide/server-sent-events)                  | Validated + documented `text/event-stream`.         |
-| `useContainer(Container)` (container owns construction) | `api.register(new C(deps))` — or register a resolved instance | Container-agnostic; you hand covenix the instance.    |
+| `useContainer(Container)` (container owns construction) | `api.register(new C(deps))` — or register a resolved instance | Container-agnostic; you hand covenix the instance.  |
 | `routingControllersToSpec(storage, options)`            | `api.swagger()` / `generateSwagger([...])`                    | Native, Zod-derived; no class-validator-jsonschema. |
 | `useExpressServer(app, { controllers })`                | `api.mount(app)`                                              | Wires routes + validation.                          |
-| Express **or Koa** driver                               | **Express only**                                              | covenix targets Express 5.                            |
+| Express **or Koa** driver                               | **Express only**                                              | covenix targets Express 5.                          |
 
 ## A controller, side by side
 
