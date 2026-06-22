@@ -56,7 +56,7 @@ const IdParams = z.object({ id: z.string().uuid() });
 @Tags('Users')
 export class UsersController {
   // Dependency injected explicitly by the caller in main.ts — no container.
-  constructor(private readonly users: UserService) { }
+  constructor(private readonly users: UserService) {}
 
   @Get()
   @Summary('List users (paginated)')
